@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aplicações Distribuídas · ASCN · meiUM</title>
+<meta name="description" content="ASCN · Tema 2: porquê distribuir, scale-up vs. scale-out, replicação, partição (sharding), SOA e microsserviços, e as arquiteturas cliente-servidor, proxy, manager-worker, grupo de servidores, bus e multi-camada.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var d=document.documentElement,g=function(k){return JSON.parse(localStorage.getItem('meium:'+k))},t=g('theme'),f=g('fontScale');if(t==='light'||t==='dark')d.dataset.theme=t;if(f)d.style.setProperty('--fs',f);if(g('showExtra')===false)d.classList.add('hide-extra')}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="ascn" data-topic="02" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 2.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="2.0" data-title="Visão geral" data-desc="Porquê distribuir e como.">
+  <header class="ph">
+    <h1>Aplicações Distribuídas<span class="en">Distributed Applications</span></h1>
+    <p class="lede">Porque é que uma aplicação se espalha por vários servidores, e de que formas o pode fazer. Duas perguntas: <strong>porquê distribuir?</strong> e <strong>como distribuir?</strong></p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.0.1</span>Porquê distribuir</h2>
+    <div class="three">
+      <div class="card c1"><span class="tag">Modularidade</span><p>Desacoplar componentes com preocupações diferentes: armazenamento, base de dados, servidor aplicacional, servidor web.</p></div>
+      <div class="card c2"><span class="tag">Desempenho e escalabilidade</span><p>Mais servidores a fazer o trabalho significa mais capacidade.</p></div>
+      <div class="card c3"><span class="tag">Disponibilidade e fiabilidade</span><p>O hardware e o software falham com frequência; com vários servidores, a falha de um não tem de parar o serviço.</p></div>
+    </div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <p class="src">Baseado nas aulas de ASCN (Distributed Applications). Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 2.1 MONÓLITO ============================ -->
+<article class="page" data-page="monolito" data-num="2.1" data-title="Do monólito à escala" data-desc="Scale-up, scale-out e redundância.">
+  <header class="ph">
+    <h1>Do sistema monolítico à escala<span class="en">Monolithic system · Challenges</span></h1>
+    <p class="lede">Num sistema <strong>monolítico</strong>, vários componentes (armazenamento, base de dados, servidor aplicacional) servem vários alvos (por exemplo, os dados de clientes diferentes) <strong>no mesmo servidor</strong>.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.1.1</span>Dois problemas</h2>
+    <div class="two">
+      <div class="card"><h3>E se o servidor não aguentar a carga dos clientes?</h3>
+        <ul><li><strong>Scale-up</strong> (escalar na vertical): aumentar os recursos do servidor — mais CPU, RAM, disco.</li>
+        <li><strong>Scale-out</strong> (escalar na horizontal): aumentar o <strong>número</strong> de servidores.</li></ul></div>
+      <div class="card"><h3>E se o servidor falhar?</h3>
+        <ul><li><strong>Redundância</strong>: ter servidores redundantes, prontos a assumir o trabalho.</li></ul></div>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Scale-up</th><th>Scale-out</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Como</strong></td><td>Uma máquina maior</td><td>Mais máquinas</td></tr>
+        <tr><td><strong>Limite</strong> <span class="xtag">complemento</span></td><td>O maior servidor que existe (e o custo cresce depressa)</td><td>Praticamente ilimitado, se a aplicação souber distribuir o trabalho</td></tr>
+        <tr><td><strong>Tolerância a falhas</strong></td><td>Não ajuda: continua a haver um só servidor</td><td>Pode ajudar, se houver redundância</td></tr>
+        <tr><td><strong>Exige mudar a aplicação?</strong> <span class="xtag">complemento</span></td><td>Normalmente não</td><td>Sim: é preciso decidir como repartir dados e trabalho</td></tr>
+      </tbody></table></div>
+  </section>
+</article>
+
+<!-- ============================ 2.2 PADRÕES ============================ -->
+<article class="page" data-page="padroes" data-num="2.2" data-title="Replicação, partição e SOA" data-desc="Os três mecanismos de distribuição.">
+  <header class="ph">
+    <h1>Replicação, partição e SOA<span class="en">Distribution patterns</span></h1>
+    <p class="lede">Os principais mecanismos de distribuição são três. <strong>Todos servem o scale-out</strong>; só a replicação dá também <strong>redundância</strong>. Não são exclusivos: combinam-se.</p>
+  </header>
+
+  <section class="blk prose">
+    <p>Exemplo: uma aplicação com três camadas (armazenamento, base de dados, servidor aplicacional) que guarda os dados de três clientes, A, B e C.</p>
+
+    <h2><span class="sn">2.2.1</span>Replicação</h2>
+    <p><strong>Várias cópias</strong> dos mesmos dados e/ou da mesma funcionalidade, mantidas sincronizadas.</p>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Servidor 1</th><th>Servidor 2</th></tr></thead>
+      <tbody><tr><td>Armazenamento, BD, aplicação</td><td>A, B, C</td><td>A, B, C</td></tr></tbody></table></div>
+    <ul>
+      <li><strong>Fiabilidade</strong>: se o servidor 1 falhar, o servidor 2 faz o seu trabalho.</li>
+      <li><strong>Scale-out</strong>: os pedidos de <em>leitura</em> repartem-se pelos dois.</li>
+    </ul>
+
+    <h2><span class="sn">2.2.2</span>Partição (sharding)</h2>
+    <p>O servidor é dividido <strong>na horizontal</strong>: cada servidor fica com uma parte dos dados e/ou da computação.</p>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Servidor 1</th><th>Servidor 2</th><th>Servidor 3</th></tr></thead>
+      <tbody><tr><td>Armazenamento, BD, aplicação</td><td>A</td><td>B</td><td>C</td></tr></tbody></table></div>
+    <ul><li><strong>Scale-out</strong>: o servidor 1 trata dos dados e pedidos do cliente A, o 2 do B, e assim por diante. Não há redundância: se o servidor 2 falhar, os dados de B ficam indisponíveis.</li></ul>
+
+    <h2><span class="sn">2.2.3</span>Arquitetura orientada a serviços (SOA)</h2>
+    <p>O servidor é dividido <strong>na vertical</strong> (por exemplo, em microsserviços): cada servidor fica com uma funcionalidade, para todos os dados.</p>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Servidor 1</th><th>Servidor 2</th><th>Servidor 3</th></tr></thead>
+      <tbody><tr><td>Funcionalidade</td><td>Armazenamento</td><td>Base de dados</td><td>Aplicação</td></tr><tr><td>Dados</td><td>A, B, C</td><td>A, B, C</td><td>A, B, C</td></tr></tbody></table></div>
+    <ul><li><strong>Scale-out e modularidade</strong>: cada serviço pode ser desenvolvido, instalado e escalado à parte.</li></ul>
+
+    <div class="tw"><table>
+      <thead><tr><th>Mecanismo</th><th>Divide…</th><th>Scale-out</th><th>Redundância</th><th>Modularidade</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Replicação</strong></td><td>Nada — copia tudo</td><td>✓ (leituras)</td><td>✓</td><td>—</td></tr>
+        <tr><td><strong>Partição</strong></td><td>Os dados/pedidos (horizontal)</td><td>✓</td><td>—</td><td>—</td></tr>
+        <tr><td><strong>SOA</strong></td><td>As funcionalidades (vertical)</td><td>✓</td><td>—</td><td>✓</td></tr>
+      </tbody></table></div>
+    <div class="note"><span class="lbl">Combinar</span>
+      <p>O caso típico: <strong>particionar</strong> os dados por vários servidores para escalar e <strong>replicar</strong> cada partição para tolerar falhas.</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 2.3 MICROSSERVIÇOS ============================ -->
+<article class="page" data-page="micro" data-num="2.3" data-title="Microsserviços" data-desc="Vantagens e dificuldades de partir a aplicação.">
+  <header class="ph">
+    <h1>Do monólito aos microsserviços<span class="en">Monolithic to Microservices</span></h1>
+    <p class="lede">Numa arquitetura de <strong>microsserviços</strong>, a aplicação é partida em serviços pequenos, cada um com uma funcionalidade específica, que comunicam entre si pela rede.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="two">
+      <div class="card c1"><span class="tag">Vantagem</span><p>Cada serviço implementa uma funcionalidade específica e <strong>escala de forma independente</strong>: se o serviço de pagamentos estiver sobrecarregado, acrescentam-se instâncias só desse.</p></div>
+      <div class="card c2"><span class="tag">Dificuldades</span>
+        <ul>
+          <li><strong>Decomposição</strong>: quão "micro" é micro? Devo partir mais as funcionalidades?</li>
+          <li><strong>Consistência</strong>: como garantir que os dados estão consistentes entre todos os serviços?</li>
+          <li><strong>Deployment e testes complexos</strong>: muitos serviços, muitas versões, muitas interações.</li>
+        </ul></div>
+    </div>
+    <div class="note extra"><span class="lbl">Complemento · porque é que o DevOps importa aqui</span>
+      <p>Com dezenas de serviços, instalar e configurar à mão é impraticável. Os microsserviços só são viáveis com a automação do tema 1 e do tema 3.</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 2.4 ARQUITETURAS ============================ -->
+<article class="page" data-page="arquiteturas" data-num="2.4" data-title="Arquiteturas distribuídas" data-desc="Cliente-servidor, proxy, manager-worker, grupo, bus, multi-camada.">
+  <header class="ph">
+    <h1>Arquiteturas distribuídas<span class="en">Distributed architectures</span></h1>
+    <p class="lede">Os mecanismos anteriores dizem <em>o que</em> se distribui; as arquiteturas dizem <em>como</em> os componentes se organizam e comunicam para o permitir.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="widget" data-widget="arch"></div>
+
+    <h2><span class="sn">2.4.1</span>Cliente-servidor</h2>
+    <ul>
+      <li>A funcionalidade e os dados estão no <strong>servidor</strong>.</li>
+      <li>Um <strong>stub</strong> corre embutido no cliente: dá uma API para interagir com o servidor e esconde os detalhes do protocolo. Faz parte do pacote de software do servidor.</li>
+      <li>Exemplo: a Web, em que o protocolo é HTTP.</li>
+      <li>Com um só servidor, não há escalabilidade nem fiabilidade.</li>
+    </ul>
+
+    <h2><span class="sn">2.4.2</span>Proxy-servidor</h2>
+    <ul>
+      <li>O <strong>proxy</strong> abstrai a interação com vários servidores: bom para replicação e/ou sharding <strong>transparentes</strong>.</li>
+      <li>O proxy pode ser um gargalo de escalabilidade e disponibilidade: <strong>ponto único de contenção e de falha</strong>.</li>
+      <li>Exemplo: MongoDB.</li>
+    </ul>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Stub</th><th>Proxy</th></tr></thead>
+      <tbody>
+        <tr><td>Onde está</td><td>No cliente</td><td>Entre o cliente e os servidores, por baixo do protocolo</td></tr>
+        <tr><td>O que torna transparente</td><td>O <strong>protocolo</strong></td><td>Os <strong>servidores</strong> (quantos são, onde estão os dados)</td></tr>
+      </tbody></table></div>
+    <p class="small muted">Os dois podem combinar-se: o cliente usa um stub para falar com o proxy.</p>
+
+    <h2><span class="sn">2.4.3</span>Manager-worker</h2>
+    <ul>
+      <li>A funcionalidade divide-se entre um <strong>manager</strong> (trata da localização dos ficheiros: os <strong>metadados</strong>) e vários <strong>workers</strong> (tratam do conteúdo: os <strong>dados</strong>).</li>
+      <li>Os dados podem ser replicados e/ou particionados pelos workers.</li>
+      <li>Escala melhor, porque divide a funcionalidade — mas o manager continua a poder ser um ponto único de contenção e de falha.</li>
+      <li>Comum em sistemas de armazenamento: HDFS, Lustre…</li>
+    </ul>
+
+    <h2><span class="sn">2.4.4</span>Grupo de servidores</h2>
+    <ul>
+      <li><strong>Todos</strong> os servidores podem atender e processar pedidos: a falha de um não compromete dados nem funcionalidade.</li>
+      <li>Um <strong>protocolo de sincronização</strong> garante a replicação e consistência do estado entre servidores — exige coordenação.</li>
+      <li><strong>Sem pontos únicos de falha</strong>, mas a coordenação torna mais difícil escalar.</li>
+      <li>Exemplo: ZooKeeper.</li>
+    </ul>
+
+    <h2><span class="sn">2.4.5</span>Bus</h2>
+    <ul>
+      <li>O <strong>bus</strong> encaminha mensagens: os participantes publicam e consomem mensagens usando um protocolo.</li>
+      <li><strong>Desacopla produtores de consumidores</strong> → mais flexibilidade: um cliente pode consumir umas mensagens e produzir outras, e é fácil acrescentar novos participantes.</li>
+      <li>Exemplo: Apache Kafka.</li>
+    </ul>
+
+    <h2><span class="sn">2.4.6</span>Multi-camada (multi-tier)</h2>
+    <ul>
+      <li>Cada servidor atua como <strong>cliente da camada seguinte</strong>: cliente-servidor encadeado.</li>
+      <li>Permite instalar e escalar <strong>de forma independente</strong> cada funcionalidade.</li>
+      <li>Exemplo: o protocolo A é a Web; o "stub B" é o driver da base de dados; o protocolo B é SQL.</li>
+    </ul>
+
+    <div class="tw"><table>
+      <thead><tr><th>Arquitetura</th><th>Ideia</th><th>Ponto único de falha</th><th>Exemplo</th></tr></thead>
+      <tbody>
+        <tr><td>Cliente-servidor</td><td>Stub no cliente, tudo no servidor</td><td>O servidor</td><td>Web</td></tr>
+        <tr><td>Proxy-servidor</td><td>Proxy esconde vários servidores</td><td>O proxy</td><td>MongoDB</td></tr>
+        <tr><td>Manager-worker</td><td>Metadados no manager, dados nos workers</td><td>O manager</td><td>HDFS, Lustre</td></tr>
+        <tr><td>Grupo de servidores</td><td>Todos atendem, estado sincronizado</td><td>Nenhum</td><td>ZooKeeper</td></tr>
+        <tr><td>Bus</td><td>Publicar/consumir mensagens</td><td>O bus (se centralizado)</td><td>Kafka</td></tr>
+        <tr><td>Multi-camada</td><td>Cada camada é cliente da seguinte</td><td>Camadas com um só servidor</td><td>Web + app + BD</td></tr>
+      </tbody></table></div>
+  </section>
+</article>
+
+<!-- ============================ 2.5 ESTADO ============================ -->
+<article class="page" data-page="estado" data-num="2.5" data-title="Estado e combinações" data-desc="Onde fica o estado e como se juntam as peças.">
+  <header class="ph">
+    <h1>Estado em multi-camada e combinações<span class="en">State in multi-tier · Final remarks</span></h1>
+    <p class="lede">Numa aplicação multi-camada, o <strong>estado</strong> (os dados que têm de sobreviver entre pedidos) não está espalhado por igual.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="tw"><table>
+      <thead><tr><th>Camada</th><th>Estado típico</th></tr></thead>
+      <tbody>
+        <tr><td>Superior: servidor web</td><td><strong>Sem estado</strong> (stateless) — só computação</td></tr>
+        <tr><td>Intermédia: servidor aplicacional</td><td>Estado <strong>transitório</strong> ou em cache</td></tr>
+        <tr><td>Inferior: base de dados</td><td>Estado <strong>persistente</strong></td></tr>
+      </tbody></table></div>
+    <p class="small muted">É o caso típico, não uma regra.</p>
+    <details class="ans"><summary>Que camadas é preciso considerar para garantir disponibilidade?</summary>
+      <div><p><strong>Todas.</strong> Se qualquer camada tiver um só servidor, a sua falha para a aplicação inteira. Mas o esforço é diferente: nas camadas sem estado basta pôr mais instâncias; na camada com estado persistente é preciso replicar os dados.</p></div></details>
+    <details class="ans"><summary>Porque é que a computação é mais fácil de replicar e particionar do que o estado persistente?</summary>
+      <div><p>Um servidor sem estado é <strong>intercambiável</strong>: qualquer réplica pode atender qualquer pedido, e não há nada a sincronizar entre réplicas. Com estado persistente, cada escrita tem de chegar a todas as réplicas (ou à partição certa) e é preciso garantir que todas ficam <strong>consistentes</strong> — exatamente a coordenação que torna o grupo de servidores difícil de escalar.</p></div></details>
+
+    <h2><span class="sn">2.5.1</span>Combinar tudo</h2>
+    <p>Os padrões, mecanismos e arquiteturas combinam-se para cumprir requisitos de desempenho, escala e fiabilidade:</p>
+    <ul>
+      <li>Os dados são <strong>particionados</strong> por vários servidores para escalar, e cada partição é <strong>replicada</strong> para tolerar falhas.</li>
+      <li>Os componentes proxy e manager podem seguir eles próprios uma arquitetura de <strong>grupo de servidores</strong>, para deixarem de ser pontos únicos de falha e de contenção.</li>
+      <li>Cada camada de uma aplicação multi-camada pode seguir a sua própria arquitetura e os seus próprios mecanismos de distribuição.</li>
+    </ul>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo e perguntas para testar.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Conceito</th><th>Ideia-chave</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Scale-up / scale-out</strong></td><td>Servidor maior / mais servidores.</td></tr>
+        <tr><td><strong>Replicação</strong></td><td>Cópias iguais: redundância + leituras distribuídas.</td></tr>
+        <tr><td><strong>Partição (sharding)</strong></td><td>Divisão horizontal dos dados/pedidos: escala, sem redundância.</td></tr>
+        <tr><td><strong>SOA / microsserviços</strong></td><td>Divisão vertical por funcionalidade: escala e modularidade; difícil de decompor, manter consistente e testar.</td></tr>
+        <tr><td><strong>Stub vs. proxy</strong></td><td>Stub esconde o protocolo (no cliente); proxy esconde os servidores (no meio).</td></tr>
+        <tr><td><strong>Manager-worker</strong></td><td>Metadados no manager, dados nos workers (HDFS).</td></tr>
+        <tr><td><strong>Grupo de servidores</strong></td><td>Sem ponto único de falha; coordenação limita a escala (ZooKeeper).</td></tr>
+        <tr><td><strong>Bus</strong></td><td>Publicar/consumir; desacopla produtores e consumidores (Kafka).</td></tr>
+        <tr><td><strong>Multi-camada</strong></td><td>Cliente-servidor encadeado; estado sobretudo nas camadas de baixo.</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.2</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">Qual dos mecanismos dá também redundância (tolerância a falhas)?</p>
+        <div class="opts"><button data-ok>Replicação</button><button>Partição</button><button>SOA</button></div>
+        <p class="why">Só a replicação mantém várias cópias: se um servidor falhar, outro tem os mesmos dados.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Dividir os clientes A–M para o servidor 1 e N–Z para o servidor 2 é…</p>
+        <div class="opts"><button>Replicação</button><button data-ok>Partição (sharding)</button><button>SOA</button></div>
+        <p class="why">Divisão horizontal dos dados: cada servidor tem uma parte.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual é a diferença entre um stub e um proxy?</p>
+        <div class="opts"><button>São a mesma coisa</button><button data-ok>O stub esconde o protocolo ao cliente; o proxy esconde os servidores que estão por trás</button><button>O stub corre no servidor; o proxy no cliente</button></div>
+        <p class="why">O stub está no cliente e dá uma API; o proxy fica no meio e torna transparente a replicação/sharding.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Num sistema manager-worker como o HDFS, o manager guarda…</p>
+        <div class="opts"><button>O conteúdo dos ficheiros</button><button data-ok>Os metadados: onde está cada ficheiro</button><button>Uma cópia de todos os dados</button></div>
+        <p class="why">Os workers guardam os dados; o manager sabe onde estão. Por isso pode ser um ponto único de falha.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual arquitetura não tem ponto único de falha, mas escala com mais dificuldade?</p>
+        <div class="opts"><button>Proxy-servidor</button><button data-ok>Grupo de servidores</button><button>Cliente-servidor</button></div>
+        <p class="why">Todos os servidores atendem, mas o protocolo de sincronização exige coordenação entre todos.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Porque é que é mais fácil replicar um servidor web do que uma base de dados?</p>
+        <div class="opts"><button>Porque o servidor web usa menos CPU</button><button data-ok>Porque o servidor web não tem estado persistente para manter consistente</button><button>Porque as bases de dados não podem ser replicadas</button></div>
+        <p class="why">Réplicas sem estado são intercambiáveis; com estado, cada escrita tem de ser sincronizada.</p>
+      </div>
+    </div>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/i18n.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Provisionamento de Sistemas · ASCN · meiUM</title>
+<meta name="description" content="ASCN · Tema 3: provisionamento e deployment, gestão de configuração, ferramentas (Ansible, Chef, Puppet, SaltStack), inventário, playbooks, roles, idempotência, handlers, condições, ciclos, facts e Vault.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var d=document.documentElement,g=function(k){return JSON.parse(localStorage.getItem('meium:'+k))},t=g('theme'),f=g('fontScale');if(t==='light'||t==='dark')d.dataset.theme=t;if(f)d.style.setProperty('--fs',f);if(g('showExtra')===false)d.classList.add('hide-extra')}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="ascn" data-topic="03" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 3.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="3.0" data-title="Visão geral" data-desc="Automatizar a instalação e configuração de muitas máquinas.">
+  <header class="ph">
+    <h1>Provisionamento de Sistemas<span class="en">System Provisioning</span></h1>
+    <p class="lede">Como passar da infraestrutura como código (tema 1) à prática: descrever a configuração de dezenas de máquinas em ficheiros versionados e aplicá-la com uma ferramenta — aqui, o <strong>Ansible</strong>.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.0.1</span>O fluxo de trabalho</h2>
+    <p>Na máquina de quem administra estão as receitas, guardadas num repositório (ex.: Git). A ferramenta envia-as por <strong>SSH/SCP</strong> para cada servidor — web, email, base de dados — e aplica-as.</p>
+    <ol class="pipeline">
+      <li>Escrever receitas</li><li>Versionar (Git)</li><li>Aplicar por SSH</li><li>Servidores configurados</li>
+    </ol>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <p class="src">Baseado nas aulas de ASCN (System Provisioning). Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 3.1 CONCEITOS ============================ -->
+<article class="page" data-page="conceitos" data-num="3.1" data-title="Provisionamento e deployment" data-desc="Definições e porque automatizar.">
+  <header class="ph">
+    <h1>Provisionamento e deployment<span class="en">Provisioning · Deployment</span></h1>
+    <p class="lede">Dois termos próximos, com âmbitos diferentes.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="two">
+      <div class="card c1"><span class="tag">Provisionamento</span>
+        <p>A ação de <strong>fornecer algo para ser usado</strong>.</p>
+        <p class="small">Provisionamento de servidores, de armazenamento, de rede, de VMs, de utilizadores.</p></div>
+      <div class="card c2"><span class="tag">Deployment</span>
+        <p>O processo de <strong>instalar ou atualizar uma aplicação/serviço</strong> num servidor.</p>
+        <p class="small">Instalar ou atualizar uma aplicação web; instalar um serviço de rede. O âmbito é o serviço ou a aplicação.</p></div>
+    </div>
+
+    <h2><span class="sn">3.1.1</span>Porque automatizar</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Característica</th><th>Consequência</th></tr></thead>
+      <tbody>
+        <tr><td>Aborrecido (depois da primeira vez), repetitivo e demorado</td><td>Ótimo alvo para <strong>automação</strong>: a máquina faz, tu vais fazer outra coisa.</td></tr>
+        <tr><td>Pode abranger vários sistemas heterogéneos (hardware diferente…)</td><td>Manter um <strong>inventário</strong> dos sistemas e correr as tarefas nos vários hosts, em sequência ou em paralelo.</td></tr>
+        <tr><td>Vai precisar de ajustes com o tempo</td><td>É preciso uma estratégia de <strong>gestão de configuração</strong>.</td></tr>
+      </tbody></table></div>
+  </section>
+</article>
+
+<!-- ============================ 3.2 GESTÃO DE CONFIGURAÇÃO ============================ -->
+<article class="page" data-page="gestao" data-num="3.2" data-title="Gestão de configuração" data-desc="Receitas, controlo de versões e ferramentas.">
+  <header class="ph">
+    <h1>Gestão de configuração<span class="en">Configuration Management</span></h1>
+    <p class="lede">Uma forma de lidar com alterações sistemáticas a um sistema <strong>mantendo a sua integridade</strong> ao longo de todo o ciclo de vida.</p>
+  </header>
+
+  <section class="blk prose">
+    <ul>
+      <li>Exprimir a configuração num <strong>dialeto comum</strong>: cada unidade de trabalho é uma <strong>receita</strong>. Bónus: a infraestrutura fica documentada.</li>
+      <li>Combinar com um <strong>sistema de controlo de versões</strong> (ex.: Git): a configuração evolui com a infraestrutura e fica o histórico completo das alterações.</li>
+    </ul>
+
+    <h2><span class="sn">3.2.1</span>Receitas</h2>
+    <p>Uma receita define a automação de uma tarefa através de diretivas numa dada linguagem. A forma mais simples é um script de shell:</p>
+    <pre data-title="Receita em shell: criar um utilizador com acesso por chave SSH"><code class="language-bash">#!/bin/sh
+username=deployer
+apt-get -y update
+apt-get -y upgrade
+apt-get -y install vim-nox openntpd sudo whois aptitude
+useradd -G sudo -p "password" -s /bin/bash -m $username
+mkdir -p /home/$username/.ssh
+chmod 700 /home/$username/.ssh
+chown $username: /home/$username/.ssh
+echo "public_key" >> /home/$username/.ssh/authorized_keys
+chmod 600 /home/$username/.ssh/authorized_keys
+chown $username: /home/$username/.ssh/authorized_keys</code></pre>
+    <div class="note warn"><span class="lbl">O problema do script</span>
+      <p>Corrido uma segunda vez, o <code>useradd</code> falha (o utilizador já existe) e o <code>echo &gt;&gt;</code> acrescenta a chave outra vez. Um script descreve <strong>passos</strong>, não um <strong>estado</strong>. As ferramentas de gestão de configuração resolvem isto com a idempotência (3.3).</p>
+    </div>
+
+    <h2><span class="sn">3.2.2</span>As ferramentas</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Ferramenta</th><th>Linguagem</th><th>Agente</th><th>Sem agente</th><th>SSH</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Ansible</strong></td><td>YAML</td><td>Não</td><td>Sim</td><td>Sim</td></tr>
+        <tr><td><strong>Chef</strong></td><td>Ruby</td><td>Sim</td><td>Suportado</td><td>Sim</td></tr>
+        <tr><td><strong>Puppet</strong></td><td>Linguagem declarativa própria</td><td>Sim</td><td>Suportado</td><td>Sim</td></tr>
+        <tr><td><strong>SaltStack</strong></td><td>YAML</td><td>Sim</td><td>Suportado</td><td>Sim</td></tr>
+      </tbody></table></div>
+    <div class="note"><span class="lbl">Agente vs. sem agente</span>
+      <p>Com <strong>agente</strong>, cada servidor gerido corre um programa da ferramenta, que recebe ou vai buscar a configuração. <strong>Sem agente</strong> (o caso do Ansible), basta que o servidor aceite ligações SSH e tenha Python: não há nada para instalar nem manter nos hosts.</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 3.3 ANSIBLE ============================ -->
+<article class="page" data-page="ansible" data-num="3.3" data-title="Ansible: conceitos" data-desc="Vocabulário, funcionamento e idempotência.">
+  <header class="ph">
+    <h1>Ansible<span class="en">Ansible</span></h1>
+    <p class="lede">O <strong>Ansible</strong> é uma ferramenta de automação open-source usada para gestão de configuração, deployment de aplicações, orquestração de serviços e provisionamento.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.3.1</span>Vocabulário</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Termo</th><th>O que é</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Inventário</strong></td><td>Os alvos do deployment (hosts), agrupados.</td></tr>
+        <tr><td><strong>Módulo</strong></td><td>Unidade de trabalho reutilizável, distribuída com o Ansible ou desenvolvida para ele (<code>apt</code>, <code>user</code>, <code>copy</code>, <code>service</code>…).</td></tr>
+        <tr><td><strong>Tarefa</strong></td><td>Um módulo com argumentos, que cria uma ação ("instalar o nginx").</td></tr>
+        <tr><td><strong>Handler</strong></td><td>Tarefa especial que só corre quando é <strong>notificada</strong> (ex.: reiniciar um serviço quando a configuração muda).</td></tr>
+        <tr><td><strong>Template</strong></td><td>Ficheiro de configuração dinâmico, escrito em Jinja2 (o motor de templates do Python).</td></tr>
+        <tr><td><strong>Role</strong></td><td>Componente reutilizável que agrupa variáveis, templates, tarefas, handlers… (configurável).</td></tr>
+        <tr><td><strong>Playbook</strong></td><td>Descreve as políticas a impor nos sistemas remotos: um conjunto de roles e/ou tarefas aplicadas a grupos de hosts.</td></tr>
+      </tbody></table></div>
+
+    <h2><span class="sn">3.3.2</span>Como funciona</h2>
+    <ol class="steps-list">
+      <li><div>O Ansible é operado a partir de um <strong>nó de gestão</strong> (management node), onde se escrevem e executam os playbooks.</div></li>
+      <li><div>A lista de hosts geridos está no <strong>ficheiro de inventário</strong>, organizada em grupos.</div></li>
+      <li><div>O Ansible liga-se aos hosts remotos por <strong>SSH</strong> e executa as roles/tarefas definidas no playbook.</div></li>
+      <li><div>As tarefas só fazem alterações se o estado do alvo for <strong>diferente do esperado</strong> — <strong>idempotência</strong>.</div></li>
+    </ol>
+    <p>As receitas escrevem-se em <strong>YAML</strong>, com módulos e tarefas, organizadas em roles e playbooks.</p>
+    <div class="widget" data-widget="idempotency"></div>
+    <div class="note"><span class="lbl">Porque é que a idempotência importa</span>
+      <p>Pode-se correr o mesmo playbook sempre que se quiser: num servidor novo configura tudo; num servidor já configurado não muda nada; num servidor que divergiu, corrige só o que divergiu. É isto que combate o configuration drift do tema 1.</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 3.4 INVENTÁRIO E PLAYBOOKS ============================ -->
+<article class="page" data-page="playbooks" data-num="3.4" data-title="Inventário e playbooks" data-desc="Escrever, organizar e executar.">
+  <header class="ph">
+    <h1>Inventário e playbooks<span class="en">Inventory · Playbooks · Execution</span></h1>
+    <p class="lede">Os três ficheiros que se escrevem sempre: o inventário (onde), o playbook (o quê) e, opcionalmente, o <code>ansible.cfg</code> (como ligar).</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.4.1</span>Inventário</h2>
+    <pre data-title="hosts.inv"><code class="language-text">[webservers]
+host-[01:99].example.com
+
+[database]
+db-01.example.com
+staging.example.com</code></pre>
+    <p>Os grupos entre parênteses retos podem ser usados como alvo dos playbooks. <code>host-[01:99]</code> é uma abreviatura para 99 hosts.</p>
+
+    <h2><span class="sn">3.4.2</span>Um playbook simples</h2>
+    <p>O mesmo que o script de shell de 3.2 — criar um utilizador e autorizar a sua chave SSH — mas declarado como estado desejado:</p>
+    <pre data-title="provision.yml"><code class="language-yaml">- hosts: all
+  vars:
+    username: someuser
+    shell: /bin/bash
+  tasks:
+    - name: create unprivileged user
+      user:                                  # módulo
+        name: "{{ username }}"
+        password: "secretpasswordhash"
+        shell: "{{ shell }}"
+
+    - name: set SSH authorized key
+      authorized_key:                        # módulo
+        user: "{{ username }}"
+        state: present
+        key: "{{ lookup('file', '/home/' + username + '/.ssh/id_rsa.pub') }}"</code></pre>
+    <ul>
+      <li><code>hosts</code>: a que hosts (ou grupos do inventário) se aplica.</li>
+      <li><code>vars</code>: variáveis, usadas com <code>{{ … }}</code> (Jinja2).</li>
+      <li>Cada tarefa tem um <code>name</code> e um <strong>módulo</strong> com os seus argumentos.</li>
+      <li><code>state: present</code> descreve o estado final, não a ação: se a chave já lá está, nada acontece.</li>
+    </ul>
+
+    <h2><span class="sn">3.4.3</span>Estrutura com roles</h2>
+    <div class="two">
+      <pre data-title="Organização"><code class="language-text">hosts.inv
+provision.yml
+roles/
+ └─ role/
+    ├─ files/      ficheiros estáticos
+    ├─ templates/  templates Jinja2
+    ├─ tasks/      main.yml: as tarefas
+    ├─ handlers/   main.yml: handlers
+    ├─ vars/       main.yml: variáveis da role
+    └─ …           defaults, meta…</code></pre>
+      <pre data-title="provision.yml"><code class="language-yaml">- hosts: webservers
+  roles:
+    - config
+    - users
+    - ssh-server
+    - ntp-client</code></pre>
+    </div>
+    <p>Cada role é reutilizável entre projetos. Há exemplos no repositório oficial <code>ansible/ansible-examples</code>.</p>
+
+    <h2><span class="sn">3.4.4</span>Executar</h2>
+    <pre data-title="Sem ansible.cfg"><code class="language-bash">ansible-playbook playbook.yml -b -i hosts.inv -u someuser -K --private-key=/path/to/private_key</code></pre>
+    <div class="tw"><table>
+      <thead><tr><th>Opção</th><th>Significado</th></tr></thead>
+      <tbody>
+        <tr><td><code>-b</code></td><td><em>become</em>: elevar privilégios com <code>sudo</code></td></tr>
+        <tr><td><code>-i</code></td><td>ficheiro de inventário a usar</td></tr>
+        <tr><td><code>-u</code></td><td>utilizador com que se faz login</td></tr>
+        <tr><td><code>-K</code></td><td>pedir a password de <code>sudo</code></td></tr>
+      </tbody></table></div>
+    <p>Com um <code>ansible.cfg</code> na pasta do projeto, as opções repetidas passam para lá e o comando encurta para <code>ansible-playbook playbook.yml -b -K</code>:</p>
+    <pre data-title="ansible.cfg"><code class="language-text">[defaults]
+inventory = hosts.inv
+remote_user = someusername
+private_key_file = /path/to/someuser_private_key</code></pre>
+    <p class="small muted">Em versões antigas do Ansible a primeira chave chamava-se <code>hostfile</code>; hoje é <code>inventory</code>.</p>
+  </section>
+</article>
+
+<!-- ============================ 3.5 MAIS LONGE ============================ -->
+<article class="page" data-page="avancado" data-num="3.5" data-title="Handlers, condições e mais" data-desc="Handlers, when, loops, facts, Vault e cloud.">
+  <header class="ph">
+    <h1>Subir de nível<span class="en">Level up</span></h1>
+    <p class="lede">As construções que tornam os playbooks dinâmicos, seguros e capazes de criar a própria infraestrutura.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.5.1</span>Handlers</h2>
+    <p>Uma tarefa pode <strong>notificar</strong> um handler; o handler só corre se a tarefa tiver feito alterações (e uma só vez, no fim).</p>
+    <pre><code class="language-yaml">tasks:
+  - name: template configuration file
+    template:
+      src: template.j2
+      dest: /etc/nginx/nginx.conf
+    notify:
+      - restart nginx
+
+handlers:
+  - name: restart nginx
+    service:
+      name: nginx
+      state: restarted</code></pre>
+
+    <h2><span class="sn">3.5.2</span>Condições</h2>
+    <pre><code class="language-yaml">- name: Common Debian
+  include_tasks: debian.yml
+  when: ansible_os_family == "Debian"
+
+- name: Common RedHat
+  include_tasks: rh.yml
+  when: ansible_os_family == "RedHat"</code></pre>
+    <p>Outras formas: uma lista de condições (todas têm de se verificar), <code>when: a or b</code>, <code>when: somevar is defined</code>, <code>when: somevar is failed</code>.</p>
+
+    <h2><span class="sn">3.5.3</span>Ciclos</h2>
+    <pre><code class="language-yaml">- name: Install packages
+  apt:
+    name: "{{ item }}"
+    update_cache: yes
+    state: latest
+  loop:
+    - vim-nox
+    - aptitude            # ou: loop: "{{ list_variable_with_packages }}"
+
+- name: Copy files
+  copy:
+    src: "{{ item.source }}"
+    dest: "{{ item.destination }}"
+  loop:
+    - { source: 'motd', destination: '/etc/motd' }
+    - { source: 'sshd', destination: '/etc/ssh/sshd_config' }</code></pre>
+
+    <h2><span class="sn">3.5.4</span>Facts</h2>
+    <p>Antes de correr as tarefas, o Ansible recolhe <strong>facts</strong> sobre cada host (distribuição, família do SO, número de CPUs, endereços IP…). Podem usar-se em tarefas e templates:</p>
+    <pre data-title="template.j2"><code class="language-text">{% for host in groups['webservers'] %}
+  {{ hostvars[host]['ansible_all_ipv4_addresses'] | join }}
+{% endfor %}
+
+{{ ansible_distribution }}  {{ ansible_os_family }}  {{ ansible_processor_vcpus }}</code></pre>
+    <p class="small muted">Exemplo típico: gerar a configuração de um balanceador de carga com os IPs de todos os servidores web.</p>
+
+    <h2><span class="sn">3.5.5</span>Vault</h2>
+    <p>O <strong>Ansible Vault</strong> guarda dados sensíveis — passwords, chaves — em ficheiros <strong>cifrados</strong>, em vez de os deixar em claro nos playbooks ou roles (que vão para o Git).</p>
+    <pre><code class="language-bash">ansible-vault create secrets.yml           # cria um ficheiro cifrado
+ansible-playbook site.yml --ask-vault-pass # pede a password para o decifrar</code></pre>
+
+    <h2><span class="sn">3.5.6</span>Provisionar a própria infraestrutura na cloud</h2>
+    <p>O Ansible também cria recursos, não só os configura. Na Google Cloud Platform há módulos como <code>gcp_compute_disk</code>, <code>gcp_compute_network</code>, <code>gcp_compute_address</code>, <code>gcp_compute_firewall</code>, <code>gcp_compute_instance</code> e <code>gcp_container_cluster</code> (VMs, redes, Kubernetes…).</p>
+    <div class="note"><span class="lbl">Inventário dinâmico</span>
+      <p>Quando as máquinas são criadas dinamicamente, os seus endereços não se conhecem de antemão. Duas soluções: <strong>manual</strong> (ir à consola ver os endereços e escrevê-los no inventário) ou <strong>automática</strong>, com um <strong>inventário dinâmico</strong> que pergunta ao fornecedor de cloud que máquinas existem.</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo e perguntas para testar.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Conceito</th><th>Ideia-chave</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Provisionamento / deployment</strong></td><td>Fornecer recursos / instalar ou atualizar uma aplicação.</td></tr>
+        <tr><td><strong>Gestão de configuração</strong></td><td>Receitas num dialeto comum + controlo de versões.</td></tr>
+        <tr><td><strong>Ansible</strong></td><td>YAML, sem agente, por SSH, a partir de um nó de gestão.</td></tr>
+        <tr><td><strong>Inventário</strong></td><td>Hosts agrupados; pode ser dinâmico.</td></tr>
+        <tr><td><strong>Módulo → tarefa → role → playbook</strong></td><td>Unidade de trabalho → ação → componente reutilizável → política aplicada a hosts.</td></tr>
+        <tr><td><strong>Idempotência</strong></td><td>Só muda o que difere do estado desejado; correr de novo é seguro.</td></tr>
+        <tr><td><strong>Handler</strong></td><td>Corre só quando notificado por uma tarefa que mudou algo.</td></tr>
+        <tr><td><strong>when / loop / facts</strong></td><td>Condições, ciclos e informação recolhida dos hosts.</td></tr>
+        <tr><td><strong>Vault</strong></td><td>Segredos cifrados nos ficheiros do projeto.</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.2</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">O que significa que o Ansible é "sem agente"?</p>
+        <div class="opts"><button>Não precisa de nó de gestão</button><button data-ok>Os hosts geridos não precisam de correr nenhum programa do Ansible; basta SSH</button><button>Não usa SSH</button></div>
+        <p class="why">Chef, Puppet e SaltStack usam normalmente um agente em cada host; o Ansible liga-se por SSH.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Corre-se o mesmo playbook duas vezes seguidas num servidor. Na segunda execução…</p>
+        <div class="opts"><button>Tudo é reinstalado</button><button data-ok>As tarefas ficam "ok" e não fazem alterações, porque o estado já é o desejado</button><button>O Ansible dá erro</button></div>
+        <p class="why">Idempotência: as tarefas só agem quando o estado atual difere do esperado.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Quando corre um handler?</p>
+        <div class="opts"><button>Sempre, no início do playbook</button><button data-ok>Quando é notificado por uma tarefa que fez alterações</button><button>Só quando há um erro</button></div>
+        <p class="why">Ex.: reiniciar o nginx só se o ficheiro de configuração tiver mudado.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">O que faz a opção <code>-b</code> do <code>ansible-playbook</code>?</p>
+        <div class="opts"><button>Corre em background</button><button data-ok>Eleva privilégios com sudo (become)</button><button>Indica o ficheiro de inventário</button></div>
+        <p class="why">-i é o inventário, -u o utilizador, -K pede a password de sudo.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Onde se devem guardar passwords usadas num playbook?</p>
+        <div class="opts"><button>Diretamente no playbook, no Git</button><button data-ok>Num ficheiro cifrado com o Ansible Vault</button><button>No inventário</button></div>
+        <p class="why">O Vault cifra os segredos para que possam ser versionados sem ficarem expostos.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Para que serve um inventário dinâmico?</p>
+        <div class="opts"><button>Para mudar de ferramenta de configuração</button><button data-ok>Para obter automaticamente os endereços de máquinas criadas dinamicamente na cloud</button><button>Para cifrar o inventário</button></div>
+        <p class="why">Quando as VMs são criadas pelo próprio playbook, os IPs só se conhecem depois.</p>
+      </div>
+    </div>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/i18n.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

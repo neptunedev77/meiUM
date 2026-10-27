@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Virtualização: Máquinas Virtuais · ASCN · meiUM</title>
+<meta name="description" content="ASCN · Tema 5: virtualização, vantagens (heterogeneidade, transparência, isolamento, consolidação) e desvantagens, máquinas virtuais, hypervisor, partilha de CPU, memória, disco e rede, virtualização completa vs. paravirtualização, hypervisors de tipo 1 e 2.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var d=document.documentElement,g=function(k){return JSON.parse(localStorage.getItem('meium:'+k))},t=g('theme'),f=g('fontScale');if(t==='light'||t==='dark')d.dataset.theme=t;if(f)d.style.setProperty('--fs',f);if(g('showExtra')===false)d.classList.add('hide-extra')}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="ascn" data-topic="05" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 5.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="5.0" data-title="Visão geral" data-desc="O que é virtualizar e onde se usa.">
+  <header class="ph">
+    <h1>Virtualização: Máquinas Virtuais<span class="en">Virtualization (Part I)</span></h1>
+    <p class="lede"><strong>Virtualização</strong> é a técnica que cria um dispositivo ou recurso <strong>virtual, feito em software</strong> — na prática, uma abstração construída sobre recursos de hardware ou de software que já existem.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.0.1</span>Exemplos</h2>
+    <div class="two">
+      <div class="card"><span class="tag">Tipos de virtualização</span><ul><li>Máquinas virtuais (VMs)</li><li>Redes virtuais</li><li>Memória virtual</li><li>Volumes lógicos de armazenamento</li></ul></div>
+      <div class="card"><span class="tag">Na prática</span>
+        <ul>
+          <li><strong>Infraestruturas de desktops virtuais (VDI)</strong>: os ambientes de trabalho dos utilizadores são servidos por um serviço central, ex.: VMs num cluster de servidores (VMware Horizon, Amazon WorkSpaces).</li>
+          <li><strong>Cloud</strong>: os clientes recebem VMs que correm nos servidores do fornecedor (Amazon EC2, Google Compute Engine).</li>
+        </ul></div>
+    </div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <p class="src">Baseado nas aulas de ASCN (Virtualization, Part I). Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 5.1 VANTAGENS ============================ -->
+<article class="page" data-page="vantagens" data-num="5.1" data-title="Vantagens" data-desc="Heterogeneidade, transparência, isolamento, consolidação.">
+  <header class="ph">
+    <h1>Vantagens da virtualização<span class="en">Advantages</span></h1>
+    <p class="lede">Quatro razões pelas quais a virtualização está em todo o lado.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.1.1</span>Heterogeneidade</h2>
+    <p>O hardware é muito heterogéneo: modelos diferentes do mesmo tipo (CPU, GPU, RAM, disco, rede) podem ter interfaces e drivers diferentes. A virtualização <strong>esconde essa heterogeneidade</strong> e oferece recursos virtuais unificados — CPUs virtuais, discos virtuais, redes virtuais — com uma <strong>única interface</strong>, seja qual for o modelo físico por baixo.</p>
+
+    <h2><span class="sn">5.1.2</span>Transparência</h2>
+    <p>Interagir com um recurso virtual é como interagir com um físico: ao fazer <code>ssh</code> para uma máquina remota, a experiência é igual quer seja uma VM quer seja um servidor bare-metal. <strong>Transparente</strong> quer dizer que o utilizador não precisa de mudar a forma de trabalhar (comandos, programas, scripts).</p>
+
+    <h2><span class="sn">5.1.3</span>Isolamento</h2>
+    <p>Recursos virtuais que partilham um recurso físico têm de estar isolados:</p>
+    <div class="three">
+      <div class="card c1"><span class="tag">Segurança</span><p>A VM de um utilizador não pode aceder à memória das VMs de outros — isso permitiria ataques e corrupção de memória.</p></div>
+      <div class="card c2"><span class="tag">Desempenho</span><p>A VM de um utilizador não deve prejudicar o desempenho das outras que partilham CPU, memória, disco e rede.</p></div>
+      <div class="card c3"><span class="tag">Falhas</span><p>A falha de uma VM não deve fazer falhar as outras VMs do mesmo host.</p></div>
+    </div>
+
+    <h2><span class="sn">5.1.4</span>Consolidação e gestão</h2>
+    <ul>
+      <li><strong>Consolidar</strong> os recursos físicos baixa os custos e aproveita melhor o hardware: um só servidor pode correr, por exemplo, vários sistemas operativos em VMs.</li>
+      <li>Gerir recursos virtuais é mais <strong>fácil e flexível</strong>: as VMs criam-se, destroem-se e migram mais depressa do que servidores físicos.</li>
+    </ul>
+  </section>
+</article>
+
+<!-- ============================ 5.2 DESVANTAGENS ============================ -->
+<article class="page" data-page="desvantagens" data-num="5.2" data-title="Desvantagens" data-desc="Custo de desempenho, sobrealocação, segurança e falhas partilhadas.">
+  <header class="ph">
+    <h1>Desvantagens da virtualização<span class="en">Disadvantages</span></h1>
+    <p class="lede">A camada extra de abstração tem custos.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="two">
+      <div class="card c1"><span class="tag">Desempenho e sobrealocação</span>
+        <ul>
+          <li>A virtualização costuma acrescentar uma <strong>penalização de desempenho</strong>: os mecanismos que abstraem o hardware têm trabalho extra a mediar cada pedido virtual até ao hardware real.</li>
+          <li>Pôr demasiados recursos virtuais sobre o mesmo hardware leva a <strong>sobrealocação</strong> (over-provisioning) e degradação: quando várias VMs no mesmo servidor pedem mais núcleos, memória ou largura de banda do que existe.</li>
+        </ul></div>
+      <div class="card c2"><span class="tag">Segurança e fiabilidade</span>
+        <ul>
+          <li>Se o isolamento falhar, ou se alguém malicioso tiver acesso privilegiado ao recurso físico, <strong>todos</strong> os recursos virtuais ficam comprometidos — ex.: um administrador com root no servidor pode comprometer todas as VMs.</li>
+          <li>A falha de um recurso físico compromete <strong>todos</strong> os virtuais que o usam: se o servidor avariar, todas as VMs que lá correm caem.</li>
+        </ul></div>
+    </div>
+    <div class="note"><span class="lbl">Não é só sobre VMs</span>
+      <p>Estas vantagens e desvantagens valem para os vários tipos de virtualização — memória, rede, armazenamento — não só para VMs. Exercício: confirma cada propriedade para a memória virtual (ex.: o isolamento é o que impede um processo de ler a memória de outro).</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 5.3 MÁQUINAS VIRTUAIS ============================ -->
+<article class="page" data-page="vms" data-num="5.3" data-title="Máquinas virtuais e hypervisor" data-desc="História, arquitetura e o papel do hypervisor.">
+  <header class="ph">
+    <h1>Máquinas virtuais<span class="en">Virtual Machines</span></h1>
+    <p class="lede">Uma <strong>máquina virtual</strong> permite correr <strong>vários sistemas operativos</strong> sobre o mesmo servidor físico.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.3.1</span>Contexto</h2>
+    <ul>
+      <li>Os mainframes da IBM, há cerca de 50 anos, já permitiam às aplicações usar porções isoladas dos recursos do sistema.</li>
+      <li>A virtualização massificou-se no início dos anos 2000, com os servidores x86, por causa do <strong>custo</strong> da infraestrutura (servidores caros) e dos <strong>recursos subaproveitados</strong> (servidores longe da sua capacidade máxima).</li>
+      <li>Além disso, adaptar uma aplicação para correr noutro sistema operativo é caro e difícil — com VMs, corre-se o SO de que ela precisa.</li>
+    </ul>
+
+    <h2><span class="sn">5.3.2</span>Arquitetura</h2>
+    <p>As instruções do SO convidado (a VM) são <strong>intercetadas, traduzidas e executadas</strong> no SO e hardware do host.</p>
+    <div class="card">
+      <svg class="w-svg" viewBox="0 0 640 230" role="img" aria-label="Arquitetura de máquinas virtuais">
+        <g style="font-family:var(--f-display);font-size:13px;font-weight:600">
+          <rect x="20" y="10" width="180" height="40" rx="6" style="fill:var(--card-2);stroke:var(--rule)"/><text x="110" y="35" text-anchor="middle" style="fill:var(--ink)">Aplicações</text>
+          <rect x="230" y="10" width="180" height="40" rx="6" style="fill:var(--card-2);stroke:var(--rule)"/><text x="320" y="35" text-anchor="middle" style="fill:var(--ink)">Aplicações</text>
+          <rect x="440" y="10" width="180" height="40" rx="6" style="fill:var(--card-2);stroke:var(--rule)"/><text x="530" y="35" text-anchor="middle" style="fill:var(--ink)">Aplicações</text>
+          <rect x="20" y="56" width="180" height="40" rx="6" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="110" y="81" text-anchor="middle" style="fill:var(--ink)">SO convidado (VM 1)</text>
+          <rect x="230" y="56" width="180" height="40" rx="6" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="320" y="81" text-anchor="middle" style="fill:var(--ink)">SO convidado (VM 2)</text>
+          <rect x="440" y="56" width="180" height="40" rx="6" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="530" y="81" text-anchor="middle" style="fill:var(--ink)">SO convidado (VM n)</text>
+          <rect x="20" y="112" width="600" height="46" rx="6" style="fill:var(--warn-bg);stroke:var(--warn)"/><text x="320" y="132" text-anchor="middle" style="fill:var(--ink)">Hypervisor (VMM)</text>
+          <text x="320" y="150" text-anchor="middle" style="fill:var(--muted);font-family:var(--f-mono);font-size:11px;font-weight:500">Xen · KVM · VMware · VirtualBox</text>
+          <rect x="20" y="172" width="600" height="46" rx="6" style="fill:var(--card-2);stroke:var(--rule)"/><text x="320" y="192" text-anchor="middle" style="fill:var(--ink)">Hardware / SO do host</text>
+          <text x="320" y="210" text-anchor="middle" style="fill:var(--muted);font-family:var(--f-mono);font-size:11px;font-weight:500">CPU · RAM · disco · rede</text>
+        </g>
+      </svg>
+    </div>
+
+    <h2><span class="sn">5.3.3</span>O hypervisor</h2>
+    <ul>
+      <li>Também chamado <strong>Virtual Machine Monitor (VMM)</strong>. Exemplos: Xen, KVM, VMware, VirtualBox.</li>
+      <li>Controla a interação de baixo nível entre as VMs e o SO e hardware do host: dá acesso ao CPU, à RAM, ao disco e à rede do host.</li>
+    </ul>
+    <p>Mas como é que os recursos físicos são <strong>partilhados</strong> entre as VMs? É o assunto da sub-página seguinte.</p>
+  </section>
+</article>
+
+<!-- ============================ 5.4 RECURSOS ============================ -->
+<article class="page" data-page="recursos" data-num="5.4" data-title="Partilhar CPU, memória, disco e rede" data-desc="Time slicing, thin provisioning e modos de rede.">
+  <header class="ph">
+    <h1>Como as VMs partilham o host<span class="en">Host's CPU · RAM · Storage · Network</span></h1>
+    <p class="lede">Cada tipo de recurso é partilhado de forma diferente.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.4.1</span>CPU: time slicing</h2>
+    <ul>
+      <li>O tempo de processamento é <strong>fatiado</strong> e repartido entre as VMs — como vários processos num SO (as aulas de Sistemas Operativos).</li>
+      <li><strong>Cuidado</strong>: atribuir mais vCPUs do que os núcleos existentes (<strong>overcommit</strong>) pode levar a mau desempenho.</li>
+    </ul>
+
+    <h2><span class="sn">5.4.2</span>RAM e armazenamento persistente</h2>
+    <ul>
+      <li>Cada VM fica com uma <strong>porção específica</strong> da RAM e da capacidade de armazenamento (SSD, HDD) do host.</li>
+      <li>A gestão de memória usa sobretudo os mecanismos tradicionais dos SO: paginação, TLB (Translation Lookaside Buffer)…</li>
+      <li>O armazenamento persistente é <strong>partilhado</strong> entre VMs: tem de lidar bem com vários leitores e escritores, e pode ser atribuído à medida que é preciso (<strong>thin provisioning</strong>).</li>
+    </ul>
+    <div class="note extra"><span class="lbl">Complemento · thin provisioning</span>
+      <p>Uma VM pode "ver" um disco de 100 GB que, no host, só ocupa o espaço realmente escrito (ex.: 8 GB). Poupa espaço, mas se todas as VMs encherem os seus discos ao mesmo tempo o host pode ficar sem espaço — é outra forma de sobrealocação.</p>
+    </div>
+
+    <div class="widget" data-widget="overcommit"></div>
+
+    <h2><span class="sn">5.4.3</span>Rede</h2>
+    <p>As VMs partilham a largura de banda do host e podem ter diferentes configurações de rede:</p>
+    <div class="tw"><table>
+      <thead><tr><th>Modo</th><th>Como funciona</th><th>A VM consegue chegar a…</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Host-only</strong></td><td>Partilha o espaço de rede do host</td><td>Só ao host</td></tr>
+        <tr><td><strong>NAT</strong></td><td>O tráfego da VM sai como se fosse do host (uma só identidade de rede)</td><td>Recursos externos (mas não é diretamente visível de fora)</td></tr>
+        <tr><td><strong>Bridge</strong></td><td>O hypervisor dá à VM um IP próprio</td><td>Toda a rede física; é vista como mais um nó da rede</td></tr>
+      </tbody></table></div>
+  </section>
+</article>
+
+<!-- ============================ 5.5 MODOS E TIPOS ============================ -->
+<article class="page" data-page="modos" data-num="5.5" data-title="Modos e tipos de virtualização" data-desc="Completa vs. paravirtualização; hypervisors de tipo 1 e 2.">
+  <header class="ph">
+    <h1>Modos e tipos de virtualização<span class="en">Virtualization Modes · Types</span></h1>
+    <p class="lede">Duas classificações independentes: <strong>como</strong> o SO convidado é virtualizado (modo) e <strong>onde</strong> corre o hypervisor (tipo).</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.5.1</span>Modos</h2>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Virtualização completa</th><th>Paravirtualização</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Ideia</strong></td><td>O SO convidado é totalmente abstraído do hardware do host</td><td>O SO convidado tem modificações (hooks) para evitar a tradução das instruções mais caras</td></tr>
+        <tr><td><strong>Exemplo</strong></td><td>VirtualBox</td><td>Xen</td></tr>
+        <tr><td><strong>Vantagem</strong></td><td>Sem alterar o SO: mais sistemas suportados e VMs mais fáceis de migrar/portar</td><td>Melhor desempenho de CPU e I/O (menos tradução)</td></tr>
+        <tr><td><strong>Desvantagem</strong></td><td>Todas as instruções têm de ser traduzidas pelo hypervisor: CPU e I/O potencialmente mais lentos</td><td>O SO tem de ser modificado: pior manutenção e portabilidade (imagens de SO modificadas)</td></tr>
+      </tbody></table></div>
+    <div class="note"><span class="lbl">Virtualização assistida por hardware</span>
+      <p>Extensões do processador como <strong>Intel VT-x</strong> e <strong>AMD-V</strong> reduzem a penalização da tradução de instruções na virtualização completa — o hardware ajuda o hypervisor.</p>
+    </div>
+
+    <h2><span class="sn">5.5.2</span>Tipos de hypervisor</h2>
+    <div class="two">
+      <div class="card c1"><span class="tag">Tipo 1 · bare metal</span>
+        <ul>
+          <li>Não precisa de um SO de uso geral no host: é instalado <strong>diretamente no hardware</strong>, como um "pequeno sistema operativo".</li>
+          <li><strong>Bom desempenho</strong> (o pequeno SO é otimizado para virtualizar), mas costuma exigir suporte de virtualização no hardware.</li>
+          <li>Ex.: VMware ESX.</li>
+        </ul></div>
+      <div class="card c2"><span class="tag">Tipo 2 · hosted</span>
+        <ul>
+          <li>Instalado <strong>por cima de um SO de uso geral</strong>; muitos ainda exigem módulos de kernel específicos.</li>
+          <li><strong>Pior desempenho</strong>: o SO não está otimizado para virtualizar.</li>
+          <li>Ex.: VirtualBox.</li>
+        </ul></div>
+    </div>
+    <div class="note warn"><span class="lbl">Classificações que variam</span>
+      <p>O <strong>Xen</strong> e o <strong>KVM</strong> aparecem classificados de formas diferentes consoante a fonte. O Xen corre diretamente sobre o hardware (com um domínio privilegiado, o Dom0, para gerir dispositivos), por isso é muitas vezes descrito como tipo 1. O KVM é um módulo que transforma o próprio kernel Linux num hypervisor — corre "dentro" de um SO de uso geral, mas com acesso direto ao hardware. Em exame, justifica a classificação pelo critério: <strong>há ou não um SO de uso geral por baixo do hypervisor?</strong></p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo e perguntas para testar.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Conceito</th><th>Ideia-chave</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Virtualização</strong></td><td>Recurso em software, abstraído sobre recursos existentes.</td></tr>
+        <tr><td><strong>Vantagens</strong></td><td>Heterogeneidade escondida, transparência, isolamento (segurança, desempenho, falhas), consolidação.</td></tr>
+        <tr><td><strong>Desvantagens</strong></td><td>Penalização de desempenho, sobrealocação, um ataque/falha no físico afeta todos os virtuais.</td></tr>
+        <tr><td><strong>Hypervisor (VMM)</strong></td><td>Medeia o acesso das VMs ao CPU, RAM, disco e rede do host.</td></tr>
+        <tr><td><strong>CPU / RAM / disco</strong></td><td>Time slicing (cuidado com overcommit) / porção fixa, paginação e TLB / partilhado, thin provisioning.</td></tr>
+        <tr><td><strong>Rede</strong></td><td>Host-only (só o host), NAT (sai como o host), bridge (IP próprio na rede).</td></tr>
+        <tr><td><strong>Completa vs. para</strong></td><td>SO intacto, mais tradução / SO modificado, mais rápido. VT-x/AMD-V ajudam a completa.</td></tr>
+        <tr><td><strong>Tipo 1 vs. tipo 2</strong></td><td>Diretamente no hardware, melhor desempenho / sobre um SO de uso geral.</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.2</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">A VM de um cliente está a usar 100% do CPU e as VMs de outros clientes no mesmo host não abrandam. Que propriedade é esta?</p>
+        <div class="opts"><button>Transparência</button><button data-ok>Isolamento (de desempenho)</button><button>Heterogeneidade</button></div>
+        <p class="why">O isolamento garante que uma VM não prejudica o desempenho, a segurança ou a disponibilidade das outras.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Um servidor com 16 núcleos corre VMs com um total de 40 vCPUs. O que pode acontecer?</p>
+        <div class="opts"><button>Nada: os vCPUs são independentes dos núcleos</button><button data-ok>Se as VMs ficarem ocupadas ao mesmo tempo, o time slicing reparte 16 núcleos por 40 vCPUs e todas abrandam</button><button>O hypervisor recusa arrancar as VMs</button></div>
+        <p class="why">Overcommit de CPU: funciona enquanto a procura real for baixa; com carga simultânea, há degradação.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Queres que a VM seja vista na rede física com o seu próprio IP. Que modo usas?</p>
+        <div class="opts"><button>Host-only</button><button>NAT</button><button data-ok>Bridge</button></div>
+        <p class="why">Em bridge a VM é mais um nó da rede; em NAT o tráfego sai com a identidade do host.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual é a principal desvantagem da paravirtualização?</p>
+        <div class="opts"><button>Pior desempenho de I/O</button><button data-ok>Exige modificar o SO convidado</button><button>Não suporta Linux</button></div>
+        <p class="why">Ganha desempenho evitando traduções caras, mas à custa de imagens de SO modificadas.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">O que distingue um hypervisor de tipo 1?</p>
+        <div class="opts"><button data-ok>Corre diretamente sobre o hardware, sem SO de uso geral por baixo</button><button>Só corre em portáteis</button><button>Exige paravirtualização</button></div>
+        <p class="why">Tipo 1 = bare metal (ex.: VMware ESX); tipo 2 = sobre um SO de uso geral (ex.: VirtualBox).</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Para que servem o Intel VT-x e o AMD-V?</p>
+        <div class="opts"><button>Para cifrar a memória das VMs</button><button data-ok>Para reduzir, com ajuda do hardware, o custo da tradução de instruções na virtualização completa</button><button>Para ligar VMs em rede</button></div>
+        <p class="why">Virtualização assistida por hardware.</p>
+      </div>
+    </div>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/i18n.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

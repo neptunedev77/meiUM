@@ -828,4 +828,158 @@
     el.querySelector('[data-a="new"]').addEventListener('click', draw);
     draw();
   };
+
+  /* =====================================================================
+     cloudstack — quem gere cada camada: on-premises, IaaS, PaaS, SaaS
+     ===================================================================== */
+  W.cloudstack = el => {
+    const LAYERS = ['Aplicações', 'Segurança', 'Bases de dados', 'Sistema operativo', 'Virtualização', 'Servidores', 'Armazenamento', 'Rede', 'Data centers'];
+    const M = {
+      onprem: { l: 'On-premises', n: 9, txt: 'Tudo é teu: comprar e ligar o hardware, virtualizar, instalar o SO, manter as bases de dados e a aplicação.', ex: 'O servidor na cave da empresa' },
+      iaas: { l: 'IaaS', n: 4, txt: 'O fornecedor dá-te máquinas virtuais, discos e rede. Tu instalas e geres o sistema operativo e tudo o que está por cima.', ex: 'Amazon EC2, Google Compute Engine, Amazon S3, OpenStack' },
+      paas: { l: 'PaaS', n: 1, txt: 'Entregas o código da aplicação; a plataforma trata de onde e como corre (SO, runtime, escala).', ex: 'Google App Engine' },
+      saas: { l: 'SaaS', n: 0, txt: 'Usas um software pronto, através de uma API, de um cliente ou do browser. Só configuras e usas.', ex: 'Gmail, Salesforce, Amazon DynamoDB, Amazon SageMaker' }
+    };
+    el.innerHTML = head(el, 'Quem gere o quê?', 'Escolhe o modelo. As camadas a cor são geridas por ti (cliente); as cinzentas pelo fornecedor de cloud.') + `
+      <div class="seg">${Object.entries(M).map(([k, v], i) => `<button type="button" class="btn sm${i === 1 ? ' on' : ''}" data-m="${k}">${v.l}</button>`).join('')}</div>
+      <div class="cs-wrap"><div class="cs-stack"></div><div style="display:flex;flex-direction:column;gap:10px"><dl class="kpis"></dl><p class="w-out"></p></div></div>`;
+    const st = el.querySelector('.cs-stack'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out');
+    function draw(k) {
+      const m = M[k];
+      el.querySelectorAll('[data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === k));
+      st.innerHTML = LAYERS.map((l, i) => `<div class="cs-layer ${i < m.n ? 'me' : 'prov'}">${l}<span>${i < m.n ? 'tu' : 'fornecedor'}</span></div>`).join('');
+      kp.innerHTML = kpi('geres tu', `${m.n} de 9`, 1) + kpi('o fornecedor gere', `${9 - m.n} de 9`);
+      out.innerHTML = `${m.txt}<br><span class="small muted">Exemplos: ${m.ex}.</span>`;
+    }
+    el.addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (b) draw(b.dataset.m); });
+    draw('iaas');
+  };
+
+  /* =====================================================================
+     arch — arquiteturas distribuídas; clicar num nó simula a sua falha
+     ===================================================================== */
+  W.arch = el => {
+    const A = {
+      cs: { l: 'Cliente-servidor', nodes: [['c', 'Cliente', 320, 40, 0], ['s', 'Servidor', 320, 200, 1]], edges: [['c', 's']],
+        scale: 'Nenhuma (um só servidor)', spof: 'O servidor', ex: 'A Web (HTTP)', txt: 'A funcionalidade e os dados estão no servidor; o <b>stub</b> no cliente esconde os detalhes do protocolo.' },
+      proxy: { l: 'Proxy-servidor', nodes: [['c', 'Cliente', 320, 30, 0], ['p', 'Proxy', 320, 118, 1], ['s1', 'Servidor 1', 170, 210, 0], ['s2', 'Servidor 2', 320, 210, 0], ['s3', 'Servidor n', 470, 210, 0]], edges: [['c', 'p'], ['p', 's1'], ['p', 's2'], ['p', 's3']],
+        scale: 'Boa: o proxy distribui por vários servidores', spof: 'O proxy', ex: 'MongoDB (mongos)', txt: 'O <b>proxy</b> torna os servidores transparentes para o cliente: ideal para replicação e sharding transparentes. Mas concentra todo o tráfego.' },
+      mw: { l: 'Manager-worker', nodes: [['c', 'Cliente', 150, 40, 0], ['m', 'Manager (metadados)', 470, 40, 1], ['w1', 'Worker 1', 190, 210, 0], ['w2', 'Worker 2', 340, 210, 0], ['w3', 'Worker n', 490, 210, 0]], edges: [['c', 'm'], ['c', 'w1'], ['c', 'w2'], ['c', 'w3'], ['m', 'w1', 1], ['m', 'w2', 1], ['m', 'w3', 1]],
+        scale: 'Boa: os dados passam diretamente pelos workers', spof: 'O manager', ex: 'HDFS, Lustre', txt: 'O <b>manager</b> sabe onde está cada ficheiro (metadados); os <b>workers</b> guardam o conteúdo. O cliente pergunta ao manager e fala diretamente com os workers.' },
+      group: { l: 'Grupo de servidores', nodes: [['c', 'Cliente', 320, 30, 0], ['s1', 'Servidor 1', 170, 190, 0], ['s2', 'Servidor 2', 320, 215, 0], ['s3', 'Servidor n', 470, 190, 0]], edges: [['c', 's1'], ['c', 's2'], ['c', 's3'], ['s1', 's2', 1], ['s2', 's3', 1], ['s1', 's3', 1]],
+        scale: 'Limitada: coordenar todos custa mais quanto mais servidores', spof: 'Nenhum', ex: 'ZooKeeper', txt: 'Todos os servidores atendem pedidos e um <b>protocolo de sincronização</b> mantém o estado consistente entre eles.' },
+      bus: { l: 'Bus', nodes: [['p1', 'Produtor A', 110, 60, 0], ['p2', 'Produtor B', 110, 190, 0], ['b', 'Bus', 320, 125, 1], ['k1', 'Consumidor X', 530, 60, 0], ['k2', 'Consumidor Y', 530, 190, 0]], edges: [['p1', 'b'], ['p2', 'b'], ['b', 'k1'], ['b', 'k2']],
+        scale: 'Alta e flexível: produtores e consumidores entram e saem', spof: 'O bus (se não for distribuído)', ex: 'Apache Kafka', txt: 'O <b>bus</b> encaminha mensagens: os participantes publicam e consomem sem se conhecerem. Desacopla produtores de consumidores.' },
+      tier: { l: 'Multi-camada', nodes: [['c', 'Cliente', 320, 25, 0], ['w', 'Servidor web', 320, 95, 1], ['a', 'Servidor aplicacional', 320, 165, 1], ['d', 'Base de dados', 320, 235, 1]], edges: [['c', 'w'], ['w', 'a'], ['a', 'd']],
+        scale: 'Cada camada escala de forma independente', spof: 'Qualquer camada com um só servidor', ex: 'Web + app + base de dados', txt: 'Cada servidor é <b>cliente da camada seguinte</b> (cliente-servidor encadeado). Ex.: o servidor aplicacional usa um driver de base de dados (o stub) e fala SQL.' }
+    };
+    el.innerHTML = head(el, 'Arquiteturas distribuídas', 'Escolhe uma arquitetura e <b>clica num nó para o deitar abaixo</b>. Os nós a tracejado vermelho são pontos únicos de falha.') + `
+      <div class="seg">${Object.entries(A).map(([k, v], i) => `<button type="button" class="btn sm${i ? '' : ' on'}" data-k="${k}">${v.l}</button>`).join('')}</div>
+      <svg class="w-svg" viewBox="0 0 640 260" role="img" aria-label="Diagrama da arquitetura"></svg>
+      <dl class="kpis"></dl><p class="w-out"></p>`;
+    const svg = el.querySelector('svg'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out');
+    let cur = 'cs', down = new Set();
+    function draw() {
+      const a = A[cur], pos = Object.fromEntries(a.nodes.map(n => [n[0], n]));
+      svg.innerHTML = a.edges.map(([x, y, dash]) => { const p = pos[x], q = pos[y], off = down.has(x) || down.has(y);
+        return `<line x1="${p[2]}" y1="${p[3]}" x2="${q[2]}" y2="${q[3]}" style="stroke:${off ? 'var(--bad)' : 'var(--muted)'};stroke-width:1.6;${dash ? 'stroke-dasharray:5 4;' : ''}opacity:${off ? .35 : .9}"/>`; }).join('') +
+        a.nodes.map(([id, l, x, y, crit]) => { const w = Math.max(96, l.length * 7.4 + 22), d = down.has(id);
+          return `<g data-n="${id}" style="cursor:pointer"><rect x="${x - w / 2}" y="${y - 17}" width="${w}" height="34" rx="8" style="fill:${d ? 'var(--bad-bg)' : id === 'c' ? 'var(--card-2)' : 'var(--accent-soft)'};stroke:${d || crit ? 'var(--bad)' : 'var(--accent)'};stroke-width:${crit ? 2 : 1.5};${crit && !d ? 'stroke-dasharray:5 3' : ''}"/>
+            <text x="${x}" y="${y + 4}" text-anchor="middle" class="lab" style="${d ? 'text-decoration:line-through;fill:var(--bad)' : ''}">${d ? '✕ ' : ''}${l}</text></g>`; }).join('');
+      kp.innerHTML = kpi('escalabilidade', a.scale) + kpi('ponto único de falha', a.spof, 1) + kpi('exemplo', a.ex);
+      let msg = a.txt;
+      if (down.size) {
+        const crit = a.nodes.filter(n => down.has(n[0]) && n[4]);
+        const srv = a.nodes.filter(n => n[0] !== 'c' && !n[0].startsWith('p') && !n[0].startsWith('k'));
+        if (down.has('c')) msg = 'O cliente falhou: o serviço continua de pé para os restantes clientes.';
+        else if (crit.length) msg = `<b>Serviço indisponível.</b> ${crit.map(n => n[1]).join(', ')} era um ponto único de falha (e de contenção). Solução típica: torná-lo também um grupo de servidores replicados.`;
+        else if (cur === 'group' && srv.every(n => down.has(n[0]))) msg = '<b>Todos os servidores falharam</b>: não sobra ninguém para atender.';
+        else msg = `<b>O serviço continua</b>: os restantes nós assumem o trabalho${cur === 'group' ? ' e mantêm o estado sincronizado' : cur === 'bus' ? '; os outros participantes não são afetados' : ' (desde que os dados estejam replicados)'}.`;
+        msg += ' <span class="small muted">Clica de novo para recuperar o nó.</span>';
+      }
+      out.innerHTML = msg;
+    }
+    el.addEventListener('click', e => {
+      const b = e.target.closest('[data-k]'); if (b) { cur = b.dataset.k; down = new Set(); el.querySelectorAll('[data-k]').forEach(x => x.classList.toggle('on', x === b)); draw(); return; }
+      const g = e.target.closest('[data-n]'); if (g) { const id = g.dataset.n; down.has(id) ? down.delete(id) : down.add(id); draw(); }
+    });
+    draw();
+  };
+
+  /* =====================================================================
+     idempotency — correr um playbook Ansible várias vezes
+     ===================================================================== */
+  W.idempotency = el => {
+    const TASKS = [['pkg', 'Instalar nginx (apt)'], ['user', 'Criar utilizador deployer (user)'], ['conf', 'Copiar nginx.conf (template)'], ['svc', 'Garantir nginx a correr (service)']];
+    const fresh = () => ({ web1: {}, web2: { pkg: 1, user: 1, conf: 1, svc: 1 } });
+    let hosts = fresh(), tpl = 1, runs = 0;
+    el.innerHTML = head(el, 'Idempotência: correr o mesmo playbook duas vezes', 'O web1 é uma máquina nova; o web2 já está configurado. Corre o playbook, volta a correr, e depois altera o template.') + `
+      <div class="row"><button type="button" class="btn primary" data-a="run">▶ ansible-playbook site.yml</button>
+        <button type="button" class="btn" data-a="tpl">Alterar o template</button><button type="button" class="btn" data-a="reset">↺ Repor</button></div>
+      <div class="term" aria-live="polite"></div><p class="w-out"></p>`;
+    const term = el.querySelector('.term'), out = el.querySelector('.w-out');
+    term.innerHTML = '<span class="muted">$ à espera…</span>';
+    function run() {
+      runs++;
+      const rec = {}; let log = `<b>PLAY [webservers]</b> — execução ${runs}\n`;
+      const notified = new Set();
+      TASKS.forEach(([k, name]) => {
+        log += `\n<b>TASK [${name}]</b>\n`;
+        Object.entries(hosts).forEach(([h, s]) => {
+          rec[h] = rec[h] || { ok: 0, changed: 0 };
+          const want = k === 'conf' ? tpl : 1;
+          if (s[k] === want) { rec[h].ok++; log += `<span class="ok">ok: [${h}]</span>\n`; }
+          else { s[k] = want; rec[h].changed++; rec[h].ok++; if (k === 'conf') notified.add(h); log += `<span class="chg">changed: [${h}]</span>\n`; }
+        });
+      });
+      if (notified.size) { log += `\n<b>RUNNING HANDLER [restart nginx]</b>\n` + [...notified].map(h => `<span class="chg">changed: [${h}]</span>\n`).join(''); notified.forEach(h => { rec[h].ok++; rec[h].changed++; }); }
+      log += '\n<b>PLAY RECAP</b>\n' + Object.entries(rec).map(([h, r]) => `${h.padEnd(6)} : ok=${r.ok}  <span class="${r.changed ? 'chg' : 'ok'}">changed=${r.changed}</span>`).join('\n');
+      term.innerHTML = log;
+      const tot = Object.values(rec).reduce((a, r) => a + r.changed, 0);
+      out.innerHTML = tot === 0 ? '<b>Nada mudou</b>: o estado já era o desejado, por isso nenhuma tarefa fez alterações. Correr de novo é seguro — é isto a idempotência.'
+        : notified.size ? 'Só a tarefa do template mudou (nos hosts onde o ficheiro estava diferente), e isso <b>notificou o handler</b> que reinicia o nginx. As outras tarefas ficaram "ok".'
+        : 'Cada tarefa só faz alterações onde o estado atual difere do desejado: o web1 foi configurado de raiz, o web2 já estava certo.';
+    }
+    el.addEventListener('click', e => {
+      const b = e.target.closest('[data-a]'); if (!b) return;
+      if (b.dataset.a === 'run') run();
+      if (b.dataset.a === 'tpl') { tpl++; out.innerHTML = 'O template mudou no repositório. Corre o playbook para aplicar a alteração.'; }
+      if (b.dataset.a === 'reset') { hosts = fresh(); tpl = 1; runs = 0; term.innerHTML = '<span class="muted">$ à espera…</span>'; out.innerHTML = ''; }
+    });
+  };
+
+  /* =====================================================================
+     overcommit — quantas VMs cabem num servidor
+     ===================================================================== */
+  W.overcommit = el => {
+    const SIZES = { s: ['pequena', 2, 4], m: ['média', 4, 16], l: ['grande', 8, 32] };
+    let vms = ['m', 'm', 's'];
+    el.innerHTML = head(el, 'Partilhar um servidor entre VMs', 'Um servidor com 16 núcleos e 64 GB de RAM. Acrescenta VMs e ajusta quanto da sua capacidade elas usam realmente.') + `
+      <div class="row">${Object.entries(SIZES).map(([k, [n, c, r]]) => `<button type="button" class="btn sm" data-add="${k}">+ VM ${n} (${c} vCPU, ${r} GB)</button>`).join('')}<button type="button" class="btn sm" data-a="pop">− Remover</button></div>
+      <label class="f"><span>utilização média das VMs = <b data-uv></b></span><input type="range" min="10" max="100" step="5" value="40"></label>
+      <div class="oc-bars"></div><div class="oc-vms"></div><p class="w-out"></p>`;
+    const bars = el.querySelector('.oc-bars'), list = el.querySelector('.oc-vms'), out = el.querySelector('.w-out'), rg = el.querySelector('input');
+    const CORES = 16, RAM = 64;
+    const bar = (label, v, cap, unit) => { const p = v / cap; return `<div class="oc-bar"><span>${label}</span><div class="oc-track"><div style="width:${Math.min(100, p * 100)}%;background:${p > 1 ? 'var(--bad)' : p > 0.85 ? 'var(--warn)' : 'var(--accent)'}"></div>${p > 1 ? `<i style="left:${100 / p}%"></i>` : ''}</div><b>${fmt(v, 1)} / ${cap} ${unit} (${fmt(p * 100, 0)}%)</b></div>`; };
+    function draw() {
+      const u = +rg.value / 100;
+      el.querySelector('[data-uv]').textContent = rg.value + '%';
+      const vcpu = vms.reduce((s, k) => s + SIZES[k][1], 0), ram = vms.reduce((s, k) => s + SIZES[k][2], 0), demand = vcpu * u;
+      bars.innerHTML = bar('vCPUs atribuídos', vcpu, CORES, 'núcleos') + bar('CPU realmente pedido', demand, CORES, 'núcleos') + bar('RAM atribuída', ram, RAM, 'GB');
+      list.innerHTML = vms.map((k, i) => `<span class="chip in" title="VM ${SIZES[k][0]}" style="width:auto;padding:0 8px">VM${i + 1}·${SIZES[k][1]}c</span>`).join('') || '<span class="muted small">Sem VMs.</span>';
+      const r = vcpu / CORES;
+      let msg = `Rácio vCPU:núcleo = <b>${fmt(r, 2)}:1</b>. `;
+      if (ram > RAM) msg += '<b>A RAM não chega</b>: a memória atribuída excede a física — o host passa a fazer swapping e todas as VMs ficam lentas. ';
+      if (demand > CORES) msg += '<b>CPU saturado</b>: as VMs pedem mais tempo de CPU do que existe; o time slicing reparte o que há e todas abrandam.';
+      else if (r > 1) msg += 'Há <b>overcommit de CPU</b>, mas como as VMs não usam tudo ao mesmo tempo, o time slicing ainda dá conta. Sobe a utilização para ver o limite.';
+      else if (ram <= RAM) msg += 'Tudo cabe nos recursos físicos.';
+      out.innerHTML = msg;
+    }
+    el.addEventListener('click', e => {
+      const a = e.target.closest('[data-add]'); if (a) { vms.push(a.dataset.add); draw(); }
+      if (e.target.closest('[data-a="pop"]')) { vms.pop(); draw(); }
+    });
+    rg.addEventListener('input', draw);
+    draw();
+  };
 })();

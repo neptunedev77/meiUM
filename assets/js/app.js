@@ -286,11 +286,13 @@
   /* --- blocos de código: <pre><code class="language-python"> --- */
   const KW = {
     python: /\b(import|from|as|def|return|for|in|if|elif|else|while|print|True|False|None|lambda|with|class|and|or|not|is|try|except|pass|yield)\b/,
-    bash: /\b(conda|pip|python|wsl|jupyter|deactivate|cd|source|export)\b/
+    bash: /\b(conda|pip|python|wsl|jupyter|deactivate|cd|source|export|ansible-playbook|ansible-vault|ansible|apt-get|useradd|mkdir|chmod|chown|echo|sudo|ssh)\b/,
+    yaml: /\b(true|false|yes|no|present|absent|latest|restarted|started|stopped)\b/
   };
   function highlight(src, lang) {
     const kw = KW[lang] || KW.python;
-    const flag = lang === 'bash' ? String.raw`(\s--?[\w-]+)` : '(?!)';
+    /* grupo extra: opções da linha de comando (bash) ou chaves (yaml) */
+    const flag = lang === 'bash' ? String.raw`(\s--?[\w-]+)` : lang === 'yaml' ? String.raw`(^[ \t]*-?[ \t]*[\w.]+(?=:))` : '(?!)';
     const re = new RegExp(String.raw`(#.*$)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|` + kw.source + String.raw`|(\b\d+(?:\.\d+)?\b)|` + flag + String.raw`|(\b[A-Za-z_]\w*(?=\())`, 'gm');
     let out = '', last = 0, m;
     while ((m = re.exec(src))) {
@@ -311,7 +313,7 @@
       code.innerHTML = lang === 'text' ? esc(raw) : highlight(raw, lang);
       const wrap = document.createElement('div');
       wrap.className = 'code';
-      const label = pre.dataset.title || { python: 'Python', bash: 'Terminal' }[lang] || lang;
+      const label = pre.dataset.title || { python: 'Python', bash: 'Terminal', yaml: 'YAML' }[lang] || lang;
       wrap.innerHTML = `<div class="cap"><span>${esc(label)}</span><button class="cp" type="button">${t('copy')}</button></div>`;
       pre.replaceWith(wrap);
       wrap.appendChild(pre);

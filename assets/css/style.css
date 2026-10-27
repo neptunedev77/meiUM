@@ -234,6 +234,29 @@ details.ans>div{padding:0 16px 16px;display:flex;flex-direction:column;gap:12px}
 .bs-row .small{margin-left:8px}
 .vt{display:grid;gap:10px}
 
+/* pilha de modelos de serviço cloud */
+.cs-wrap{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr);gap:16px;align-items:start}
+.cs-stack{display:flex;flex-direction:column;gap:3px}
+.cs-layer{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;font-family:var(--f-display);font-weight:600;font-size:14px;transition:background .2s,color .2s}
+.cs-layer span{font-family:var(--f-mono);font-size:10.5px;font-weight:500;opacity:.8}
+.cs-layer.me{background:var(--accent);color:var(--accent-ink)}
+.cs-layer.prov{background:var(--card-2);color:var(--muted);border:1px dashed var(--rule)}
+@media (max-width:600px){.cs-wrap{grid-template-columns:minmax(0,1fr)}}
+
+/* terminal simulado (idempotência) */
+.term{background:var(--code-bg);color:var(--code-fg);border-radius:8px;padding:12px 14px;font-family:var(--f-mono);font-size:12.5px;line-height:1.55;white-space:pre-wrap;max-height:340px;overflow:auto}
+.term .ok{color:#6fdc9c} .term .chg{color:#f5c14b} .term b{color:#fff;font-weight:600}
+
+/* barras de recursos (overcommit) */
+.oc-bars{display:flex;flex-direction:column;gap:8px}
+.oc-bar{display:grid;grid-template-columns:150px minmax(0,1fr);gap:4px 12px;align-items:center;font-size:14px}
+.oc-bar b{grid-column:2;font-family:var(--f-mono);font-size:12px;font-weight:500;color:var(--ink-2)}
+.oc-track{position:relative;height:14px;background:var(--card-2);border:1px solid var(--rule);border-radius:4px;overflow:hidden}
+.oc-track div{height:100%;transition:width .2s}
+.oc-track i{position:absolute;top:0;bottom:0;width:2px;background:var(--ink)}
+.oc-vms{display:flex;flex-wrap:wrap;gap:4px}
+@media (max-width:600px){.oc-bar{grid-template-columns:minmax(0,1fr)}.oc-bar b{grid-column:1}}
+
 /* pipeline de ML */
 .pipeline{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:0;max-width:none;counter-reset:p}
 .pipeline li{counter-increment:p;display:flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--rule);border-radius:999px;background:var(--card);font-family:var(--f-display);font-size:14px;font-weight:600}

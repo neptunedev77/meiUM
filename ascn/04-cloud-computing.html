@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Computação em Nuvem · ASCN · meiUM</title>
+<meta name="description" content="ASCN · Tema 4: IaaS, PaaS e SaaS, OpenStack (Nova, Cinder, Manila, Swift, Neutron, Telemetry), equivalentes AWS/GCP, elasticidade, vantagens e desvantagens da cloud.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var d=document.documentElement,g=function(k){return JSON.parse(localStorage.getItem('meium:'+k))},t=g('theme'),f=g('fontScale');if(t==='light'||t==='dark')d.dataset.theme=t;if(f)d.style.setProperty('--fs',f);if(g('showExtra')===false)d.classList.add('hide-extra')}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="ascn" data-topic="04" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 4.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="4.0" data-title="Visão geral" data-desc="As três abstrações: IaaS, PaaS e SaaS.">
+  <header class="ph">
+    <h1>Computação em Nuvem<span class="en">Cloud Computing</span></h1>
+    <p class="lede">Os serviços de cloud dividem-se em três grandes abstrações, consoante <strong>quanto da pilha</strong> fica a cargo do fornecedor: <strong>IaaS</strong> (infraestrutura), <strong>PaaS</strong> (plataforma) e <strong>SaaS</strong> (software).</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="widget" data-widget="cloudstack"></div>
+    <div class="tw"><table>
+      <thead><tr><th>Modelo</th><th>O que recebes</th><th>A unidade que entregas/gere</th><th>Exemplos</th></tr></thead>
+      <tbody>
+        <tr><td><strong>IaaS</strong></td><td>Hardware virtualizado: computação, armazenamento, rede</td><td>VMs, discos, redes</td><td>Amazon EC2, Google Compute Engine, Amazon S3, OpenStack</td></tr>
+        <tr><td><strong>PaaS</strong></td><td>Um ambiente para desenvolver, instalar e correr aplicações</td><td>A aplicação</td><td>Google App Engine</td></tr>
+        <tr><td><strong>SaaS</strong></td><td>Software completo, pronto a usar</td><td>Nada: só usas</td><td>Gmail, Salesforce, Amazon DynamoDB, Amazon SageMaker</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <p class="src">Baseado nas aulas de ASCN (Cloud Computing). Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 4.1 IaaS ============================ -->
+<article class="page" data-page="iaas" data-num="4.1" data-title="IaaS" data-desc="Hardware virtualizado, a pedido e pago ao uso.">
+  <header class="ph">
+    <h1>Infrastructure-as-a-Service<span class="en">IaaS</span></h1>
+    <p class="lede">O fornecedor tem os data centers; tu alugas os recursos de que precisas, quando precisas.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.1.1</span>A infraestrutura</h2>
+    <ul>
+      <li>Data centers espalhados pelo mundo (Ásia, Europa, América).</li>
+      <li>Cada um com cerca de <strong>80 000 servidores</strong>.</li>
+      <li>Principais fornecedores: Google, Amazon e Microsoft.</li>
+    </ul>
+    <h2><span class="sn">4.1.2</span>Objetivos</h2>
+    <ul>
+      <li>Fornecer recursos de hardware <strong>virtualizados</strong>: computação, armazenamento e rede.</li>
+      <li>Recursos atribuídos <strong>a pedido</strong> (on demand: quando o utilizador os pede) e em regime de <strong>pagamento por uso</strong> (pay-per-use: só se paga o que se usa de facto).</li>
+    </ul>
+    <div class="two">
+      <div class="card"><span class="tag">Computação</span><p>Amazon EC2, Google Compute Engine</p></div>
+      <div class="card"><span class="tag">Armazenamento</span><p>Amazon S3</p></div>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 4.2 OPENSTACK ============================ -->
+<article class="page" data-page="openstack" data-num="4.2" data-title="OpenStack" data-desc="Os serviços de uma cloud IaaS, por dentro.">
+  <header class="ph">
+    <h1>Um exemplo de IaaS: OpenStack<span class="en">OpenStack</span></h1>
+    <p class="lede">Software open-source para criar clouds <strong>privadas e públicas</strong>. Controla grandes conjuntos de recursos de computação, armazenamento e rede num data center, geridos por um dashboard ou pela API do OpenStack. Cada função é um serviço com nome próprio.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.2.1</span>Computação: Nova</h2>
+    <p>O <strong>Nova</strong> fornece diferentes tipos de instâncias de computação: servidores <strong>bare-metal</strong>, <strong>máquinas virtuais</strong> e <strong>containers</strong>. Para isso integra-se com outros serviços:</p>
+    <div class="tw"><table>
+      <thead><tr><th>Serviço</th><th>Função</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Keystone</strong></td><td>Identidade e autenticação</td></tr>
+        <tr><td><strong>Glance</strong></td><td>Repositório de imagens (ex.: imagens de VMs)</td></tr>
+        <tr><td><strong>Neutron</strong></td><td>Redes virtuais ou físicas para as instâncias</td></tr>
+        <tr><td><strong>Placement</strong></td><td>Regista os recursos de hardware disponíveis e atribui-os (ex.: ao criar uma VM)</td></tr>
+      </tbody></table></div>
+
+    <h2><span class="sn">4.2.2</span>Armazenamento: efémero, Cinder, Manila, Swift</h2>
+    <p>As instâncias têm armazenamento <strong>efémero</strong>, dado pelo Nova e <strong>apagado quando a instância termina</strong>. Para armazenamento persistente há três serviços:</p>
+    <div class="three">
+      <div class="card c1"><span class="tag">Cinder · blocos</span><p>Volumes que aparecem à VM como um disco (ex.: <code>/dev/vdc</code>), que se particiona, formata e monta.</p></div>
+      <div class="card c2"><span class="tag">Manila · ficheiros</span><p>Sistemas de ficheiros partilhados entre instâncias, como um NFS.</p></div>
+      <div class="card c3"><span class="tag">Swift · objetos</span><p>API chave-valor (imagina um hash map distribuído), ideal para dados não estruturados — vídeos, imagens. Muito escalável e fiável.</p></div>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Efémero</th><th>Blocos (Cinder)</th><th>Objetos (Swift)</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Serve para</strong></td><td>Correr o SO e espaço temporário</td><td>Acrescentar armazenamento persistente a uma VM</td><td>Guardar dados, incluindo imagens de VMs</td></tr>
+        <tr><td><strong>Acede-se através de</strong></td><td>Um sistema de ficheiros</td><td>Um dispositivo de blocos, que se particiona, formata e monta</td><td>Uma API REST</td></tr>
+        <tr><td><strong>Acessível a partir de</strong></td><td>Dentro de uma VM</td><td>Dentro de uma VM</td><td>Qualquer lado</td></tr>
+        <tr><td><strong>Gerido por</strong></td><td>Nova</td><td>Cinder</td><td>Swift</td></tr>
+        <tr><td><strong>Persiste até…</strong></td><td>A VM terminar</td><td>Ser apagado pelo utilizador</td><td>Ser apagado pelo utilizador</td></tr>
+        <tr><td><strong>Tamanho definido por</strong></td><td>O administrador (os <em>flavors</em>)</td><td>O utilizador, no pedido</td><td>O armazenamento físico disponível</td></tr>
+        <tr><td><strong>Uso típico</strong></td><td>Disco de 10 GB + 30 GB</td><td>Disco de 1 TB</td><td>Dezenas de TB de datasets</td></tr>
+      </tbody></table></div>
+
+    <h2><span class="sn">4.2.3</span>Rede e monitorização: Neutron e Telemetry</h2>
+    <ul>
+      <li><strong>Neutron</strong>: fornece rede como serviço (<strong>NaaS</strong>) aos ambientes virtuais. Segue os princípios de <strong>Software-Defined Networking</strong> (SDN): separa o encaminhamento dos pacotes das decisões de routing.</li>
+      <li><strong>Telemetry</strong>: monitorização da infraestrutura e dos recursos virtuais. Recolhe métricas de recursos físicos e virtuais, guarda-as para análise e <strong>dispara ações</strong> quando se cumprem regras — por exemplo, lançar mais VMs quando o CPU passa um limiar.</li>
+    </ul>
+
+    <h2><span class="sn">4.2.4</span>Equivalentes noutros fornecedores</h2>
+    <div class="tw"><table>
+      <thead><tr><th>OpenStack</th><th>Amazon Web Services</th><th>Google Cloud Platform</th></tr></thead>
+      <tbody>
+        <tr><td>Nova (computação)</td><td>EC2</td><td>Compute Engine</td></tr>
+        <tr><td>Cinder (blocos)</td><td>EBS (Elastic Block Storage)</td><td>Persistent Disks</td></tr>
+        <tr><td>Swift (objetos)</td><td>S3 (Simple Storage Service)</td><td>Cloud Storage</td></tr>
+        <tr><td>Neutron (rede)</td><td>Networking</td><td>Cloud Virtual Network</td></tr>
+        <tr><td>Telemetry (monitorização)</td><td>CloudWatch</td><td>Stackdriver</td></tr>
+      </tbody></table></div>
+  </section>
+</article>
+
+<!-- ============================ 4.3 PaaS ============================ -->
+<article class="page" data-page="paas" data-num="4.3" data-title="PaaS" data-desc="Entregas a aplicação, a plataforma trata do resto.">
+  <header class="ph">
+    <h1>Platform-as-a-Service<span class="en">PaaS</span></h1>
+    <p class="lede">O utilizador escreve uma aplicação e faz deploy dela; a plataforma garante que a aplicação corre e tem acesso aos recursos de que precisa.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.3.1</span>Diferenças em relação ao IaaS</h2>
+    <ul>
+      <li>O utilizador concentra-se na <strong>funcionalidade</strong> a disponibilizar, não nos recursos físicos ou virtuais que a suportam.</li>
+      <li>Os recursos tornam-se <strong>transparentes</strong> — o utilizador não precisa de saber em que hardware a aplicação corre — e a <strong>aplicação</strong> passa a ser a unidade de deployment.</li>
+      <li>Oferece um <strong>ambiente de desenvolvimento</strong> para desenvolver, instalar e correr aplicações: normalmente um ambiente de programação com várias linguagens (Python, Java…) e APIs para usar outros serviços da cloud.</li>
+    </ul>
+    <h2><span class="sn">4.3.2</span>Exemplo: Google App Engine</h2>
+    <ul>
+      <li>Baseado em instâncias de <strong>containers</strong>.</li>
+      <li>Várias linguagens (Java, Python, PHP…), ferramentas (Cloud SDK, IntelliJ IDEA…) e APIs (Google Cloud Storage…).</li>
+      <li>Funcionalidades de versionamento, testes, monitorização e logging.</li>
+    </ul>
+  </section>
+</article>
+
+<!-- ============================ 4.4 SaaS ============================ -->
+<article class="page" data-page="saas" data-num="4.4" data-title="SaaS" data-desc="Software completo oferecido como serviço.">
+  <header class="ph">
+    <h1>Software-as-a-Service<span class="en">SaaS</span></h1>
+    <p class="lede">Aplicações completas ou software genérico oferecidos como serviço. A aplicação do utilizador usa o serviço através de uma API — e nem precisa de correr na mesma plataforma.</p>
+  </header>
+
+  <section class="blk prose">
+    <ul>
+      <li>Alguns são <strong>componentes de software</strong> que exportam as suas APIs tradicionais.</li>
+      <li>Outros são acessíveis como <strong>serviços web</strong> ou pelo browser.</li>
+    </ul>
+    <div class="three">
+      <div class="card c1"><span class="tag">Bases de dados</span><p>Não há nada para instalar: a base de dados é usada através de um cliente, como uma tradicional, mas com configuração mínima e acesso remoto. Ex.: <strong>Amazon DynamoDB</strong>.</p></div>
+      <div class="card c2"><span class="tag">Aplicações web</span><p><strong>Salesforce</strong> e as <strong>Google Apps</strong> (Gmail…).</p></div>
+      <div class="card c3"><span class="tag">IA e análise de dados</span><p>Plataformas como o <strong>Amazon SageMaker</strong>.</p></div>
+    </div>
+    <p>Gerir (tarefa do <strong>fornecedor</strong>) e usar (tarefa do <strong>utilizador</strong>) estes serviços exige perceber muitos conceitos e tecnologias: sistemas distribuídos, virtualização, redes, armazenamento, provisionamento, monitorização, relatórios, faturação… e a interoperabilidade entre tudo isto.</p>
+  </section>
+</article>
+
+<!-- ============================ 4.5 VANTAGENS E DESVANTAGENS ============================ -->
+<article class="page" data-page="tradeoffs" data-num="4.5" data-title="Vantagens e desvantagens" data-desc="Conveniência, rapidez e elasticidade vs. perda de controlo.">
+  <header class="ph">
+    <h1>Vantagens e desvantagens<span class="en">Advantages · Disadvantages</span></h1>
+    <p class="lede">Subir de IaaS para PaaS e para SaaS dá cada vez mais conveniência — e tira cada vez mais controlo.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.5.1</span>Vantagens</h2>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>IaaS</th><th>PaaS</th><th>SaaS</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Conveniência</strong></td><td>Evitar custos iniciais de hardware e de gestão da infraestrutura; instalar "facilmente" aplicações legadas</td><td>Focar no desenvolvimento da aplicação; ferramentas de desenvolvimento, deploy, debugging e benchmarking já prontas</td><td>Aproveitar componentes existentes (bases de dados, servidores web/aplicacionais)</td></tr>
+        <tr><td><strong>Rapidez</strong></td><td>A infraestrutura já está instalada e configurada</td><td>Uma framework de desenvolvimento já instalada e configurada</td><td>Integração rápida de várias soluções de software</td></tr>
+        <tr><td><strong>Elasticidade</strong></td><td>Ilusão de recursos praticamente infinitos; o utilizador aumenta/diminui recursos conforme a procura (à mão ou com ferramentas de terceiros)</td><td>O fornecedor trata da elasticidade; a unidade de escala é normalmente a aplicação (mais/menos instâncias ou componentes)</td><td>O próprio serviço trata da elasticidade automaticamente</td></tr>
+      </tbody></table></div>
+    <div class="note"><span class="lbl">Elasticidade</span>
+      <p>Capacidade de <strong>aumentar ou reduzir</strong> recursos (computação, armazenamento, rede) e/ou componentes (bases de dados, aplicações, servidores web) conforme as necessidades da aplicação. Junto com o pagamento por uso, é o que permite pagar pouco quando há pouca procura e aguentar picos.</p>
+    </div>
+
+    <h2><span class="sn">4.5.2</span>Desvantagens</h2>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Perda de controlo</th></tr></thead>
+      <tbody>
+        <tr><td><strong>IaaS</strong></td><td>Sem controlo sobre o hardware e o software de virtualização: não há como afinar a infraestrutura para a aplicação.</td></tr>
+        <tr><td><strong>PaaS</strong></td><td>Sem controlo sobre o hardware nem sobre a plataforma: gestão, afinação e monitorização limitadas às ferramentas oferecidas.</td></tr>
+        <tr><td><strong>SaaS</strong></td><td>Software de terceiros, otimizado e configurado sobretudo pelo fornecedor.</td></tr>
+      </tbody></table></div>
+    <div class="three">
+      <div class="card c1"><span class="tag">Fiabilidade</span><p>Se o fornecedor falhar (mesmo que raramente), a aplicação falha, e a recuperação está fora do controlo do dono da aplicação.</p></div>
+      <div class="card c2"><span class="tag">Segurança</span><p>A aplicação é, no máximo, tão segura como o fornecedor: uma vulnerabilidade dele é uma vulnerabilidade dela, e só ele a pode corrigir.</p></div>
+      <div class="card c3"><span class="tag">Privacidade</span><p>O fornecedor guarda os dados dos utilizadores: risco de fugas por ataques externos ou internos. Há dados protegidos por lei (RGPD, HIPAA) que algumas instituições — como hospitais — não podem guardar em serviços de terceiros.</p></div>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo e perguntas para testar.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Conceito</th><th>Ideia-chave</th></tr></thead>
+      <tbody>
+        <tr><td><strong>IaaS</strong></td><td>Hardware virtualizado, a pedido e pago ao uso. Geres do SO para cima.</td></tr>
+        <tr><td><strong>PaaS</strong></td><td>Plataforma de desenvolvimento; a aplicação é a unidade de deploy.</td></tr>
+        <tr><td><strong>SaaS</strong></td><td>Software pronto a usar, por API, cliente ou browser.</td></tr>
+        <tr><td><strong>Nova / Keystone / Glance / Neutron / Placement</strong></td><td>Computação / identidade / imagens / rede / atribuição de recursos.</td></tr>
+        <tr><td><strong>Efémero / Cinder / Manila / Swift</strong></td><td>Morre com a VM / blocos / ficheiros partilhados / objetos por REST.</td></tr>
+        <tr><td><strong>Telemetry</strong></td><td>Métricas + regras que disparam ações (ex.: mais VMs).</td></tr>
+        <tr><td><strong>Elasticidade</strong></td><td>Escalar recursos ou componentes para cima e para baixo conforme a procura.</td></tr>
+        <tr><td><strong>Desvantagens</strong></td><td>Perda de controlo, dependência da fiabilidade e segurança do fornecedor, privacidade.</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.2</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">Alugas uma VM e instalas lá o SO, a base de dados e a aplicação. É…</p>
+        <div class="opts"><button data-ok>IaaS</button><button>PaaS</button><button>SaaS</button></div>
+        <p class="why">Recebes infraestrutura virtualizada e geres tudo a partir do sistema operativo.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">No Google App Engine, qual é a unidade de deployment?</p>
+        <div class="opts"><button>A máquina virtual</button><button data-ok>A aplicação</button><button>O disco</button></div>
+        <p class="why">É PaaS: os recursos são transparentes e entrega-se o código da aplicação.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Que tipo de armazenamento do OpenStack desaparece quando a instância termina?</p>
+        <div class="opts"><button data-ok>Efémero (Nova)</button><button>Cinder</button><button>Swift</button></div>
+        <p class="why">Cinder e Swift persistem até o utilizador os apagar.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Precisas de guardar dezenas de TB de vídeos acessíveis de qualquer lado por HTTP. Qual escolhes?</p>
+        <div class="opts"><button>Cinder (blocos)</button><button data-ok>Swift (objetos)</button><button>Armazenamento efémero</button></div>
+        <p class="why">Armazenamento de objetos: API REST, acessível de qualquer lado, muito escalável. Equivale ao S3.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual é o equivalente AWS do Cinder?</p>
+        <div class="opts"><button>S3</button><button data-ok>EBS</button><button>CloudWatch</button></div>
+        <p class="why">Cinder ↔ EBS (blocos); Swift ↔ S3 (objetos); Telemetry ↔ CloudWatch.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Um hospital não pode guardar dados clínicos num SaaS de terceiros. Que desvantagem da cloud é esta?</p>
+        <div class="opts"><button>Elasticidade</button><button data-ok>Privacidade (dados protegidos por lei)</button><button>Velocidade</button></div>
+        <p class="why">Legislação como o RGPD ou a HIPAA pode impedir o uso de serviços de terceiros.</p>
+      </div>
+    </div>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/i18n.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

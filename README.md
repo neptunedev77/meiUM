@@ -10,6 +10,7 @@ index.html                     página inicial (lista de UCs, gerada a partir do
 daa/
   index.html                   página da UC (lista de temas)
   01-data-science-concepts.html   um tema = um ficheiro; cada <article class="page"> é uma sub-página (#hash)
+ascn/                          Aplicações e Serviços de Computação em Nuvem (mesma estrutura)
 assets/
   css/style.css                estilos (tema claro/escuro, layout, componentes)
   js/catalog.js                ← registo de UCs e temas: a única fonte da navegação
