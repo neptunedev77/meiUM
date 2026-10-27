@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Feature Engineering · DAA · meiUM</title>
+<meta name="description" content="DAA · Tema 5: valores em falta, colunas constantes, dados desequilibrados, codificação de variáveis categóricas (label, one-hot, binária, factorize), datas e exploração de relações.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var t=JSON.parse(localStorage.getItem('meium:theme'));if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="daa" data-topic="05" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 5.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="5.0" data-title="Visão geral" data-desc="Transformar dados reais, desarrumados, em features que um modelo consegue usar.">
+  <header class="ph">
+    <h1>Feature Engineering<span class="en">Feature Engineering</span></h1>
+    <p class="lede">Os dados reais raramente chegam prontos: há valores em falta, colunas inúteis, texto, datas. <strong>Feature engineering</strong> é o trabalho de os transformar em features numéricas, limpas e informativas — muitas vezes é isto, mais do que a escolha do modelo, que decide o resultado.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.0.1</span>A lista de verificação</h2>
+    <ol class="steps-list">
+      <li><div><strong>Remover</strong> valores em falta, outliers e entradas ou features desnecessárias.</div></li>
+      <li><div><strong>Verificar e imputar</strong> valores nulos.</div></li>
+      <li><div><strong>Verificar o desequilíbrio</strong> das classes.</div></li>
+      <li><div><strong>Reindexar e reformatar</strong> os dados: texto → números, datas → componentes úteis.</div></li>
+    </ol>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <div class="note"><span class="lbl">Exemplo usado</span>
+      <p>Um registo de <strong>incidentes de trânsito</strong> numa cidade, com uma linha por hora: data, nome da cidade, luminosidade (LIGHT, DARK…), estradas afetadas, condições meteorológicas e o nível de incidentes (None, Low, Medium, High, Very_High), que é o que queremos prever. O código usa uma versão pequena destes dados, criada no próprio código.</p>
+    </div>
+    <pre><code class="language-python">import pandas as pd, numpy as np
+
+df = pd.DataFrame({
+    'data': ['2021-03-12 15:00', '2021-09-29 09:00', '2021-06-13 11:00',
+             '2021-12-07 23:00', '2021-12-05 05:00', '2021-01-22 09:00'],
+    'cidade': ['Guimarães'] * 6,
+    'luminosidade': ['LIGHT', 'LIGHT', 'LIGHT', 'DARK', 'DARK', 'LOW_LIGHT'],
+    'temperatura': [14.0, 15.0, np.nan, 9.0, 8.0, 8.0],
+    'estradas': ['N101', None, 'N101,N105', None, None, 'N206'],
+    'precipitacao': [0.0] * 6,
+    'incidentes': ['Low', 'Very_High', 'High', 'Medium', 'None', 'Low'],
+})</code></pre>
+    <p class="src">Baseado nas aulas de DAA (Feature Engineering). Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 5.1 VALORES EM FALTA ============================ -->
+<article class="page" data-page="missing" data-num="5.1" data-title="Valores em falta" data-desc="Detetar, remover ou preencher.">
+  <header class="ph">
+    <h1>Valores em falta<span class="en">Dealing with Missing Values</span></h1>
+    <p class="lede">A maioria dos modelos não aceita valores em falta (NaN). Primeiro deteta-se onde estão; depois decide-se, coluna a coluna, o que fazer.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.1.1</span>Detetar</h2>
+    <pre><code class="language-python">df.isnull().sum()       # temperatura: 1, estradas: 3, restantes: 0
+sns.heatmap(df.isnull(), cbar=False, cmap='viridis')   # cada traço é um valor em falta
+df[df['estradas'].isnull()]                            # ver as linhas afetadas</code></pre>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.1.2</span>As opções</h2>
+    <p>Uma boa prática é <strong>experimentar em cópias</strong> (<code>df1 = df.copy()</code>, <code>df2 = df.copy()</code>) e comparar antes de decidir.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Opção</th><th>Código</th><th>Quando faz sentido</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Remover a coluna</strong></td><td><code>df.drop(['estradas'], axis=1)</code></td><td>A coluna tem muitos nulos ou não acrescenta valor ao objetivo.</td></tr>
+        <tr><td><strong>Preencher com uma constante</strong></td><td><code>df.fillna(0)</code></td><td>O nulo significa mesmo "zero" ou "nenhum" (ex.: sem estradas afetadas).</td></tr>
+        <tr><td><strong>Preencher com uma estatística</strong></td><td><code>df['temperatura'].fillna(df['temperatura'].median())</code></td><td>Poucos nulos numa variável numérica. A mediana resiste a outliers.</td></tr>
+        <tr><td><strong>Preencher por grupo</strong></td><td><code>fillna(df.groupby(g)[c].transform('median'))</code></td><td>O valor varia com outra variável (tema 4).</td></tr>
+        <tr><td><strong>Interpolar</strong></td><td><code>df['temperatura'].interpolate()</code></td><td>Séries temporais: o valor em falta fica entre os vizinhos.</td></tr>
+        <tr><td><strong>Remover as linhas</strong></td><td><code>df.dropna()</code></td><td>Poucas linhas afetadas, ou nulos no próprio target.</td></tr>
+      </tbody></table></div>
+    <p>No exemplo, a coluna <code>estradas</code> (lista de estradas afetadas, em texto) não acrescenta valor ao objetivo e tem metade dos valores em falta: remove-se. A temperatura em falta preenche-se com a mediana (9.0).</p>
+    <div class="note warn"><span class="lbl">Armadilha: "None" lido como valor em falta</span>
+      <p>Por omissão, <code>pd.read_csv</code> converte o texto <code>"None"</code> (e também <code>"NA"</code>, <code>"null"</code>, <code>"n/a"</code>…) em NaN. Se "None" for uma categoria legítima — como o nível de incidentes "nenhum" — a classe desaparece silenciosamente e parece haver milhares de valores em falta no target. Solução: <code>pd.read_csv(f, keep_default_na=False, na_values=[''])</code>. <span class="xtag">complemento</span></p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 5.2 CONSTANTES E DESEQUILÍBRIO ============================ -->
+<article class="page" data-page="unicos" data-num="5.2" data-title="Colunas constantes e desequilíbrio" data-desc="Features que não informam e classes desproporcionadas.">
+  <header class="ph">
+    <h1>Colunas constantes e classes desequilibradas<span class="en">Dealing with Unique Values</span></h1>
+    <p class="lede">Uma feature que tem sempre o mesmo valor não ajuda a distinguir nada. E um target com classes muito desproporcionadas muda a forma como se treina e avalia.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.2.1</span>Colunas com um só valor</h2>
+    <pre><code class="language-python">df.nunique()      # cidade: 1, precipitacao: 1, luminosidade: 3, incidentes: 5, data: 6 …
+
+constantes = [c for c in df.columns if df[c].nunique() == 1]   # ['cidade', 'precipitacao']
+df = df.drop(columns=constantes)</code></pre>
+    <p>Todos os registos são da mesma cidade, e a precipitação é 0 em todas as linhas. Ambas são removidas: não dão ao modelo nenhuma informação para separar as classes.</p>
+    <div class="note extra"><span class="lbl">Complemento · o contrário também é suspeito</span>
+      <p>Uma coluna com um valor <strong>diferente em cada linha</strong> (como um ID ou a data-hora completa) também não generaliza: o modelo pode memorizá-la. As datas tratam-se extraindo componentes (5.4).</p>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.2.2</span>Distribuição do target</h2>
+    <pre><code class="language-python">df['incidentes'].value_counts()             # quantos exemplos de cada classe
+sns.barplot(x=counts.index, y=counts.values)  # ou um gráfico circular com plt.pie</code></pre>
+    <p>Num dataset real de incidentes, uma distribuição como High 36%, Low 24%, Very_High 20%, Medium 19% é razoavelmente equilibrada. Se uma classe tivesse 1% dos exemplos, a accuracy deixaria de ser fiável (tema 2) e seria preciso olhar para precision, recall e F1 por classe — e, possivelmente, usar folds estratificados ou <code>class_weight='balanced'</code>. <span class="xtag">complemento</span></p>
+  </section>
+</article>
+
+<!-- ============================ 5.3 CATEGÓRICAS ============================ -->
+<article class="page" data-page="categoricas" data-num="5.3" data-title="Variáveis categóricas" data-desc="Seis formas de transformar texto em números.">
+  <header class="ph">
+    <h1>Variáveis categóricas<span class="en">Handling Categoric Data</span></h1>
+    <p class="lede">Alguns modelos aceitam dados categóricos, mas a maioria (incluindo os do scikit-learn) precisa de números. Há várias formas de fazer a conversão, e a escolha muda o que o modelo "vê".</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.3.1</span>Os métodos</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Método</th><th>Ideia</th><th>Ferramenta</th></tr></thead>
+      <tbody>
+        <tr><td><strong>a) Substituir valores</strong></td><td>Um dicionário que tu defines: <code>None→0, Low→1, …, Very_High→4</code>.</td><td><code>df.replace(mapa)</code> / <code>map</code></td></tr>
+        <tr><td><strong>b) Label encoding</strong></td><td>Um inteiro por categoria, atribuído automaticamente.</td><td><code>LabelEncoder()</code></td></tr>
+        <tr><td><strong>c) One-hot encoding</strong></td><td>Uma coluna 0/1 por categoria.</td><td><code>pd.get_dummies</code>, <code>LabelBinarizer</code>, <code>OneHotEncoder</code></td></tr>
+        <tr><td><strong>d) Binary encoding</strong></td><td>O inteiro de cada categoria escrito em binário, um bit por coluna.</td><td><code>category_encoders.BinaryEncoder</code></td></tr>
+        <tr><td><strong>e) Backward difference</strong></td><td>Cada coluna compara um nível com o anterior; os valores ficam entre −1 e 1.</td><td><code>category_encoders.BackwardDifferenceEncoder</code></td></tr>
+        <tr><td><strong>f) Factorize</strong></td><td>Um inteiro por categoria, pela ordem em que aparecem.</td><td><code>pd.factorize</code></td></tr>
+      </tbody></table></div>
+    <div class="widget" data-widget="encoding"></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.3.2</span>Comparar os resultados</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Nível</th><th class="num">Decimal (ordinal)</th><th class="num">Binário</th><th class="num">One-hot</th></tr></thead>
+      <tbody>
+        <tr><td>None</td><td class="num">0</td><td class="num">000</td><td class="num">00001</td></tr>
+        <tr><td>Low</td><td class="num">1</td><td class="num">001</td><td class="num">00010</td></tr>
+        <tr><td>Medium</td><td class="num">2</td><td class="num">010</td><td class="num">00100</td></tr>
+        <tr><td>High</td><td class="num">3</td><td class="num">011</td><td class="num">01000</td></tr>
+        <tr><td>Very_High</td><td class="num">4</td><td class="num">100</td><td class="num">10000</td></tr>
+      </tbody></table></div>
+    <p>Para k categorias: ordinal usa 1 coluna, binário ⌈log₂ k⌉ colunas (aqui 3), one-hot k colunas (aqui 5).</p>
+    <pre><code class="language-python">mapa = {'None': 0, 'Low': 1, 'Medium': 2, 'High': 3, 'Very_High': 4}
+df['incidentes'].map(mapa)                      # [1, 4, 3, 2, 0, 1]   a ordem faz sentido
+
+from sklearn.preprocessing import LabelEncoder
+LabelEncoder().fit_transform(df['incidentes'])  # [1, 4, 0, 2, 3, 1]   ordem alfabética
+
+pd.factorize(df['incidentes'])[0] + 1           # [1, 2, 3, 4, 5, 1]   ordem de aparecimento
+
+pd.get_dummies(df['luminosidade'], prefix='lum', dtype=int)
+#    lum_DARK  lum_LIGHT  lum_LOW_LIGHT
+# 0         0          1              0  …
+
+import category_encoders as ce                  # pip install category_encoders
+ce.BinaryEncoder(cols=['incidentes']).fit_transform(df)</code></pre>
+    <div class="note warn"><span class="lbl">O LabelEncoder não é aleatório — é alfabético</span>
+      <p>Atribui os inteiros pela ordem alfabética das categorias: High = 0, Low = 1, Medium = 2, None = 3, Very_High = 4. Num nível ordinal isto <strong>baralha</strong> a ordem real (High fica "abaixo" de Low). O mesmo vale para o <code>factorize</code>, que segue a ordem de aparecimento. Para variáveis ordinais, usa um mapa explícito.</p>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.3.3</span>Qual escolher</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Tipo de variável</th><th>Método recomendado</th><th>Porquê</th></tr></thead>
+      <tbody>
+        <tr><td>Ordinal (Low &lt; Medium &lt; High)</td><td>Mapa explícito</td><td>Preserva a ordem real numa só coluna.</td></tr>
+        <tr><td>Nominal, poucas categorias (luminosidade)</td><td>One-hot</td><td>Não inventa ordem.</td></tr>
+        <tr><td>Nominal, muitas categorias (códigos postais)</td><td>Binary encoding</td><td>Evita centenas de colunas.</td></tr>
+        <tr><td>Target de classificação</td><td>Label encoding / factorize</td><td>Os classificadores só precisam de rótulos distintos.</td></tr>
+      </tbody></table></div>
+    <div class="note extra"><span class="lbl">Complemento · árvores vs. modelos lineares</span>
+      <p>Uma árvore de decisão aguenta bem uma ordem arbitrária (pode separar "código ≤ 2" e depois "código ≤ 0"), embora precise de mais divisões. Um modelo linear não: trata o código como uma quantidade e assume que "Very_High = 4" é quatro vezes "Low = 1".</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 5.4 DATAS ============================ -->
+<article class="page" data-page="datas" data-num="5.4" data-title="Datas" data-desc="Converter para datetime e extrair componentes.">
+  <header class="ph">
+    <h1>Datas<span class="en">Handling Dates</span></h1>
+    <p class="lede">Uma data em texto ("2021-03-12 15:00") não diz nada a um modelo. Convertida em datetime, dá origem a várias features úteis: mês, dia, hora, dia da semana…</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.4.1</span>Converter</h2>
+    <pre><code class="language-python">df['data'] = pd.to_datetime(df['data'], format='%Y-%m-%d %H:%M', errors='coerce')
+assert df['data'].isnull().sum() == 0, 'datas inválidas'   # errors='coerce' transforma datas inválidas em NaT</code></pre>
+    <p>Indicar o <code>format</code> evita ambiguidades (05/06 é maio ou junho?) e acelera a conversão. Com <code>errors='coerce'</code>, uma data impossível vira <code>NaT</code> em vez de dar erro — por isso se confirma a seguir que não há nenhuma.</p>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.4.2</span>Extrair componentes</h2>
+    <pre><code class="language-python">df['mes'] = df['data'].dt.month
+df['dia'] = df['data'].dt.day
+df['hora'] = df['data'].dt.hour
+df['dia_semana'] = df['data'].dt.day_of_week              # 0 = segunda … 6 = domingo
+df['fim_semana'] = (df['dia_semana'] >= 5).astype(int)</code></pre>
+    <div class="tw"><table>
+      <thead><tr><th>data</th><th class="num">mes</th><th class="num">dia</th><th class="num">hora</th><th class="num">dia_semana</th><th class="num">fim_semana</th></tr></thead>
+      <tbody>
+        <tr><td>2021-03-12 15:00</td><td class="num">3</td><td class="num">12</td><td class="num">15</td><td class="num">4</td><td class="num">0</td></tr>
+        <tr><td>2021-06-13 11:00</td><td class="num">6</td><td class="num">13</td><td class="num">11</td><td class="num">6</td><td class="num">1</td></tr>
+        <tr><td>2021-12-07 23:00</td><td class="num">12</td><td class="num">7</td><td class="num">23</td><td class="num">1</td><td class="num">0</td></tr>
+      </tbody></table></div>
+    <p>Depois de extrair, aplica-se a regra de 5.2: se o ano for sempre 2021 e os minutos sempre 0, essas componentes são constantes e removem-se. A coluna de data original também sai — o modelo usa as componentes.</p>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.4.3</span>Diferenças entre datas</h2>
+    <pre><code class="language-python">import datetime
+hoje = datetime.datetime.today()
+(hoje - df['data']).dt.days        # há quantos dias aconteceu cada registo
+df['data'].dt.time                 # só a hora do dia, como objeto time</code></pre>
+    <p>A diferença entre duas datas é um <code>timedelta</code>; <code>.dt.days</code> converte-a num número. Útil para features como "antiguidade do cliente" ou "dias desde a última compra".</p>
+    <div class="note extra"><span class="lbl">Complemento · variáveis cíclicas</span>
+      <p>Para o modelo, a hora 23 e a hora 0 estão "longe" (23 unidades), mas na realidade estão seguidas. Uma solução comum é codificar com seno e cosseno: \(\sin(2\pi\cdot h/24)\) e \(\cos(2\pi\cdot h/24)\).</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 5.5 RELAÇÕES ============================ -->
+<article class="page" data-page="eda" data-num="5.5" data-title="Relações entre features" data-desc="Explorar antes de modelar: heatmap, pairplot e jointplots.">
+  <header class="ph">
+    <h1>Relações entre features<span class="en">Exploratory Data Analysis</span></h1>
+    <p class="lede">Com tudo numérico, já se pode procurar relações entre features — e entre as features e o target — antes de escolher o modelo.</p>
+  </header>
+
+  <section class="blk prose">
+    <ol class="steps-list">
+      <li><div><strong>Matriz de correlação</strong> (<code>sns.heatmap(df.corr(method='pearson'))</code>) para destacar os pares mais relacionados. Num dataset de trânsito, por exemplo: magnitude do atraso com atraso em segundos (redundantes) e humidade com luminosidade.</div></li>
+      <li><div><strong>Pairplot</strong> (<code>sns.pairplot(df, hue='incidentes')</code>) para ver tudo de uma vez — com muitas features, fica difícil de ler.</div></li>
+      <li><div><strong>Joint plots</strong> (<code>sns.jointplot(x=…, y=…, data=df)</code>) para estudar um par de cada vez: dispersão no centro e a distribuição de cada variável nas margens.</div></li>
+      <li><div><strong>Reta de regressão</strong> (<code>sns.lmplot(x='temperatura', y='humidade', data=df)</code>) para confirmar uma tendência — por exemplo, a humidade tende a descer quando a temperatura sobe.</div></li>
+    </ol>
+    <div class="note"><span class="lbl">Ler gráficos de variáveis codificadas</span>
+      <p>Uma variável categórica codificada (luminosidade = 1, 2, 3) aparece num gráfico de dispersão como <strong>colunas verticais de pontos</strong>. Não é uma relação contínua: é uma variável discreta. Para essas, boxplots por categoria são mais legíveis.</p>
+    </div>
+    <p>Daqui segue-se para a modelação: separar X (sem a data original e sem o target) e y, dividir treino/teste e treinar — o que o tema 6 faz com uma árvore de decisão.</p>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo, armadilhas e perguntas para testar.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Problema</th><th>Solução típica</th></tr></thead>
+      <tbody>
+        <tr><td>Coluna com muitos nulos / sem valor</td><td><code>drop(columns=…)</code></td></tr>
+        <tr><td>Poucos nulos numéricos</td><td><code>fillna(mediana)</code>, por grupo, ou <code>interpolate()</code></td></tr>
+        <tr><td>Nulos em poucas linhas</td><td><code>dropna()</code></td></tr>
+        <tr><td>Coluna constante</td><td><code>nunique() == 1</code> → remover</td></tr>
+        <tr><td>Categórica ordinal</td><td>mapa explícito</td></tr>
+        <tr><td>Categórica nominal</td><td>one-hot (poucas categorias) / binária (muitas)</td></tr>
+        <tr><td>Data em texto</td><td><code>to_datetime(format=…)</code> → <code>.dt.month</code>, <code>.dt.hour</code>…</td></tr>
+        <tr><td>Classes desproporcionadas</td><td>métricas por classe, folds estratificados</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">Σ.2</span>Armadilhas frequentes</h2>
+    <ul>
+      <li><code>read_csv</code> lê "None", "NA" e "null" como NaN por omissão.</li>
+      <li><code>LabelEncoder</code> ordena alfabeticamente; <code>factorize</code> pela ordem de aparecimento — nenhum respeita uma ordem ordinal.</li>
+      <li>One-hot com muitas categorias explode o número de colunas.</li>
+      <li>Converter datas sem <code>format</code> pode trocar dia e mês.</li>
+      <li>Remover linhas com nulos pode deitar fora uma grande parte do dataset — conta-as primeiro.</li>
+    </ul>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.3</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">Uma coluna "país" tem o valor "Portugal" em todas as linhas. O que fazer?</p>
+        <div class="opts"><button>One-hot encoding</button><button data-ok>Remover a coluna</button><button>Label encoding</button></div>
+        <p class="why">Com um só valor (<code>nunique() == 1</code>), a coluna não ajuda a distinguir nenhuma classe.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Para codificar "tamanho" com valores S, M, L, XL, o melhor é…</p>
+        <div class="opts"><button>LabelEncoder</button><button data-ok>Um mapa explícito S→0, M→1, L→2, XL→3</button><button>One-hot encoding</button></div>
+        <p class="why">É ordinal: o mapa preserva a ordem real. O LabelEncoder ordenaria alfabeticamente (L, M, S, XL).</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Com 6 categorias, quantas colunas gera o binary encoding?</p>
+        <div class="opts"><button>1</button><button data-ok>3</button><button>6</button></div>
+        <p class="why">Os inteiros 1 a 6 cabem em 3 bits (⌈log₂ 7⌉ = 3). O one-hot geraria 6 colunas.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">O que faz <code>errors='coerce'</code> em <code>pd.to_datetime</code>?</p>
+        <div class="opts"><button>Corrige automaticamente as datas mal escritas</button><button data-ok>Converte as datas inválidas em NaT em vez de dar erro</button><button>Remove as linhas com datas inválidas</button></div>
+        <p class="why">As datas inválidas ficam como NaT (o "NaN" das datas); depois é preciso verificá-las e tratá-las.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Uma coluna de temperatura tem 2% de nulos e alguns outliers. A opção mais segura é…</p>
+        <div class="opts"><button>Preencher com 0</button><button>Preencher com a média</button><button data-ok>Preencher com a mediana</button></div>
+        <p class="why">0 é uma temperatura real e enviesaria os dados; a média é puxada pelos outliers; a mediana é robusta.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Num CSV, a classe "None" (sem incidentes) aparece como NaN depois do <code>read_csv</code>. Porquê?</p>
+        <div class="opts"><button>O ficheiro está corrompido</button><button data-ok>O pandas trata o texto "None" como valor em falta por omissão</button><button>O pandas não lê texto</button></div>
+        <p class="why">"None" está na lista de valores em falta por omissão. Usa <code>keep_default_na=False</code>.</p>
+      </div>
+    </div>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

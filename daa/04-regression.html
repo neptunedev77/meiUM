@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Regressão Linear e Logística · DAA · meiUM</title>
+<meta name="description" content="DAA · Tema 4: aprendizagem supervisionada, regressão linear, interpretação de coeficientes, métricas, regularização LASSO, regressão logística, preparação de dados e solvers.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var t=JSON.parse(localStorage.getItem('meium:theme'));if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="daa" data-topic="04" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 4.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="4.0" data-title="Visão geral" data-desc="Aprendizagem supervisionada e os dois modelos do tema.">
+  <header class="ph">
+    <h1>Regressão Linear e Logística<span class="en">Linear and Logistic Regression</span></h1>
+    <p class="lede">Dois dos modelos mais simples e mais usados de aprendizagem supervisionada: a regressão linear prevê um <strong>número</strong>, a regressão logística prevê uma <strong>classe</strong> (através de uma probabilidade).</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.0.1</span>Aprendizagem supervisionada</h2>
+    <p>A escolha do algoritmo depende do tipo de dados e do contexto. Quando temos <strong>dados rotulados</strong> — sabemos de antemão a resposta certa (o target) para cada exemplo de treino — usamos o paradigma de <strong>aprendizagem supervisionada</strong>: o modelo aprende a mapear o input X no output y.</p>
+    <ol class="pipeline">
+      <li>Definição do problema</li><li>Recolha</li><li>Preparação</li><li>Divisão</li><li class="on">Treino do modelo</li><li class="on">Avaliação</li><li>Deployment</li><li>Monitorização</li>
+    </ol>
+    <div class="two">
+      <div class="card c1"><span class="tag">Regressão linear</span><p>Target <strong>contínuo</strong>: preço de uma casa, temperatura, tempo de entrega.</p></div>
+      <div class="card c2"><span class="tag">Regressão logística</span><p>Target <strong>categórico</strong>: sobrevive ou não, spam ou não, maligno ou benigno. Apesar do nome, é um modelo de <strong>classificação</strong>.</p></div>
+    </div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <div class="note"><span class="lbl">Exemplos usados</span>
+      <ul>
+        <li><strong>Preços de casas</strong> (regressão linear): um dataset sintético de 1000 casas, gerado com NumPy dentro do próprio código, onde sabemos a fórmula verdadeira — dá para confirmar se o modelo a recupera.</li>
+        <li><code>load_breast_cancer</code> (regressão logística): prever se um tumor é maligno.</li>
+      </ul>
+    </div>
+    <p class="src">Baseado nas aulas de DAA (Linear and Logistic Regression). Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 4.1 REGRESSÃO LINEAR ============================ -->
+<article class="page" data-page="linear" data-num="4.1" data-title="Regressão linear" data-desc="A reta (ou hiperplano) que melhor se ajusta e como ler os coeficientes.">
+  <header class="ph">
+    <h1>Regressão linear<span class="en">Linear Regression</span></h1>
+    <p class="lede">O modelo assume que o target é uma <strong>soma pesada</strong> das features mais uma constante. Treinar é encontrar os pesos que fazem as previsões ficar o mais perto possível dos valores reais.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.1.1</span>O modelo</h2>
+    <div class="formula"><div class="cap">Previsão <span class="xtag">complemento</span></div>\[\hat{y}=\beta_0+\beta_1x_1+\beta_2x_2+\dots+\beta_px_p\]</div>
+    <ul>
+      <li>\(\beta_0\) é a <strong>ordenada na origem</strong> (<code>intercept_</code>): a previsão quando todas as features valem 0.</li>
+      <li>\(\beta_1,\dots,\beta_p\) são os <strong>coeficientes</strong> (<code>coef_</code>): um por feature.</li>
+      <li>O treino escolhe os β que <strong>minimizam o MSE</strong> nos dados de treino (método dos mínimos quadrados).</li>
+    </ul>
+    <div class="widget" data-widget="linfit"></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.1.2</span>Interpretar os coeficientes</h2>
+    <p>Cada coeficiente lê-se assim: <strong>mantendo todas as outras features fixas</strong>, aumentar essa feature em 1 unidade está associado a uma variação de β no target.</p>
+    <p>No exemplo das casas, os dados foram gerados com a fórmula <em>preço = 50 + 2·área + 10·quartos − 0.8·idade − 3·distância + ruído</em> (preço em milhares de €). O modelo recupera-a quase exatamente:</p>
+    <div class="tw"><table>
+      <thead><tr><th>Feature</th><th class="num">Verdadeiro</th><th class="num">Estimado</th><th>Leitura</th></tr></thead>
+      <tbody>
+        <tr><td>área (m²)</td><td class="num">2.0</td><td class="num">2.02</td><td>+1 m² → +2 020 €</td></tr>
+        <tr><td>quartos</td><td class="num">10</td><td class="num">10.80</td><td>+1 quarto → +10 800 €, à mesma área</td></tr>
+        <tr><td>idade (anos)</td><td class="num">−0.8</td><td class="num">−0.75</td><td>+1 ano → −750 €</td></tr>
+        <tr><td>distância ao centro (km)</td><td class="num">−3.0</td><td class="num">−2.98</td><td>+1 km → −2 980 €</td></tr>
+        <tr><td>intercept</td><td class="num">50</td><td class="num">43.91</td><td>sem significado prático (casa de 0 m²)</td></tr>
+      </tbody></table></div>
+    <div class="note warn"><span class="lbl">Associação, não causa</span>
+      <p>"Está associado a" não é "causa". Além disso, o tamanho de um coeficiente depende das <strong>unidades</strong> da feature: um coeficiente grande não quer dizer uma feature importante (o coeficiente do rendimento médio em € é minúsculo porque 1 € é muito pouco).</p>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.1.3</span>O fluxo completo</h2>
+    <ol class="steps-list">
+      <li><div><strong>Explorar</strong>: <code>info()</code>, <code>describe()</code>, <code>pairplot</code>, histograma do target, heatmap das correlações. No exemplo, o preço correlaciona 0.89 com a área.</div></li>
+      <li><div><strong>Escolher X e y</strong>: o target é o preço. Colunas não numéricas ou irrelevantes (ex.: a morada) ficam de fora.</div></li>
+      <li><div><strong>Dividir</strong> treino/teste e confirmar que o target tem uma distribuição parecida nos dois (histogramas de <code>y_train</code> e <code>y_test</code>).</div></li>
+      <li><div><strong>Treinar</strong> e ler <code>intercept_</code> e <code>coef_</code>.</div></li>
+      <li><div><strong>Prever e analisar</strong>: gráfico real vs. previsto (pontos perto da diagonal = bom) e histograma dos resíduos (deve parecer uma normal centrada em 0).</div></li>
+    </ol>
+    <pre><code class="language-python">import numpy as np, pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+
+rng = np.random.default_rng(0); n = 1000
+area = rng.normal(120, 30, n).clip(40, 250)
+quartos = np.round(area / 30 + rng.normal(0, 0.7, n)).clip(1, 8)
+idade = rng.uniform(0, 60, n); dist = rng.uniform(0.5, 25, n)
+preco = 50 + 2*area + 10*quartos - 0.8*idade - 3*dist + rng.normal(0, 25, n)
+df = pd.DataFrame({'area': area, 'quartos': quartos, 'idade': idade, 'dist_centro': dist, 'preco': preco})
+
+X, y = df.drop(columns='preco'), df['preco']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+lm = LinearRegression().fit(X_train, y_train)
+lm.intercept_                                            # 43.91
+pd.DataFrame(lm.coef_, X.columns, columns=['Coefficient'])   # 2.02, 10.80, -0.75, -2.98
+predictions = lm.predict(X_test)</code></pre>
+  </section>
+</article>
+
+<!-- ============================ 4.2 MÉTRICAS ============================ -->
+<article class="page" data-page="metricas" data-num="4.2" data-title="Avaliar uma regressão" data-desc="MAE, MSE, RMSE como funções de perda.">
+  <header class="ph">
+    <h1>Avaliar uma regressão<span class="en">Regression Evaluation Metrics</span></h1>
+    <p class="lede">As três métricas mais usadas são as do tema 2: MAE, MSE e RMSE. Aqui fica a comparação prática entre elas.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="tw"><table>
+      <thead><tr><th>Métrica</th><th>Porque se usa</th><th class="num">Casas (teste)</th></tr></thead>
+      <tbody>
+        <tr><td><strong>MAE</strong></td><td>A mais fácil de perceber: é o erro médio.</td><td class="num">19.83</td></tr>
+        <tr><td><strong>MSE</strong></td><td>Mais popular do que o MAE porque "castiga" os erros grandes.</td><td class="num">580.58</td></tr>
+        <tr><td><strong>RMSE</strong></td><td>Ainda mais popular: castiga erros grandes e está nas unidades do target.</td><td class="num">24.10</td></tr>
+      </tbody></table></div>
+    <p>Todas são <strong>funções de perda</strong> (loss functions): o objetivo é minimizá-las. No exemplo, o modelo erra em média cerca de 20 mil € (MAE), e o RMSE de 24 mil € coincide com o ruído de desvio padrão 25 que pusemos nos dados — não há muito mais a ganhar.</p>
+    <pre><code class="language-python">from sklearn import metrics
+print('MAE:', metrics.mean_absolute_error(y_test, predictions))        # 19.83
+print('MSE:', metrics.mean_squared_error(y_test, predictions))         # 580.58
+print('RMSE:', metrics.root_mean_squared_error(y_test, predictions))   # 24.10</code></pre>
+    <div class="note extra"><span class="lbl">Complemento · R²</span>
+      <p>O <strong>coeficiente de determinação</strong> \(R^2 = 1 - \frac{\sum(y-\hat{y})^2}{\sum(y-\bar{y})^2}\) diz que fração da variação do target o modelo explica: 1 é perfeito, 0 é tão bom como prever sempre a média. Aqui, <code>metrics.r2_score(y_test, predictions)</code> = 0.901. É também o que <code>lm.score(X_test, y_test)</code> devolve.</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 4.3 REGULARIZAÇÃO ============================ -->
+<article class="page" data-page="regularizacao" data-num="4.3" data-title="Regularização: LASSO" data-desc="Penalizar coeficientes para generalizar melhor.">
+  <header class="ph">
+    <h1>Regularização: regressão linear vs. LASSO<span class="en">Regularization</span></h1>
+    <p class="lede">A <strong>regularização</strong> acrescenta uma penalização à função objetivo durante o treino, para evitar overfitting e melhorar a generalização. A ideia é desencorajar o modelo de se ajustar demasiado aos dados de treino, o que o faria falhar em dados novos.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.3.1</span>LASSO</h2>
+    <div class="formula"><div class="cap">Função objetivo do LASSO <span class="xtag">complemento</span></div>\[\min_\beta\ \underbrace{\frac{1}{2n}\sum_{i}(y_i-\hat{y}_i)^2}_{\text{erro}}\ +\ \alpha\underbrace{\sum_{j}\lvert\beta_j\rvert}_{\text{penalização L1}}\]</div>
+    <ul>
+      <li>O hiperparâmetro <code>alpha</code> controla a força da penalização: <code>alpha=0</code> é a regressão linear normal; quanto maior, mais os coeficientes encolhem.</li>
+      <li>A penalização L1 tem uma propriedade especial: põe coeficientes <strong>exatamente a zero</strong>. O LASSO faz, por isso, <strong>seleção de features</strong> automática.</li>
+    </ul>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.3.2</span>A experiência: features de puro ruído</h2>
+    <p>Acrescentam-se ao dataset duas colunas de números aleatórios (<code>ruido1</code>, <code>ruido2</code>), que não têm nada a ver com o preço, e compara-se a regressão linear com o LASSO:</p>
+    <pre><code class="language-python">df['ruido1'] = rng.integers(1, 10, n)        # aleatório, sem relação com o preço
+df['ruido2'] = rng.integers(10, 100, n)
+
+lin_reg = LinearRegression().fit(X_train, y_train)
+lasso = Lasso(alpha=5).fit(X_train, y_train)</code></pre>
+    <div class="tw"><table>
+      <thead><tr><th>Feature</th><th class="num">Linear</th><th class="num">LASSO α = 5 (dados brutos)</th><th class="num">LASSO α = 0.5 (dados standardizados)</th></tr></thead>
+      <tbody>
+        <tr><td>area</td><td class="num">2.02</td><td class="num">2.29</td><td class="num">58.72</td></tr>
+        <tr><td>quartos</td><td class="num">10.77</td><td class="num"><b>2.76</b></td><td class="num">13.31</td></tr>
+        <tr><td>idade</td><td class="num">−0.75</td><td class="num">−0.71</td><td class="num">−12.17</td></tr>
+        <tr><td>dist_centro</td><td class="num">−2.98</td><td class="num">−2.90</td><td class="num">−20.35</td></tr>
+        <tr><td>ruido1</td><td class="num">0.136</td><td class="num"><b>0</b></td><td class="num"><b>0</b></td></tr>
+        <tr><td>ruido2</td><td class="num">−0.004</td><td class="num"><b>0</b></td><td class="num"><b>0</b></td></tr>
+        <tr><td>RMSE no teste</td><td class="num">24.09</td><td class="num">25.47</td><td class="num">24.15</td></tr>
+      </tbody></table></div>
+    <p>A regressão linear dá um peso (pequeno, mas não nulo) ao ruído. O LASSO elimina-o. Mas nos dados brutos, para chegar lá, teve de encolher muito o coeficiente dos quartos (de 10.8 para 2.8) e o erro subiu.</p>
+    <div class="note warn"><span class="lbl">Standardizar antes de regularizar</span>
+      <p>A penalização trata todos os coeficientes por igual, mas o seu tamanho depende das unidades: um coeficiente "grande" pode só refletir uma feature em unidades pequenas. Com features em escalas muito diferentes, o LASSO regulariza mal. Standardizando primeiro (<code>StandardScaler</code>), basta um α pequeno para eliminar o ruído sem prejudicar o resto (última coluna). Os coeficientes passam a ler-se "por desvio padrão".</p>
+    </div>
+    <pre><code class="language-python">from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import Lasso
+
+lasso = make_pipeline(StandardScaler(), Lasso(alpha=0.5)).fit(X_train, y_train)
+lasso[-1].coef_          # [58.72, 13.31, -12.17, -20.35, 0, 0]</code></pre>
+    <div class="widget" data-widget="lines" data-title="Caminho do LASSO: coeficientes vs. α (dados standardizados)">
+      <script type="application/json">{"hint": "Arrasta o α. As features de ruído caem a zero logo no início; com α grande, até as features úteis desaparecem e o erro dispara.", "xlabel": "alpha", "x": ["0.01", "0.1", "0.5", "1", "2", "3", "5", "8", "12", "20", "30", "45", "60"], "series": [{"name": "area", "color": "s1", "y": [58.93, 58.89, 58.72, 58.53, 58.13, 57.74, 56.95, 55.78, 54.2, 50.27, 41.75, 26.75, 11.75]}, {"name": "quartos", "color": "s2", "y": [13.59, 13.54, 13.31, 12.98, 12.33, 11.67, 10.37, 8.41, 5.79, 1.52, 0, 0, 0]}, {"name": "idade", "color": "s3", "y": [-12.68, -12.59, -12.17, -11.67, -10.65, -9.64, -7.61, -4.57, -0.51, 0, 0, 0, 0]}, {"name": "dist_centro", "color": "s4", "y": [-20.79, -20.71, -20.35, -19.9, -19.01, -18.12, -16.35, -13.68, -10.13, -2.9, 0, 0, 0]}, {"name": "ruido1", "color": "s5", "y": [0.34, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}, {"name": "ruido2", "color": "muted", "y": [-0.09, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}], "extra": [{"name": "RMSE teste", "v": ["24.09", "24.10", "24.15", "24.23", "24.47", "24.82", "25.81", "27.95", "31.76", "38.10", "44.72", "54.90", "66.74"]}], "start": 2, "digits": 2}</script>
+    </div>
+    <div class="note extra"><span class="lbl">Complemento · Ridge</span>
+      <p>A <strong>regressão Ridge</strong> usa a penalização L2, \(\alpha\sum\beta_j^2\): também encolhe os coeficientes, mas nunca os põe exatamente a zero. O <strong>Elastic Net</strong> combina L1 e L2.</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 4.4 LOGÍSTICA ============================ -->
+<article class="page" data-page="logistica" data-num="4.4" data-title="Regressão logística" data-desc="Da combinação linear à probabilidade com a sigmoide.">
+  <header class="ph">
+    <h1>Regressão logística<span class="en">Logistic Regression</span></h1>
+    <p class="lede">Para classificar não serve uma reta: as previsões têm de ficar entre 0 e 1. A regressão logística calcula a mesma combinação linear da regressão linear e depois "espreme-a" para uma probabilidade.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.4.1</span>A sigmoide <span class="xtag">complemento</span></h2>
+    <div class="fgrid">
+      <div class="formula"><div class="cap">Combinação linear</div>\[z=\beta_0+\beta_1x_1+\dots+\beta_px_p\]</div>
+      <div class="formula"><div class="cap">Probabilidade da classe 1</div>\[P(y=1\mid x)=\sigma(z)=\frac{1}{1+e^{-z}}\]</div>
+    </div>
+    <ul>
+      <li>z muito positivo → probabilidade perto de 1; z muito negativo → perto de 0; z = 0 → 0.5.</li>
+      <li>A classe prevista é 1 quando a probabilidade passa o <strong>limiar</strong> (0.5 por omissão). O <code>predict_proba</code> devolve as probabilidades; o <code>predict</code> devolve já a classe.</li>
+      <li>O treino escolhe os β que minimizam o <strong>log-loss</strong> (entropia cruzada), que castiga muito as previsões confiantes e erradas.</li>
+    </ul>
+    <div class="widget" data-widget="sigmoid"></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.4.2</span>Coeficientes</h2>
+    <p>Um coeficiente positivo aumenta a probabilidade da classe 1 quando a feature sobe; um negativo diminui-a. A leitura exata é em termos de <em>odds</em>: +1 unidade multiplica as odds \(P/(1-P)\) por \(e^{\beta}\). <span class="xtag">complemento</span></p>
+  </section>
+</article>
+
+<!-- ============================ 4.5 PREPARAR ============================ -->
+<article class="page" data-page="preparar" data-num="4.5" data-title="Preparar os dados" data-desc="Valores em falta, imputação por grupo e variáveis dummy.">
+  <header class="ph">
+    <h1>Preparar os dados para o modelo<span class="en">Exploratory Data Analysis · Data Preprocessing</span></h1>
+    <p class="lede">A regressão logística (como a linear) só aceita números e não aceita valores em falta. Antes de treinar é preciso tratar das duas coisas.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.5.1</span>Ver onde faltam dados</h2>
+    <p>Um mapa de calor de <code>df.isnull()</code> (<code>sns.heatmap(df.isnull(), cbar=False)</code>) mostra cada valor em falta como um traço. A decisão depende da quantidade:</p>
+    <div class="tw"><table>
+      <thead><tr><th>Situação</th><th>Exemplo</th><th>O que fazer</th></tr></thead>
+      <tbody>
+        <tr><td>Falta uma fração pequena (ex.: ~20%)</td><td>idade dos passageiros de um navio</td><td><strong>Imputar</strong>: preencher com um valor razoável.</td></tr>
+        <tr><td>Falta quase tudo</td><td>número da cabine</td><td><strong>Remover a coluna</strong> ou substituí-la por uma feature mais simples, como "cabine conhecida: 1 ou 0".</td></tr>
+        <tr><td>Faltam poucas linhas</td><td>2 portos de embarque em falta</td><td><strong>Remover essas linhas</strong> (<code>dropna</code>).</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.5.2</span>Imputar por grupo</h2>
+    <p>Preencher todas as idades em falta com a média global é a solução mais simples. Melhor: usar a <strong>mediana do grupo</strong> a que a pessoa pertence, se a idade variar entre grupos — por exemplo, passageiros de 1.ª classe tendem a ser mais velhos (um boxplot da idade por classe mostra-o).</p>
+    <pre><code class="language-python">df = pd.DataFrame({'Pclass': [1, 1, 1, 1, 3, 3, 3, 3, 3],
+                   'Age':    [38, 35, None, 54, 22, 26, None, 35, 2]})
+
+df.groupby('Pclass')['Age'].median()            # 1: 38.0   3: 24.0
+df['Age'] = df['Age'].fillna(df.groupby('Pclass')['Age'].transform('median'))
+# a idade em falta da 1.ª classe passa a 38, a da 3.ª classe passa a 24</code></pre>
+    <p><code>transform('median')</code> devolve, para cada linha, a mediana do seu grupo — com o mesmo tamanho da coluna original, pronta para o <code>fillna</code>.</p>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.5.3</span>Variáveis categóricas → dummies</h2>
+    <p><code>pd.get_dummies</code> transforma uma coluna categórica em colunas 0/1, uma por categoria. Com <code>drop_first=True</code> remove-se uma delas, porque é redundante: se não é Q nem S, é C.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Embarked</th><th class="num">Q</th><th class="num">S</th></tr></thead>
+      <tbody><tr><td>S</td><td class="num">0</td><td class="num">1</td></tr><tr><td>C</td><td class="num">0</td><td class="num">0</td></tr><tr><td>Q</td><td class="num">1</td><td class="num">0</td></tr></tbody></table></div>
+    <pre><code class="language-python">sex = pd.get_dummies(df['Sex'], drop_first=True)          # uma coluna: male
+embark = pd.get_dummies(df['Embarked'], drop_first=True)  # duas colunas: Q, S
+df = pd.concat([df.drop(columns=['Sex', 'Embarked']), sex, embark], axis=1)</code></pre>
+    <div class="note extra"><span class="lbl">Complemento · porquê drop_first</span>
+      <p>Com todas as colunas, a soma das dummies é sempre 1 — igual à constante β₀. Isso torna os coeficientes de modelos lineares instáveis (multicolinearidade perfeita). Remover uma categoria resolve; os coeficientes passam a ler-se "em relação à categoria removida".</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 4.6 TREINAR E AVALIAR ============================ -->
+<article class="page" data-page="solvers" data-num="4.6" data-title="Solvers e avaliação" data-desc="Escolher o solver e ler o classification_report.">
+  <header class="ph">
+    <h1>Treinar: solvers e avaliação<span class="en">Logistic Regression solvers</span></h1>
+    <p class="lede">Ao contrário da regressão linear, a logística não tem uma fórmula fechada: os coeficientes encontram-se por um algoritmo de otimização iterativo, o <strong>solver</strong>.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.6.1</span>Escolher o solver</h2>
+    <ul>
+      <li>Para datasets <strong>pequenos</strong>, <code>liblinear</code> é uma boa escolha; <code>sag</code> e <code>saga</code> são mais rápidos para datasets <strong>grandes</strong>.</li>
+      <li>Para problemas <strong>multiclasse</strong>, só <code>newton-cg</code>, <code>sag</code>, <code>saga</code> e <code>lbfgs</code> otimizam a perda multinomial; <code>liblinear</code> fica limitado a esquemas um-contra-todos (one-vs-rest).</li>
+    </ul>
+    <div class="tw"><table>
+      <thead><tr><th>Solver</th><th>Penalizações suportadas</th></tr></thead>
+      <tbody>
+        <tr><td><code>lbfgs</code> (omissão)</td><td>L2, nenhuma</td></tr>
+        <tr><td><code>newton-cg</code></td><td>L2, nenhuma</td></tr>
+        <tr><td><code>liblinear</code></td><td>L1, L2</td></tr>
+        <tr><td><code>sag</code></td><td>L2, nenhuma</td></tr>
+        <tr><td><code>saga</code></td><td>Elastic Net, L1, L2, nenhuma</td></tr>
+      </tbody></table></div>
+    <p>Hiperparâmetros principais: <code>penalty</code>, <code>C</code> (o <strong>inverso</strong> da força da regularização: C pequeno = mais regularização), <code>solver</code>, <code>max_iter</code>, <code>random_state</code>.</p>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.6.2</span>Comparar solvers</h2>
+    <p>Com o dataset de tumores (70/30), os quatro solvers chegam a resultados parecidos — mas só depois de standardizar as features:</p>
+    <div class="tw"><table>
+      <thead><tr><th>Solver</th><th class="num">Accuracy (dados brutos)</th><th class="num">Iterações</th><th class="num">Accuracy (standardizados)</th><th class="num">Iterações</th></tr></thead>
+      <tbody>
+        <tr><td>lbfgs</td><td class="num">0.971</td><td class="num"><b>100</b> ⚠</td><td class="num">0.982</td><td class="num">19</td></tr>
+        <tr><td>liblinear</td><td class="num">0.965</td><td class="num">21</td><td class="num">0.982</td><td class="num">8</td></tr>
+        <tr><td>newton-cg</td><td class="num">0.977</td><td class="num">50</td><td class="num">0.982</td><td class="num">9</td></tr>
+        <tr><td>saga</td><td class="num">0.953</td><td class="num"><b>100</b> ⚠</td><td class="num">0.988</td><td class="num">100</td></tr>
+      </tbody></table></div>
+    <div class="note warn"><span class="lbl">ConvergenceWarning</span>
+      <p>⚠ = o solver chegou ao limite de <code>max_iter</code> sem convergir, e o sklearn avisa. As duas soluções: aumentar <code>max_iter</code> ou — melhor — <strong>standardizar</strong> as features, que acelera muito a convergência.</p>
+    </div>
+    <pre><code class="language-python">from sklearn.linear_model import LogisticRegression
+from sklearn.datasets import load_breast_cancer
+
+X, y = load_breast_cancer(return_X_y=True); y = 1 - y        # 1 = maligno
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+logmodel = make_pipeline(StandardScaler(), LogisticRegression(solver='lbfgs', random_state=42))
+logmodel.fit(X_train, y_train)
+predictions = logmodel.predict(X_test)</code></pre>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.6.3</span>Ler o classification_report</h2>
+    <pre><code class="language-python">from sklearn.metrics import classification_report, ConfusionMatrixDisplay
+print(classification_report(y_test, predictions))
+ConfusionMatrixDisplay.from_predictions(y_test, predictions)    # [[106, 2], [1, 62]]</code></pre>
+    <pre data-title="Saída"><code class="language-text">              precision    recall  f1-score   support
+
+           0       0.99      0.98      0.99       108
+           1       0.97      0.98      0.98        63
+
+    accuracy                           0.98       171
+   macro avg       0.98      0.98      0.98       171
+weighted avg       0.98      0.98      0.98       171</code></pre>
+    <ul>
+      <li>Uma linha <strong>por classe</strong>: precision, recall e F1 calculados como se essa classe fosse a "positiva".</li>
+      <li><strong>support</strong>: quantos exemplos reais dessa classe há no teste (108 benignos, 63 malignos).</li>
+      <li><strong>macro avg</strong>: média simples das classes — cada classe pesa o mesmo.</li>
+      <li><strong>weighted avg</strong>: média pesada pelo support — as classes maiores pesam mais.</li>
+    </ul>
+    <p>Com classes desequilibradas, um macro avg muito abaixo do weighted avg indica que a classe pequena está a ser mal prevista.</p>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo, armadilhas e perguntas para testar.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Conceito</th><th>Ideia-chave</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Regressão linear</strong></td><td>\(\hat{y}=\beta_0+\sum\beta_jx_j\); minimiza o MSE; prevê números.</td></tr>
+        <tr><td><strong>Coeficiente</strong></td><td>Variação do target por +1 unidade da feature, com as outras fixas. Depende das unidades.</td></tr>
+        <tr><td><strong>MAE / MSE / RMSE</strong></td><td>Erro médio / castiga erros grandes / castiga e está nas unidades. Funções de perda.</td></tr>
+        <tr><td><strong>Regularização</strong></td><td>Penalização na função objetivo para evitar overfitting.</td></tr>
+        <tr><td><strong>LASSO (L1)</strong></td><td>Encolhe coeficientes e põe alguns a zero → seleção de features. Standardizar antes.</td></tr>
+        <tr><td><strong>Regressão logística</strong></td><td>\(P(y=1)=\sigma(z)\); classificação; limiar 0.5 por omissão.</td></tr>
+        <tr><td><strong>Imputação por grupo</strong></td><td><code>fillna(df.groupby(g)[c].transform('median'))</code></td></tr>
+        <tr><td><strong>Dummies</strong></td><td><code>pd.get_dummies(..., drop_first=True)</code></td></tr>
+        <tr><td><strong>Solvers</strong></td><td>liblinear: pequenos (L1/L2, só OvR); sag/saga: grandes; lbfgs: omissão.</td></tr>
+        <tr><td><strong>classification_report</strong></td><td>Precision/recall/F1 por classe; support; macro vs. weighted avg.</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">Σ.2</span>Armadilhas frequentes</h2>
+    <ul>
+      <li>A regressão logística é de <strong>classificação</strong>, apesar do nome.</li>
+      <li>Coeficiente grande ≠ feature importante: depende da escala.</li>
+      <li>Regularizar sem standardizar penaliza as features de forma desigual.</li>
+      <li>Em <code>LogisticRegression</code>, <code>C</code> grande = <strong>menos</strong> regularização.</li>
+      <li>ConvergenceWarning: standardiza ou aumenta <code>max_iter</code>.</li>
+      <li>Dummies com todas as categorias criam redundância; usa <code>drop_first=True</code> em modelos lineares.</li>
+    </ul>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.3</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">Num modelo de preços, o coeficiente de "quartos" é 10.8 (milhares de €). Isto significa que…</p>
+        <div class="opts"><button>Cada casa custa 10.8 mil € por quarto, no total</button><button data-ok>Mantendo as outras features fixas, +1 quarto está associado a +10.8 mil €</button><button>Ter mais quartos causa um aumento de preço de 10.8 mil €</button></div>
+        <p class="why">É uma associação, condicionada às outras features. Não prova causalidade.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">O que distingue o LASSO da regressão linear normal?</p>
+        <div class="opts"><button>Usa uma função sigmoide</button><button data-ok>Acrescenta uma penalização L1 que pode pôr coeficientes a zero</button><button>Só funciona com uma feature</button></div>
+        <p class="why">A penalização α·Σ|β| encolhe os coeficientes e anula os menos úteis.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Aumentar o <code>alpha</code> do LASSO…</p>
+        <div class="opts"><button>Diminui a regularização</button><button data-ok>Aumenta a regularização: mais coeficientes encolhem ou vão a zero</button><button>Não tem efeito nos coeficientes</button></div>
+        <p class="why">α maior = penalização mais forte. Com α demasiado grande, até as features úteis desaparecem e o erro sobe.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Uma regressão logística dá z = 0 para uma amostra. A probabilidade da classe 1 é…</p>
+        <div class="opts"><button>0</button><button data-ok>0.5</button><button>1</button></div>
+        <p class="why">σ(0) = 1/(1 + e⁰) = 0.5: a amostra está exatamente na fronteira de decisão.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Num problema multiclasse com perda multinomial, que solver <strong>não</strong> serve?</p>
+        <div class="opts"><button>lbfgs</button><button>saga</button><button data-ok>liblinear</button></div>
+        <p class="why">liblinear só faz esquemas um-contra-todos (one-vs-rest).</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">No classification_report, o "support" de uma classe é…</p>
+        <div class="opts"><button>A precision dessa classe</button><button data-ok>O número de exemplos reais dessa classe no conjunto avaliado</button><button>O número de previsões dessa classe</button></div>
+        <p class="why">Support = quantos exemplos daquela classe existem em y_test. É o peso usado no weighted avg.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">80% dos valores de uma coluna estão em falta. A abordagem mais razoável é…</p>
+        <div class="opts"><button>Imputar todos com a média</button><button data-ok>Remover a coluna, ou trocá-la por um indicador "valor conhecido: 1/0"</button><button>Remover todas as linhas com valor em falta</button></div>
+        <p class="why">Imputar 80% dos valores inventa dados; remover essas linhas destrói o dataset. O indicador preserva a pouca informação que existe.</p>
+      </div>
+    </div>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ensemble Learning · DAA · meiUM</title>
+<meta name="description" content="DAA · Tema 7: combinar modelos — max voting (hard/soft), bagging e Random Forest, boosting (Gradient Boosting, XGBoost), stacking e comparação de modelos.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var t=JSON.parse(localStorage.getItem('meium:theme'));if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="daa" data-topic="07" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 7.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="7.0" data-title="Visão geral" data-desc="Porque é que vários modelos juntos podem ser melhores do que um.">
+  <header class="ph">
+    <h1>Ensemble Learning<span class="en">Ensemble Learning</span></h1>
+    <p class="lede">Em vez de procurar o melhor modelo, <strong>combinar vários</strong>. Se os modelos erram em sítios diferentes, os erros compensam-se e o conjunto (o <em>ensemble</em>) é mais estável e muitas vezes mais exato do que cada um sozinho.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">7.0.1</span>As quatro famílias</h2>
+    <div class="two">
+      <div class="card c1"><span class="tag">Max voting</span><p>Vários modelos <strong>votam</strong>; ganha a classe mais votada (ou a de maior probabilidade média).</p></div>
+      <div class="card c2"><span class="tag">Bagging</span><p>Muitos modelos iguais, cada um treinado numa <strong>amostra diferente</strong> dos dados; faz-se a média. Random Forest.</p></div>
+      <div class="card c3"><span class="tag">Boosting</span><p>Modelos treinados <strong>em sequência</strong>, cada um a corrigir os erros dos anteriores. Gradient Boosting, XGBoost.</p></div>
+      <div class="card"><span class="tag">Stacking</span><p>Modelos diferentes cujas previsões são <strong>combinadas por outro modelo</strong> (o meta-learner).</p></div>
+    </div>
+    <div class="note extra"><span class="lbl">Complemento · porque funciona</span>
+      <p>Se cada modelo acerta 70% das vezes e os erros fossem independentes, a maioria de 5 modelos acertaria cerca de 84%. Na prática os erros são correlacionados (os modelos veem os mesmos dados), por isso o ganho é menor — e daí o esforço do bagging e das Random Forests em <strong>diversificar</strong> os modelos.</p>
+    </div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <div class="note"><span class="lbl">Exemplo usado</span>
+      <p><code>load_breast_cancer</code> (1 = maligno), dividido 70/30 de forma estratificada. Três modelos simples servem de base de comparação: uma árvore de decisão com <code>max_depth=2</code>, uma regressão logística (com standardização) e uma Random Forest.</p>
+    </div>
+    <pre><code class="language-python">from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+X, y = load_breast_cancer(return_X_y=True); y = 1 - y
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, stratify=y)
+
+dt_model = DecisionTreeClassifier(max_depth=2, random_state=42)
+lr_model = make_pipeline(StandardScaler(), LogisticRegression(random_state=42))
+rf_model = RandomForestClassifier(random_state=42)
+
+results = {}
+for name, m in [('DT', dt_model), ('LogR', lr_model), ('RF', rf_model)]:
+    results[name] = m.fit(X_train, y_train).score(X_test, y_test)   # 0.906, 0.971, 0.965</code></pre>
+    <p class="src">Baseado nas aulas de DAA (Ensemble Learning). Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 7.1 MAX VOTING ============================ -->
+<article class="page" data-page="voting" data-num="7.1" data-title="Max voting" data-desc="Hard voting e soft voting.">
+  <header class="ph">
+    <h1>Max voting<span class="en">Majority / Hard Voting · Soft Voting</span></h1>
+    <p class="lede">Treinam-se vários modelos, cada um faz uma previsão para cada amostra e "vota". Só a classe com <strong>mais votos</strong> entra na previsão final.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="two">
+      <div class="card c1"><span class="tag">Hard voting</span><p>Cada modelo vota numa classe. Ex.: votos 1, 0, 1 → classe <strong>1</strong>.</p></div>
+      <div class="card c2"><span class="tag">Soft voting</span><p>Faz-se a média das <strong>probabilidades</strong>. Ex.: P(1) = 0.9, 0.4, 0.7 → média 0.67 → classe <strong>1</strong>. Exige modelos com <code>predict_proba</code>.</p></div>
+    </div>
+    <div class="widget" data-widget="voting" data-values="0.9,0.45,0.4"></div>
+    <p>O parâmetro <code>weights</code> dá mais peso a alguns modelos — por exemplo, <code>weights=[2, 1, 2]</code> conta o voto do primeiro e do terceiro a dobrar.</p>
+    <pre><code class="language-python">from sklearn.ensemble import VotingClassifier
+
+hvt_model = VotingClassifier(estimators=[('dt', dt_model), ('lr', lr_model), ('rf', rf_model)],
+                             voting='hard', weights=[2, 1, 2])
+hvt_model.fit(X_train, y_train)
+hvt_model.score(X_test, y_test)
+
+for model, label in zip([dt_model, lr_model, rf_model, hvt_model], ['dt', 'lr', 'rf', 'Ensemble']):
+    scores = cross_val_score(model, X_test, y_test, scoring='accuracy', cv=5)
+    print("Accuracy: %0.2f (+/- %0.2f) [%s]" % (scores.mean(), scores.std(), label))</code></pre>
+    <div class="note warn"><span class="lbl">CV no conjunto de teste?</span>
+      <p>Correr <code>cross_val_score</code> só sobre <code>X_test</code> treina e testa os modelos com uma fração pequena dos dados, o que dá estimativas ruidosas. Para comparar modelos é preferível fazer a validação cruzada sobre <strong>todos</strong> os dados (ou sobre o treino). <span class="xtag">complemento</span></p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 7.2 BAGGING ============================ -->
+<article class="page" data-page="bagging" data-num="7.2" data-title="Bagging e Random Forest" data-desc="Muitas árvores, amostras diferentes, média das previsões.">
+  <header class="ph">
+    <h1>Bagging e Random Forest<span class="en">Bootstrap AGGregating</span></h1>
+    <p class="lede"><strong>BAGGing</strong> (<em>Bootstrap AGGregating</em>) cria várias árvores de decisão a partir do mesmo dataset e combina-as calculando a <strong>média</strong> das suas previsões (ou o voto da maioria, em classificação).</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">7.2.1</span>Bootstrap: dados diferentes para cada modelo</h2>
+    <p>Se todas as árvores fossem treinadas com os mesmos dados, seriam iguais e a média não ajudaria. O bagging dá a cada uma uma <strong>amostra bootstrap</strong>: N elementos tirados ao acaso <strong>com reposição</strong> dos N originais.</p>
+    <div class="widget" data-widget="bootstrap" data-n="10"></div>
+    <div class="note"><span class="lbl">Intuição</span>
+      <p>Uma árvore profunda tem <strong>variância alta</strong>: muda muito com pequenas alterações nos dados. A média de muitas árvores ligeiramente diferentes cancela essas oscilações e reduz a variância, sem aumentar muito o bias.</p>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">7.2.2</span>Bagging no scikit-learn</h2>
+    <pre data-title="Assinatura"><code class="language-python">BaggingClassifier(estimator=None, n_estimators=10, *, max_samples=1.0, max_features=1.0,
+                  bootstrap=True, bootstrap_features=False, oob_score=False, random_state=None)</code></pre>
+    <p>Para escolher <code>n_estimators</code> usa-se um GridSearch com <strong>StratifiedShuffleSplit</strong> — outra forma de dividir os dados: faz várias divisões treino/teste aleatórias independentes (como hold-outs repetidos), mantendo a proporção de classes.</p>
+    <pre><code class="language-python">from sklearn.model_selection import StratifiedShuffleSplit, GridSearchCV
+from sklearn.ensemble import BaggingClassifier
+
+sss = StratifiedShuffleSplit(n_splits=10, test_size=0.2, random_state=42)
+bg_dt_model = BaggingClassifier(estimator=dt_model, bootstrap=True, random_state=42)
+grid_bg = GridSearchCV(bg_dt_model, {'n_estimators': [10, 40, 60, 80, 100, 160]}, cv=sss)
+grid_bg.fit(X_train, y_train)
+grid_bg.best_params_                       # {'n_estimators': 40}
+grid_bg.best_estimator_.score(X_test, y_test)   # 0.947   (uma só árvore: 0.906)</code></pre>
+    <p>O mesmo tipo de árvore (profundidade 2), mas 40 em vez de uma: de 0.906 para 0.947.</p>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">7.2.3</span>Random Forest</h2>
+    <p>Uma <strong>Random Forest</strong> é bagging de árvores com um ingrediente extra: em cada divisão, cada árvore só pode escolher entre um <strong>subconjunto aleatório de features</strong> (<code>max_features='sqrt'</code> por omissão). As árvores ficam ainda mais diferentes umas das outras, o que torna a média mais eficaz. <span class="xtag">complemento</span></p>
+    <pre data-title="Assinatura"><code class="language-python">RandomForestClassifier(n_estimators=100, *, criterion='gini', max_depth=None, min_samples_split=2,
+                       min_samples_leaf=1, max_features='sqrt', bootstrap=True, oob_score=False,
+                       random_state=None, class_weight=None, ccp_alpha=0.0, max_samples=None)</code></pre>
+    <div class="widget" data-widget="lines" data-title="Random Forest: número de árvores">
+      <script type="application/json">{"hint":"Accuracy média em validação cruzada (5 folds, dataset completo). Mais árvores nunca pioram a sério — só deixam de ajudar a partir de certo ponto e custam mais tempo.","xlabel":"n_estimators","x":["1","5","10","50","100","300"],"series":[{"name":"accuracy (CV)","color":"s3","y":[0.916,0.946,0.946,0.953,0.954,0.953]}],"best":4,"start":0,"notes":{"0":"Uma só árvore (treinada numa amostra bootstrap): 0.916.","4":"100 árvores (o valor por omissão): 0.954. Daqui para a frente o ganho é nulo."}}</script>
+    </div>
+    <div class="note extra"><span class="lbl">Complemento · out-of-bag</span>
+      <p>Cada árvore deixa de fora cerca de 37% dos dados. Com <code>oob_score=True</code>, cada observação é avaliada só pelas árvores que não a viram — uma estimativa de desempenho "grátis", sem precisar de um conjunto de validação.</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 7.3 BOOSTING ============================ -->
+<article class="page" data-page="boosting" data-num="7.3" data-title="Boosting" data-desc="Modelos em sequência, cada um a corrigir o anterior.">
+  <header class="ph">
+    <h1>Boosting<span class="en">Gradient Boosting · XGBoost</span></h1>
+    <p class="lede">O <strong>boosting</strong> acrescenta membros ao ensemble <strong>sequencialmente</strong>: cada novo modelo foca-se em corrigir as previsões dos anteriores, e o resultado final é uma <strong>média pesada</strong> das previsões.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">7.3.1</span>Bagging vs. boosting</h2>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Bagging</th><th>Boosting</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Treino</strong></td><td>Em paralelo, independentes</td><td>Em sequência, cada um depende dos anteriores</td></tr>
+        <tr><td><strong>Modelos base</strong></td><td>Árvores profundas (variância alta)</td><td>Árvores muito simples, ex.: <code>max_depth=1</code> a 3 (bias alto)</td></tr>
+        <tr><td><strong>Reduz sobretudo</strong> <span class="xtag">complemento</span></td><td>Variância</td><td>Bias</td></tr>
+        <tr><td><strong>Combinação</strong></td><td>Média / voto</td><td>Soma pesada</td></tr>
+        <tr><td><strong>Risco</strong></td><td>Pouco overfitting</td><td>Pode fazer overfitting se tiver modelos a mais</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">7.3.2</span>Gradient Boosting</h2>
+    <p>No <strong>Gradient Boosting</strong>, cada nova árvore aprende os <strong>erros que ainda restam</strong> (os resíduos, ou mais geralmente o gradiente da perda) e soma-se ao modelo, multiplicada por um fator pequeno — a <code>learning_rate</code>. <span class="xtag">complemento</span></p>
+    <pre data-title="Assinatura"><code class="language-python">GradientBoostingClassifier(*, loss='log_loss', learning_rate=0.1, n_estimators=100, subsample=1.0,
+                           max_depth=3, random_state=None, ...)</code></pre>
+    <ul>
+      <li><code>n_estimators</code>: número de árvores (etapas).</li>
+      <li><code>learning_rate</code>: quanto cada árvore contribui. Valores menores precisam de mais árvores, mas generalizam melhor — os dois afinam-se em conjunto.</li>
+      <li><code>max_depth</code>: profundidade de cada árvore (pequena; com 1, cada árvore é um único "toco").</li>
+    </ul>
+    <pre><code class="language-python">from sklearn.ensemble import GradientBoostingClassifier
+gbc_model = GradientBoostingClassifier(random_state=42).fit(X_train, y_train)
+gbc_model.score(X_test, y_test)            # 0.965</code></pre>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">7.3.3</span>XGBoost</h2>
+    <p><strong>XGBoost</strong> é uma biblioteca de gradient boosting otimizada (rápida, com regularização incorporada e suporte para valores em falta), muito usada em competições de dados tabulares. Não vem com o scikit-learn: instala-se com <code>pip install xgboost</code> ou <code>conda install -c conda-forge xgboost</code>, e tem a mesma interface (<code>fit</code>, <code>predict</code>, <code>score</code>).</p>
+    <pre><code class="language-python">from xgboost import XGBClassifier
+xgb_model = XGBClassifier(max_depth=2, objective='binary:logistic', random_state=42)
+xgb_model.fit(X_train, y_train)
+xgb_model.score(X_test, y_test)            # 0.977</code></pre>
+    <div class="note warn"><span class="lbl">Escolher o objective certo</span>
+      <p>Em classificação binária usa-se <code>objective='binary:logistic'</code> (o valor por omissão do <code>XGBClassifier</code>). <code>'reg:squarederror'</code> é o objetivo de <strong>regressão</strong> e não deve ser usado para classificar.</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 7.4 STACKING ============================ -->
+<article class="page" data-page="stacking" data-num="7.4" data-title="Stacking" data-desc="Um modelo que aprende a combinar outros.">
+  <header class="ph">
+    <h1>Stacking<span class="en">Stacking Classifier</span></h1>
+    <p class="lede">O <strong>stacking</strong> treina modelos de <strong>tipos diferentes</strong> no mesmo dataset e usa um outro modelo — o <strong>meta-learner</strong> — para aprender a melhor forma de combinar as suas previsões.</p>
+  </header>
+
+  <section class="blk prose">
+    <ol class="steps-list">
+      <li><div>Os modelos base (ex.: árvore, regressão logística, Random Forest) fazem previsões.</div></li>
+      <li><div>Essas previsões tornam-se as <strong>features</strong> de um novo dataset.</div></li>
+      <li><div>O meta-learner (muitas vezes uma regressão logística) aprende, a partir delas, a previsão final — por exemplo, a confiar mais num modelo do que noutro.</div></li>
+    </ol>
+    <pre><code class="language-python">from sklearn.ensemble import StackingClassifier
+
+estimators = [('dt', dt_model), ('lr', lr_model), ('rf', rf_model)]
+st_model = StackingClassifier(estimators=estimators, final_estimator=LogisticRegression())
+st_model.fit(X_train, y_train)
+st_model.score(X_test, y_test)             # 0.977</code></pre>
+    <div class="note extra"><span class="lbl">Complemento · porque o stacking usa CV internamente</span>
+      <p>Se o meta-learner aprendesse com previsões feitas sobre os mesmos dados em que os modelos base treinaram, veria previsões demasiado boas (os modelos já conhecem as respostas). Por isso o <code>StackingClassifier</code> gera essas previsões com validação cruzada (<code>cv</code>, 5 folds por omissão).</p>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Voting</th><th>Stacking</th></tr></thead>
+      <tbody>
+        <tr><td>Como combina</td><td>Regra fixa (maioria ou média, com pesos escolhidos à mão)</td><td>Combinação aprendida por um modelo</td></tr>
+        <tr><td>Custo</td><td>Baixo</td><td>Maior (CV interna + meta-learner)</td></tr>
+      </tbody></table></div>
+  </section>
+</article>
+
+<!-- ============================ 7.5 COMPARAR ============================ -->
+<article class="page" data-page="comparar" data-num="7.5" data-title="Comparar modelos" data-desc="Qual foi melhor, e quais vale a pena afinar?">
+  <header class="ph">
+    <h1>Comparar modelos<span class="en">Model Accuracy Comparison</span></h1>
+    <p class="lede">Com todos os modelos treinados, guardam-se os resultados num dicionário e comparam-se lado a lado — numa tabela, num gráfico de barras ou num simples <code>print</code>.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="tw"><table>
+      <thead><tr><th>Modelo</th><th class="num">Accuracy no teste</th><th class="num">CV (5 folds): média ± desvio</th></tr></thead>
+      <tbody>
+        <tr><td>Árvore de decisão (max_depth=2)</td><td class="num">0.906</td><td class="num">0.905 ± 0.032</td></tr>
+        <tr><td>Regressão logística</td><td class="num">0.971</td><td class="num"><b>0.974</b> ± 0.017</td></tr>
+        <tr><td>Random Forest</td><td class="num">0.965</td><td class="num">0.954 ± 0.013</td></tr>
+        <tr><td>Voting (hard)</td><td class="num">0.959</td><td class="num">0.954 ± 0.019</td></tr>
+        <tr><td>Voting (soft)</td><td class="num">0.953</td><td class="num">0.951 ± 0.012</td></tr>
+        <tr><td>Bagging de árvores</td><td class="num">0.947</td><td class="num">0.940 ± 0.028</td></tr>
+        <tr><td>Gradient Boosting</td><td class="num">0.965</td><td class="num">0.951 ± 0.025</td></tr>
+        <tr><td>XGBoost</td><td class="num"><b>0.977</b></td><td class="num">0.958 ± 0.019</td></tr>
+        <tr><td>Stacking</td><td class="num"><b>0.977</b></td><td class="num"><b>0.974</b> ± 0.018</td></tr>
+      </tbody></table></div>
+    <pre><code class="language-python">plt.barh(list(results.keys()), list(results.values()))    # gráfico de barras horizontais
+for key, value in results.items():
+    print("%s \t %.2f" % (key, value))</code></pre>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">7.5.1</span>Qual foi o melhor? Quais vale a pena afinar?</h2>
+    <details class="ans"><summary>Pensa primeiro, depois abre</summary>
+      <div>
+        <ul>
+          <li><strong>As diferenças entre os melhores são pequenas</strong> (0.95–0.97) e menores do que o desvio padrão da CV (≈ 0.02). Num só hold-out, a ordem entre eles podia trocar com outra semente.</li>
+          <li>O ensemble mais simples que mais ganhou foi o <strong>bagging</strong>: transformou uma árvore fraca (0.905) em 0.940.</li>
+          <li>A <strong>regressão logística</strong> sozinha empata com o stacking: neste dataset as classes separam-se quase linearmente, e um modelo simples já chega perto do limite. Um ensemble não é automaticamente melhor.</li>
+          <li>Vale a pena afinar os modelos com hiperparâmetros mais sensíveis e resultados promissores: <strong>XGBoost/Gradient Boosting</strong> (learning_rate, n_estimators, max_depth) e <strong>Random Forest</strong> (max_features, min_samples_leaf).</li>
+        </ul>
+      </div>
+    </details>
+    <div class="note warn"><span class="lbl">Comparar com o quê</span>
+      <p>Para escolher entre modelos usa-se a <strong>validação cruzada</strong> (média e desvio), não uma única divisão treino/teste. O conjunto de teste fica para confirmar, no fim, o modelo escolhido.</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo, armadilhas e perguntas para testar.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Método</th><th>Como combina</th><th>scikit-learn</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Hard voting</strong></td><td>Classe mais votada</td><td><code>VotingClassifier(voting='hard')</code></td></tr>
+        <tr><td><strong>Soft voting</strong></td><td>Média das probabilidades</td><td><code>VotingClassifier(voting='soft')</code></td></tr>
+        <tr><td><strong>Bagging</strong></td><td>Média de modelos em amostras bootstrap</td><td><code>BaggingClassifier</code></td></tr>
+        <tr><td><strong>Random Forest</strong></td><td>Bagging de árvores + features aleatórias</td><td><code>RandomForestClassifier</code></td></tr>
+        <tr><td><strong>Boosting</strong></td><td>Sequencial, corrige erros; soma pesada</td><td><code>GradientBoostingClassifier</code>, <code>XGBClassifier</code></td></tr>
+        <tr><td><strong>Stacking</strong></td><td>Meta-learner aprende a combinar</td><td><code>StackingClassifier</code></td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">Σ.2</span>Armadilhas frequentes</h2>
+    <ul>
+      <li>Soft voting exige modelos com <code>predict_proba</code>.</li>
+      <li>Bagging de modelos iguais sem diversidade não ajuda; é o bootstrap que cria a diversidade.</li>
+      <li>Boosting com demasiadas árvores (ou learning_rate alto) pode fazer overfitting.</li>
+      <li>XGBoost para classificar: <code>objective='binary:logistic'</code>, não um objetivo de regressão.</li>
+      <li>Um ensemble não é sempre melhor do que um bom modelo simples — compara com CV.</li>
+    </ul>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.3</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">Três modelos dão P(classe 1) = 0.9, 0.4 e 0.45. O que preveem o hard e o soft voting?</p>
+        <div class="opts"><button>Ambos classe 1</button><button>Ambos classe 0</button><button data-ok>Hard: classe 0; soft: classe 1</button></div>
+        <p class="why">Votos: 1, 0, 0 → hard dá 0. Média: 0.583 → soft dá 1. O modelo muito confiante pesa mais no soft.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">O que significa "bootstrap" no bagging?</p>
+        <div class="opts"><button>Treinar os modelos em sequência</button><button data-ok>Amostrar N elementos com reposição a partir dos N originais</button><button>Usar só metade das features</button></div>
+        <p class="why">Cada modelo recebe uma amostra com reposição: alguns elementos repetem-se, ~37% ficam de fora.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">O que distingue uma Random Forest de um bagging de árvores?</p>
+        <div class="opts"><button>Usa árvores de profundidade 1</button><button data-ok>Em cada divisão, só considera um subconjunto aleatório de features</button><button>Treina as árvores em sequência</button></div>
+        <p class="why">A escolha aleatória de features (max_features) torna as árvores mais diferentes entre si.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">No boosting, cada novo modelo…</p>
+        <div class="opts"><button>É treinado numa amostra bootstrap independente</button><button data-ok>Foca-se em corrigir os erros dos modelos anteriores</button><button>Vota com o mesmo peso que os outros</button></div>
+        <p class="why">É sequencial: cada modelo aprende o que os anteriores ainda erram.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">No stacking, o "meta-learner"…</p>
+        <div class="opts"><button>É o melhor dos modelos base, escolhido por CV</button><button data-ok>É um modelo treinado com as previsões dos modelos base como features</button><button>É a média das previsões</button></div>
+        <p class="why">Aprende a combinar as previsões; a média fixa seria soft voting.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Diminuir a <code>learning_rate</code> de um Gradient Boosting normalmente exige…</p>
+        <div class="opts"><button>Menos árvores</button><button data-ok>Mais árvores</button><button>Árvores mais profundas</button></div>
+        <p class="why">Cada árvore contribui menos, por isso são precisas mais etapas para chegar ao mesmo ajuste — mas costuma generalizar melhor.</p>
+      </div>
+    </div>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

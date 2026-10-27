@@ -21,11 +21,11 @@ window.CATALOG = {
       topics: [
         { id: '01', file: '01-data-science-concepts.html', title: 'Conceitos de Ciência de Dados', en: 'Introduction to Data Science Concepts', status: 'ready', source: 'DAA_PL_1' },
         { id: '02', file: '02-quality-metrics.html', title: 'Métricas de Qualidade e Validação de Modelos', en: 'Quality Metrics and Model Validation', status: 'ready', source: 'DAA_PL_2' },
-        { id: '03', file: '03-data-exploration.html', title: 'Exploração e Preparação de Dados', en: 'Data Exploration and Preparation', status: 'soon' },
-        { id: '04', file: '04-regression.html', title: 'Regressão Linear e Logística', en: 'Linear and Logistic Regression', status: 'soon' },
-        { id: '05', file: '05-feature-engineering.html', title: 'Feature Engineering', en: 'Feature Engineering', status: 'soon' },
-        { id: '06', file: '06-decision-trees.html', title: 'Poda de Árvores e Afinação de Hiperparâmetros', en: 'Decision Tree Pruning and Hyperparameter Tuning', status: 'soon' },
-        { id: '07', file: '07-ensemble-learning.html', title: 'Ensemble Learning', en: 'Ensemble Learning', status: 'soon' }
+        { id: '03', file: '03-data-exploration.html', title: 'Exploração e Preparação de Dados', en: 'Data Exploration and Preparation', status: 'ready', source: 'DAA_PL_3' },
+        { id: '04', file: '04-regression.html', title: 'Regressão Linear e Logística', en: 'Linear and Logistic Regression', status: 'ready', source: 'DAA_PL_4' },
+        { id: '05', file: '05-feature-engineering.html', title: 'Feature Engineering', en: 'Feature Engineering', status: 'ready', source: 'DAA_PL_5' },
+        { id: '06', file: '06-decision-trees.html', title: 'Poda de Árvores e Afinação de Hiperparâmetros', en: 'Decision Tree Pruning and Hyperparameter Tuning', status: 'ready', source: 'DAA_PL_5' },
+        { id: '07', file: '07-ensemble-learning.html', title: 'Ensemble Learning', en: 'Ensemble Learning', status: 'ready', source: 'DAA_PL_6' }
       ]
     }
   ]

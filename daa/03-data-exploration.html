@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Exploração e Preparação de Dados · DAA · meiUM</title>
+<meta name="description" content="DAA · Tema 3: pipeline de ML, exploração de dados, preparação, análise univariada (assimetria, curtose) e multivariada (agrupamentos, binning, boxplots, correlação).">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var t=JSON.parse(localStorage.getItem('meium:theme'));if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="daa" data-topic="03" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 3.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="3.0" data-title="Visão geral" data-desc="O pipeline de ML e onde entra a exploração de dados.">
+  <header class="ph">
+    <h1>Exploração e Preparação de Dados<span class="en">Data Exploration and Preparation</span></h1>
+    <p class="lede">Antes de escolher um modelo é preciso <strong>conhecer os dados</strong>: que variáveis existem, como se distribuem, como se relacionam entre si e com o que queremos prever. Este tema percorre essa exploração e a preparação que a acompanha.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.0.1</span>O pipeline de Machine Learning</h2>
+    <p>Um projeto de ML segue, de forma iterativa, oito etapas:</p>
+    <ol class="pipeline">
+      <li>Definição do problema</li><li class="on">Recolha dos dados</li><li class="on">Preparação dos dados</li><li>Divisão treino / validação / teste</li>
+      <li>Treino do modelo</li><li>Avaliação de candidatos</li><li>Deployment</li><li>Monitorização</li>
+    </ol>
+    <p>A monitorização fecha o ciclo: quando o desempenho em produção cai, volta-se a etapas anteriores (novos dados, nova preparação, novo modelo). Este tema concentra-se nas etapas 1 a 3.</p>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.0.2</span>O processo de exploração</h2>
+    <ol class="steps-list">
+      <li><div><strong>Importar</strong> o dataset.</div></li>
+      <li><div><strong>Perceber o quadro geral</strong>: o que é cada linha, qual é o objetivo, que tipos de variáveis existem.</div></li>
+      <li><div><strong>Preparar</strong>: corrigir nomes, duplicados, valores em falta, tipos.</div></li>
+      <li><div><strong>Perceber cada variável</strong> (análise univariada).</div></li>
+      <li><div><strong>Estudar as relações</strong> entre variáveis (análise multivariada).</div></li>
+      <li><div><strong>Brainstorming</strong>: tirar conclusões e formular hipóteses — e, se for preciso, voltar aos passos 4 e 5.</div></li>
+      <li><div>Seguir para um <strong>relatório</strong> e/ou para a <strong>modelação</strong>.</div></li>
+    </ol>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <div class="note"><span class="lbl">Dataset usado</span>
+      <p><code>load_wine</code> (vem com o scikit-learn): 178 vinhos de três castas, descritos por 13 medições físico-químicas (álcool, magnésio, flavonoides, prolina…). O objetivo é <strong>prever a casta</strong> (classe 0, 1 ou 2) a partir das propriedades do vinho.</p>
+    </div>
+    <p class="src">Baseado nas aulas de DAA (Data Exploration and Preparation). Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 3.1 PRIMEIRO OLHAR ============================ -->
+<article class="page" data-page="problema" data-num="3.1" data-title="Primeiro olhar sobre os dados" data-desc="Dimensões, tipos, estatísticas e valores em falta.">
+  <header class="ph">
+    <h1>Primeiro olhar sobre os dados<span class="en">Understanding the problem</span></h1>
+    <p class="lede">O primeiro passo é perceber os <strong>tipos de features</strong>, quão importantes são para o problema e se alguma é descrita (ou repetida) por outra.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.1.1</span>As perguntas e os comandos</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Pergunta</th><th>pandas</th><th>No dataset de vinhos</th></tr></thead>
+      <tbody>
+        <tr><td>Quantas linhas e colunas?</td><td><code>df.shape</code></td><td>(178, 14)</td></tr>
+        <tr><td>Como se chamam as colunas?</td><td><code>df.columns</code></td><td>13 medições + <code>target</code></td></tr>
+        <tr><td>Como são as primeiras/últimas linhas?</td><td><code>df.head()</code>, <code>df.tail()</code></td><td>valores reais, para ter intuição</td></tr>
+        <tr><td>De que tipo é cada coluna?</td><td><code>df.dtypes</code>, <code>df.info()</code></td><td>todas numéricas</td></tr>
+        <tr><td>Que valores tomam?</td><td><code>df.describe()</code></td><td>contagem, média, desvio, mín, quartis, máx</td></tr>
+        <tr><td>Há valores em falta?</td><td><code>df.isna().any()</code>, <code>df.isna().sum()</code></td><td>nenhum</td></tr>
+        <tr><td>Há linhas repetidas?</td><td><code>df.duplicated().sum()</code></td><td>0</td></tr>
+        <tr><td>Como se distribui o target?</td><td><code>df['target'].value_counts()</code></td><td>59 / 71 / 48</td></tr>
+      </tbody></table></div>
+    <pre><code class="language-python">import pandas as pd
+from sklearn.datasets import load_wine
+
+df = load_wine(as_frame=True).frame     # DataFrame com as 13 features + 'target'
+df.shape                                # (178, 14)
+df.info()                               # 178 non-null em todas as colunas
+df.isna().sum().sum()                   # 0 valores em falta
+df['target'].value_counts(normalize=True)   # 1: 0.399, 0: 0.331, 2: 0.270</code></pre>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.1.2</span>Estatísticas descritivas</h2>
+    <p><code>describe()</code> resume cada variável numérica com as medidas do tema 1:</p>
+    <div class="tw"><table>
+      <thead><tr><th></th><th class="num">alcohol</th><th class="num">magnesium</th><th class="num">flavanoids</th><th class="num">color_intensity</th><th class="num">proline</th></tr></thead>
+      <tbody>
+        <tr><td>mean</td><td class="num">13.00</td><td class="num">99.74</td><td class="num">2.03</td><td class="num">5.06</td><td class="num">746.89</td></tr>
+        <tr><td>std</td><td class="num">0.81</td><td class="num">14.28</td><td class="num">1.00</td><td class="num">2.32</td><td class="num">314.91</td></tr>
+        <tr><td>min</td><td class="num">11.03</td><td class="num">70</td><td class="num">0.34</td><td class="num">1.28</td><td class="num">278</td></tr>
+        <tr><td>50%</td><td class="num">13.05</td><td class="num">98</td><td class="num">2.13</td><td class="num">4.69</td><td class="num">673.5</td></tr>
+        <tr><td>max</td><td class="num">14.83</td><td class="num">162</td><td class="num">5.08</td><td class="num">13.00</td><td class="num">1680</td></tr>
+      </tbody></table></div>
+    <div class="note"><span class="lbl">O que já se nota</span>
+      <ul>
+        <li>As escalas são muito diferentes: a prolina vai de 278 a 1680, os flavonoides de 0.3 a 5. Isto importa para modelos sensíveis à escala (ver normalização em 3.2).</li>
+        <li>Na prolina e no magnésio a média está acima da mediana: indício de assimetria à direita (3.3).</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.1.3</span>Caracterizar o dataset</h2>
+    <p>No fim deste primeiro olhar, o dataset fica caracterizado em poucas frases:</p>
+    <ul>
+      <li>178 entradas e 14 atributos: 13 propriedades físico-químicas e a classe;</li>
+      <li>todos os valores são não-nulos e não há valores em falta;</li>
+      <li>o objetivo é <strong>identificar o tipo de vinho</strong> a partir das suas propriedades — um problema de classificação multiclasse com classes razoavelmente equilibradas.</li>
+    </ul>
+  </section>
+</article>
+
+<!-- ============================ 3.2 PREPARAÇÃO ============================ -->
+<article class="page" data-page="preparacao" data-num="3.2" data-title="Preparação dos dados" data-desc="Ferramentas, duplicados, nomes, filtros e escalas.">
+  <header class="ph">
+    <h1>Preparação dos dados<span class="en">Data Preparation</span></h1>
+    <p class="lede">A preparação tem vários passos e quase sempre obriga a consultar a documentação das bibliotecas (NumPy, pandas, Matplotlib, seaborn, scikit-learn). Estas são as ferramentas que aparecem mais vezes.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.2.1</span>Funções do pandas</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Função</th><th>Para quê</th></tr></thead>
+      <tbody>
+        <tr><td><code>drop</code></td><td>Remover linhas ou colunas (<code>axis=1</code> para colunas).</td></tr>
+        <tr><td><code>drop_duplicates</code></td><td>Remover linhas repetidas.</td></tr>
+        <tr><td><code>isna</code></td><td>Detetar valores em falta (True/False por célula).</td></tr>
+        <tr><td><code>dropna</code></td><td>Remover linhas (ou colunas) com valores em falta.</td></tr>
+        <tr><td><code>fillna</code></td><td>Preencher valores em falta (com 0, média, mediana…).</td></tr>
+        <tr><td><code>interpolate</code></td><td>Preencher valores em falta a partir dos vizinhos (útil em séries temporais).</td></tr>
+        <tr><td><code>groupby</code></td><td>Agrupar linhas por uma variável e calcular estatísticas por grupo.</td></tr>
+        <tr><td><code>loc</code> / <code>iloc</code></td><td>Selecionar por nome/condição (<code>loc</code>) ou por posição (<code>iloc</code>).</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.2.2</span>Ferramentas do scikit-learn</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Classe / módulo</th><th>Para quê</th></tr></thead>
+      <tbody>
+        <tr><td><code>preprocessing.MinMaxScaler</code></td><td>Reescalar cada variável para [0, 1].</td></tr>
+        <tr><td><code>preprocessing.StandardScaler</code></td><td>Centrar em 0 com desvio padrão 1 (z-score).</td></tr>
+        <tr><td><code>preprocessing.KBinsDiscretizer</code></td><td>Discretizar uma variável contínua em intervalos (binning, ver 3.4).</td></tr>
+        <tr><td><code>preprocessing.LabelEncoder</code></td><td>Converter categorias em inteiros (tema 5).</td></tr>
+        <tr><td><code>feature_selection</code></td><td>Escolher as features mais úteis.</td></tr>
+        <tr><td><code>metrics</code></td><td>Métricas de avaliação (tema 2).</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.2.3</span>Operações típicas</h2>
+    <pre><code class="language-python">df.duplicated().sum()                          # quantas linhas repetidas
+df = df.drop_duplicates()                      # removê-las
+
+df = df.rename(columns={'od280/od315_of_diluted_wines': 'protein_concentration'})
+
+# filtrar linhas por condição: manter só as que cumprem a regra
+df_clean = df.loc[(df['ash'] >= 2) &amp; (df['alcalinity_of_ash'] &gt; 15)]   # ficam 152 das 178 linhas</code></pre>
+    <div class="note warn"><span class="lbl">Filtrar é perder dados</span>
+      <p>Uma condição como a de cima remove todas as linhas que não a cumprem. Antes de filtrar, convém ter uma razão (valor impossível, erro de medição, fora do âmbito do problema) — senão estamos só a deitar fora informação.</p>
+    </div>
+    <p><strong>Remover colunas?</strong> Só quando não trazem informação para o objetivo (identificadores, constantes, texto livre irrelevante). No dataset de vinhos todas as variáveis são medições físico-químicas que podem ajudar a distinguir as castas, por isso não há razão para remover nenhuma.</p>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.2.4</span>Pôr as variáveis na mesma escala</h2>
+    <div class="fgrid">
+      <div class="formula"><div class="cap">Min-Max (MinMaxScaler)</div>\[x' = \frac{x - \min}{\max - \min}\in[0,1]\]</div>
+      <div class="formula"><div class="cap">Standardização (StandardScaler)</div>\[z = \frac{x-\mu}{\sigma}\]</div>
+    </div>
+    <div class="widget" data-widget="scale" data-values="127, 100, 101, 113, 118, 70, 162" data-title="Os primeiros valores de magnesium, reescalados"></div>
+    <div class="note extra"><span class="lbl">Complemento · quando reescalar</span>
+      <p>Modelos baseados em distâncias ou em pesos (regressão linear/logística com regularização, k-NN, SVM, redes neuronais) são sensíveis à escala. As árvores de decisão não: só comparam um valor com um limiar. O scaler aprende-se (<code>fit</code>) <strong>só nos dados de treino</strong> e depois aplica-se (<code>transform</code>) ao teste.</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 3.3 UNIVARIADA ============================ -->
+<article class="page" data-page="univariada" data-num="3.3" data-title="Análise univariada" data-desc="Uma variável de cada vez: contagens, histogramas, assimetria e curtose.">
+  <header class="ph">
+    <h1>Análise univariada<span class="en">Univariate Analysis</span></h1>
+    <p class="lede">Olhar para cada variável isoladamente: que valores toma, com que frequência, e que forma tem a sua distribuição.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.3.1</span>Contagens e resumo</h2>
+    <ul>
+      <li><code>value_counts()</code> conta quantas vezes aparece cada valor; com <code>normalize=True</code> dá proporções. Útil para o target e para variáveis categóricas.</li>
+      <li><code>describe()</code> resume uma variável numérica.</li>
+      <li><code>hist()</code> desenha o histograma — a forma mais rápida de ver a distribuição.</li>
+    </ul>
+    <pre><code class="language-python">df['target'].value_counts(normalize=True)   # proporção de cada classe
+df['magnesium'].describe()                   # mean 99.74, std 14.28, min 70, max 162
+df['magnesium'].hist()                       # não segue uma curva normal: tem picos e cauda à direita</code></pre>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.3.2</span>Assimetria e curtose</h2>
+    <p>Duas medidas resumem a <strong>forma</strong> de uma distribuição:</p>
+    <div class="two">
+      <div class="card"><span class="tag">Assimetria · skewness</span>
+        <ul>
+          <li><strong>&gt; 0</strong>: cauda à direita — moda &lt; mediana &lt; média.</li>
+          <li><strong>≈ 0</strong>: simétrica — as três coincidem.</li>
+          <li><strong>&lt; 0</strong>: cauda à esquerda — média &lt; mediana &lt; moda.</li>
+        </ul></div>
+      <div class="card"><span class="tag">Curtose · kurtosis</span>
+        <ul>
+          <li><strong>&gt; 0</strong>: leptocúrtica — pico alto, caudas pesadas.</li>
+          <li><strong>≈ 0</strong>: como a normal (mesocúrtica).</li>
+          <li><strong>&lt; 0</strong>: platicúrtica — achatada, caudas leves.</li>
+        </ul></div>
+    </div>
+    <div class="fgrid">
+      <div class="formula"><div class="cap">Assimetria <span class="xtag">complemento</span></div>\[\text{skew}=\frac{1}{n}\sum\left(\frac{x_i-\bar{x}}{\sigma}\right)^3\]</div>
+      <div class="formula"><div class="cap">Curtose (excesso) <span class="xtag">complemento</span></div>\[\text{kurt}=\frac{1}{n}\sum\left(\frac{x_i-\bar{x}}{\sigma}\right)^4-3\]</div>
+    </div>
+    <p class="small muted">O "−3" faz com que a normal tenha curtose 0. É esta versão (excesso de curtose) que o pandas devolve com <code>.kurt()</code>; o pandas aplica ainda uma pequena correção para amostras.</p>
+    <div class="widget" data-widget="shape"></div>
+    <p>No magnésio: <code>df['magnesium'].skew()</code> = <strong>1.10</strong> e <code>.kurt()</code> = <strong>2.10</strong>. As duas são maiores do que 1: a distribuição tem cauda à direita e mais valores extremos do que uma normal.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Variável</th><th class="num">skew</th><th class="num">kurt</th><th>Leitura</th></tr></thead>
+      <tbody>
+        <tr><td>magnesium</td><td class="num">1.10</td><td class="num">2.10</td><td>cauda à direita, caudas pesadas</td></tr>
+        <tr><td>malic_acid</td><td class="num">1.04</td><td class="num">0.30</td><td>cauda à direita</td></tr>
+        <tr><td>proline</td><td class="num">0.77</td><td class="num">−0.25</td><td>ligeira cauda à direita</td></tr>
+        <tr><td>alcohol</td><td class="num">−0.05</td><td class="num">−0.85</td><td>simétrica e achatada</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.3.3</span>O dicionário de variáveis</h2>
+    <p>Para não perder o fio, resume-se o que se aprendeu num pequeno documento com uma linha por variável:</p>
+    <div class="tw"><table>
+      <thead><tr><th>Variável</th><th>Tipo</th><th>Contexto</th><th>Expectativa</th><th>Comentários</th></tr></thead>
+      <tbody>
+        <tr><td>alcohol</td><td>numérica</td><td>físico-química</td><td><span class="pill p-good">alta</span></td><td>simétrica; difere entre castas</td></tr>
+        <tr><td>magnesium</td><td>numérica</td><td>físico-química</td><td><span class="pill p-mid">média</span></td><td>assimétrica, com outliers</td></tr>
+        <tr><td>flavanoids</td><td>numérica</td><td>físico-química</td><td><span class="pill p-good">alta</span></td><td>muito correlacionada com total_phenols</td></tr>
+        <tr><td>target</td><td>categórica</td><td>casta do vinho</td><td>—</td><td>o que queremos prever; 3 classes</td></tr>
+      </tbody></table></div>
+    <ul>
+      <li><strong>Variável</strong>: o nome.</li>
+      <li><strong>Tipo</strong>: categórica, numérica, booleana…</li>
+      <li><strong>Contexto</strong>: o espaço semântico da variável (aqui, sempre físico-químico).</li>
+      <li><strong>Expectativa</strong>: quão relevante se espera que seja para a tarefa (alta / média / baixa).</li>
+      <li><strong>Comentários</strong>: tudo o que valer a pena registar.</li>
+    </ul>
+  </section>
+</article>
+
+<!-- ============================ 3.4 MULTIVARIADA ============================ -->
+<article class="page" data-page="multivariada" data-num="3.4" data-title="Análise multivariada" data-desc="Agrupamentos, binning, boxplots, dispersão e correlação.">
+  <header class="ph">
+    <h1>Análise multivariada<span class="en">Multivariate Analysis</span></h1>
+    <p class="lede">Agora as variáveis em conjunto: como se relacionam umas com as outras e, sobretudo, com o target.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.4.1</span>Visão de conjunto: pairplot</h2>
+    <p><code>sns.pairplot(df, hue='target')</code> desenha um gráfico de dispersão para cada par de variáveis e a distribuição de cada uma na diagonal, com uma cor por classe. Com 13 variáveis fica uma grelha 13 × 13 — útil para detetar padrões, mas difícil de ler; por isso costuma usar-se num subconjunto de colunas.</p>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.4.2</span>Agrupar por classe</h2>
+    <p><code>groupby</code> calcula estatísticas por grupo. Agrupando pela classe percebe-se o que distingue cada casta:</p>
+    <div class="tw"><table>
+      <thead><tr><th>classe</th><th class="num">alcohol</th><th class="num">flavanoids</th><th class="num">total_phenols</th><th class="num">color_intensity</th><th class="num">proline</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td class="num">13.74</td><td class="num">2.98</td><td class="num">2.84</td><td class="num">5.53</td><td class="num"><b>1115.7</b></td></tr>
+        <tr><td>1</td><td class="num">12.28</td><td class="num">2.08</td><td class="num">2.26</td><td class="num">3.09</td><td class="num">519.5</td></tr>
+        <tr><td>2</td><td class="num">13.15</td><td class="num"><b>0.78</b></td><td class="num">1.68</td><td class="num"><b>7.40</b></td><td class="num">629.9</td></tr>
+      </tbody></table></div>
+    <pre><code class="language-python">df.groupby('target').mean()                     # média de cada variável por classe
+df.groupby('target').agg(['mean', 'median'])    # várias estatísticas de uma vez</code></pre>
+    <p>A classe 0 tem prolina muito mais alta; a classe 2 tem flavonoides muito baixos e cor intensa; a classe 1 tem menos álcool e cor clara.</p>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.4.3</span>Binning (discretização)</h2>
+    <p>No <strong>binning</strong> (ou <em>bucketing</em>), os dados são agrupados em intervalos (bins) e os valores de cada intervalo são substituídos por um único valor representativo. É uma técnica de pré-processamento, como o tratamento de valores em falta, a formatação, a normalização e a standardização.</p>
+    <p>O binning é uma técnica de <strong>suavização</strong>: reduz o ruído dos dados, à custa de perder detalhe.</p>
+    <pre><code class="language-python">from sklearn.preprocessing import KBinsDiscretizer
+
+kb = KBinsDiscretizer(n_bins=3, encode='ordinal', strategy='quantile')
+df['alcohol_bin'] = kb.fit_transform(df[['alcohol']])
+kb.bin_edges_[0]                                  # [11.03, 12.52, 13.48, 14.83]
+df.groupby('alcohol_bin')['proline'].mean()       # 0: 537, 1: 710, 2: 985</code></pre>
+    <p>Com <code>strategy='quantile'</code> cada bin fica com o mesmo número de vinhos (59, 58, 61). Agrupando pelos bins vê-se que mais álcool anda a par de mais prolina.</p>
+    <div class="note extra"><span class="lbl">Complemento · estratégias</span>
+      <p><code>'uniform'</code>: intervalos com a mesma largura. <code>'quantile'</code>: intervalos com o mesmo número de pontos. <code>'kmeans'</code>: intervalos definidos por agrupamento. Com pandas: <code>pd.cut</code> (larguras) e <code>pd.qcut</code> (quantis).</p>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.4.4</span>Numérica vs. categórica: boxplots</h2>
+    <p>A melhor forma de ver a relação entre uma variável numérica e uma categórica é um <strong>boxplot</strong> por categoria (<code>sns.catplot(x='target', y='proline', kind='box', data=df)</code>). Se as caixas das classes quase não se sobrepõem, a variável separa bem as classes.</p>
+    <ul>
+      <li><strong>proline</strong>: a caixa da classe 0 fica muito acima das outras duas.</li>
+      <li><strong>flavanoids</strong>: classe 0 estável perto de 3, classe 2 perto de 0.8 — as três caixas mal se tocam.</li>
+    </ul>
+    <p>Boxplots de uma só variável (<code>sns.boxplot(y=df['color_intensity'])</code>) servem para detetar <strong>outliers</strong> (tema 1, critério de 1.5·IQR).</p>
+    <p>Para ver se uma variável segue aproximadamente uma distribuição normal (gaussiana), desenha-se o histograma com a densidade estimada por cima: <code>sns.histplot(df['alcohol'], kde=True)</code>.</p>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.4.5</span>Duas numéricas e a classe: dispersão</h2>
+    <p><code>sns.scatterplot(x='proline', y='flavanoids', hue='target', data=df)</code> mostra duas variáveis ao mesmo tempo, com uma cor por classe. Aqui as três castas formam grupos quase separados: a classe 0 tem prolina alta e flavonoides perto de 3; a classe 2 tem flavonoides baixos; a classe 1 tem prolina baixa. <strong>Só com estas duas variáveis</strong> já se distingue quase tudo.</p>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.4.6</span>Matriz de correlação</h2>
+    <p><code>sns.heatmap(df.corr(), annot=True, vmin=-1, vmax=1)</code> mostra a correlação de todos os pares de uma vez.</p>
+    <div class="widget" data-widget="heatmap" data-title="Correlações no dataset de vinhos">
+      <script type="application/json">{"labels":["alcohol","malic_acid","total_phenols","flavanoids","color_intensity","hue","od280/od315","proline","target"],"matrix":[[1.0,0.09,0.29,0.24,0.55,-0.07,0.07,0.64,-0.33],[0.09,1.0,-0.34,-0.41,0.25,-0.56,-0.37,-0.19,0.44],[0.29,-0.34,1.0,0.86,-0.06,0.43,0.7,0.5,-0.72],[0.24,-0.41,0.86,1.0,-0.17,0.54,0.79,0.49,-0.85],[0.55,0.25,-0.06,-0.17,1.0,-0.52,-0.43,0.32,0.27],[-0.07,-0.56,0.43,0.54,-0.52,1.0,0.57,0.24,-0.62],[0.07,-0.37,0.7,0.79,-0.43,0.57,1.0,0.31,-0.79],[0.64,-0.19,0.5,0.49,0.32,0.24,0.31,1.0,-0.63],[-0.33,0.44,-0.72,-0.85,0.27,-0.62,-0.79,-0.63,1.0]]}</script>
+    </div>
+    <ul>
+      <li><strong>alcohol × proline = 0.64</strong>: mais álcool, mais prolina.</li>
+      <li><strong>flavanoids × total_phenols = 0.86</strong>: muito redundantes — dizem quase o mesmo.</li>
+      <li>Flavonoides, fenóis totais, od280/od315 e prolina têm correlação negativa com o número da classe: são altos na classe 0 e baixos na classe 2.</li>
+    </ul>
+    <div class="note warn"><span class="lbl">Cuidado com a correlação com o target</span>
+      <p>A classe é categórica: 0, 1 e 2 são rótulos, não quantidades. A correlação com <code>target</code> só tem leitura porque, neste dataset, as variáveis variam de forma ordenada entre as classes. Para variáveis categóricas, os boxplots e o <code>groupby</code> são mais fiáveis.</p>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.4.7</span>Análise crítica</h2>
+    <p>No fim da exploração, responde-se às perguntas que orientam a modelação:</p>
+    <details class="ans"><summary>Que características definem os diferentes tipos de vinho?</summary>
+      <div><p>Classe 0: muito álcool, prolina alta, flavonoides altos. Classe 1: pouco álcool, cor clara, prolina baixa. Classe 2: flavonoides muito baixos, cor intensa, matiz (hue) baixo.</p></div></details>
+    <details class="ans"><summary>Qual é o componente mais importante?</summary>
+      <div><p>Os <strong>flavonoides</strong> são a variável mais associada à classe (|r| = 0.85) e as suas caixas por classe quase não se sobrepõem. Combinados com a <strong>prolina</strong>, separam visualmente as três castas. Um modelo confirmaria esta intuição com a importância das features.</p></div></details>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo, armadilhas e perguntas para testar.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Objetivo</th><th>Ferramenta</th></tr></thead>
+      <tbody>
+        <tr><td>Dimensões, tipos, nulos</td><td><code>shape</code>, <code>info()</code>, <code>dtypes</code>, <code>isna().sum()</code></td></tr>
+        <tr><td>Resumo numérico</td><td><code>describe()</code>, <code>value_counts()</code></td></tr>
+        <tr><td>Duplicados, nomes</td><td><code>duplicated()</code>, <code>drop_duplicates()</code>, <code>rename()</code></td></tr>
+        <tr><td>Forma de uma variável</td><td>histograma, <code>skew()</code>, <code>kurt()</code></td></tr>
+        <tr><td>Estatísticas por grupo</td><td><code>groupby(...).mean()</code> / <code>.agg(...)</code></td></tr>
+        <tr><td>Discretizar</td><td><code>KBinsDiscretizer</code>, <code>pd.cut</code>, <code>pd.qcut</code></td></tr>
+        <tr><td>Numérica vs. categórica</td><td>boxplot por categoria</td></tr>
+        <tr><td>Duas numéricas</td><td>scatterplot (com <code>hue</code>), pairplot</td></tr>
+        <tr><td>Todos os pares</td><td>heatmap de <code>corr()</code></td></tr>
+        <tr><td>Escalas</td><td><code>MinMaxScaler</code> [0, 1]; <code>StandardScaler</code> μ = 0, σ = 1</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">Σ.2</span>Armadilhas frequentes</h2>
+    <ul>
+      <li>Filtrar linhas sem razão clara é deitar fora informação.</li>
+      <li>Skew &gt; 0 é cauda à <strong>direita</strong> (média &gt; mediana), não à esquerda.</li>
+      <li>Correlação alta entre duas features (ex.: 0.86) significa redundância, não que ambas sejam úteis.</li>
+      <li>Correlação com um target categórico deve ser lida com cuidado; prefere boxplots e <code>groupby</code>.</li>
+      <li>O scaler aprende-se no treino e aplica-se ao teste — nunca o contrário.</li>
+    </ul>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.3</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">Uma variável tem média 120 e mediana 95. O que é mais provável?</p>
+        <div class="opts"><button data-ok>Assimetria positiva (cauda à direita)</button><button>Assimetria negativa (cauda à esquerda)</button><button>Distribuição simétrica</button></div>
+        <p class="why">Valores altos raros puxam a média para cima da mediana → cauda à direita, skew &gt; 0.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Uma curtose (excesso) de 2.1 indica…</p>
+        <div class="opts"><button>Uma distribuição mais achatada do que a normal</button><button data-ok>Pico mais alto e caudas mais pesadas do que a normal</button><button>Uma distribuição simétrica</button></div>
+        <p class="why">Curtose &gt; 0 = leptocúrtica: mais valores extremos do que a normal. A curtose não diz nada sobre simetria.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual é o gráfico mais adequado para comparar uma variável numérica entre categorias?</p>
+        <div class="opts"><button>Histograma de uma variável</button><button data-ok>Boxplot por categoria</button><button>Matriz de correlação</button></div>
+        <p class="why">O boxplot por categoria mostra mediana, dispersão e outliers de cada grupo lado a lado.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">O binning é sobretudo uma técnica de…</p>
+        <div class="opts"><button>Aumentar a precisão dos dados</button><button data-ok>Suavização, para reduzir ruído</button><button>Detetar valores em falta</button></div>
+        <p class="why">Substituir os valores de um intervalo por um representante suaviza o ruído, à custa de perder detalhe.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Duas features têm correlação 0.95. Isto sugere que…</p>
+        <div class="opts"><button>Ambas são excelentes para prever o target</button><button data-ok>Carregam informação muito parecida (redundância)</button><button>Uma causa a outra</button></div>
+        <p class="why">A correlação entre features mede redundância. Não diz nada sobre a relação com o target, nem sobre causalidade.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Com <code>KBinsDiscretizer(n_bins=4, strategy='quantile')</code>, os bins ficam com…</p>
+        <div class="opts"><button>A mesma largura</button><button data-ok>Aproximadamente o mesmo número de observações</button><button>Os limites que o utilizador escolhe</button></div>
+        <p class="why">'quantile' corta nos quartis: ~25% dos dados em cada bin. Larguras iguais é 'uniform'.</p>
+      </div>
+    </div>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

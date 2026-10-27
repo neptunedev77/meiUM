@@ -502,4 +502,330 @@
     el.addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (b) { rg.value = b.dataset.k; draw(); } });
     draw();
   };
+
+  /* ---------- utilidades extra (integração numérica numa grelha) ---------- */
+  function moments(xs, f) {
+    const dx = xs[1] - xs[0], m0 = sum(f) * dx;
+    const mu = sum(xs.map((x, i) => x * f[i])) * dx / m0;
+    const c = k => sum(xs.map((x, i) => (x - mu) ** k * f[i])) * dx / m0;
+    const v = c(2);
+    let acc = 0, med = xs[0];
+    for (let i = 0; i < xs.length; i++) { acc += f[i] * dx / m0; if (acc >= 0.5) { med = xs[i]; break; } }
+    const mode = xs[f.indexOf(Math.max(...f))];
+    return { mean: mu, sd: Math.sqrt(v), skew: c(3) / v ** 1.5, kurt: c(4) / v ** 2 - 3, median: med, mode };
+  }
+  const readJSON = el => { const s = el.querySelector('script[type="application/json"]'); return s ? JSON.parse(s.textContent) : {}; };
+  const col = c => c && c.startsWith('--') ? `var(${c})` : `var(--${c || 's1'})`;
+
+  /* =====================================================================
+     heatmap — matriz de correlação.  <script type="application/json">{labels, matrix}</script>
+     ===================================================================== */
+  W.heatmap = el => {
+    const { labels, matrix } = readJSON(el);
+    el.innerHTML = head(el, 'Matriz de correlação', 'Cada célula é a correlação entre duas variáveis, de −1 (azul) a 1 (vermelho). Passa o rato ou toca numa célula.') + `
+      <div class="hm-wrap"><table class="hm"><thead><tr><th></th>${labels.map((_, j) => `<th>${j + 1}</th>`).join('')}</tr></thead><tbody>
+      ${matrix.map((row, i) => `<tr><th>${i + 1} · ${esc(labels[i])}</th>${row.map((v, j) => {
+        const p = Math.round(Math.abs(v) * 80);
+        const bg = `color-mix(in oklab, ${v >= 0 ? 'var(--bad)' : 'var(--s1)'} ${p}%, var(--card))`;
+        return `<td data-i="${i}" data-j="${j}" style="background:${bg};${p > 50 ? 'color:#fff' : ''}" tabindex="0">${fmt(v, 2)}</td>`;
+      }).join('')}</tr>`).join('')}</tbody></table></div>
+      <p class="w-out">Escolhe uma célula.</p>`;
+    const out = el.querySelector('.w-out');
+    const pick = td => {
+      const i = +td.dataset.i, j = +td.dataset.j, v = matrix[i][j], a = Math.abs(v);
+      if (i === j) { out.innerHTML = `<b>${esc(labels[i])}</b> com ela própria: r = 1 (a diagonal é sempre 1).`; return; }
+      const f = a >= 0.7 ? 'forte' : a >= 0.4 ? 'moderada' : a >= 0.1 ? 'fraca' : 'praticamente nula';
+      out.innerHTML = `<b>${esc(labels[i])}</b> × <b>${esc(labels[j])}</b>: r = <b>${fmt(v, 2)}</b> — correlação ${f}${a >= 0.1 ? (v > 0 ? ' positiva (sobem juntas)' : ' negativa (quando uma sobe, a outra desce)') : ''}.`;
+    };
+    el.querySelectorAll('td[data-i]').forEach(td => { td.addEventListener('mouseenter', () => pick(td)); td.addEventListener('click', () => pick(td)); td.addEventListener('focus', () => pick(td)); });
+  };
+
+  /* =====================================================================
+     shape — assimetria (skew-normal) e curtose (normal generalizada)
+     ===================================================================== */
+  W.shape = el => {
+    el.innerHTML = head(el, 'Forma da distribuição: assimetria e curtose', 'Escolhe o que queres explorar e arrasta o cursor.') + `
+      <div class="seg"><button type="button" class="btn sm on" data-m="skew">Assimetria</button><button type="button" class="btn sm" data-m="kurt">Curtose</button></div>
+      <label class="f"><span data-lbl></span><input type="range"></label>
+      <svg class="w-svg" viewBox="0 0 640 240" role="img" aria-label="Curva de densidade"></svg>
+      <div class="legend" data-leg></div>
+      <dl class="kpis"></dl><p class="w-out"></p>`;
+    const svg = el.querySelector('svg'), rg = el.querySelector('input'), lbl = el.querySelector('[data-lbl]'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out'), leg = el.querySelector('[data-leg]');
+    let mode = 'skew';
+    const xs = Array.from({ length: 601 }, (_, i) => -6 + i * 0.02);
+    function set(m) {
+      mode = m;
+      el.querySelectorAll('[data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+      if (m === 'skew') { Object.assign(rg, { min: -8, max: 8, step: 0.5 }); rg.value = 4; }
+      else { Object.assign(rg, { min: 0.8, max: 8, step: 0.1 }); rg.value = 1; }
+      draw();
+    }
+    function draw() {
+      const v = +rg.value;
+      let f, m;
+      if (mode === 'skew') {
+        f = xs.map(x => 2 * phi(x) * Phi(v * x));
+        m = moments(xs, f);
+        lbl.innerHTML = `parâmetro de forma α = <b>${fmt(v, 1)}</b>`;
+      } else {
+        const raw = xs.map(x => Math.exp(-(Math.abs(x) ** v)));
+        const s = moments(xs, raw).sd;
+        f = xs.map(x => Math.exp(-(Math.abs(x * s) ** v)));
+        m = moments(xs, f);
+        lbl.innerHTML = `forma β = <b>${fmt(v, 1)}</b> (β = 2 é a normal)`;
+      }
+      const ymax = Math.max(...f, 0.42) * 1.08;
+      const X = scale(-4.5, 4.5, 16, 624), Y = scale(0, ymax, 205, 22);
+      const vis = xs.map((x, i) => [x, f[i]]).filter(([x]) => x >= -4.5 && x <= 4.5);
+      const path = 'M' + vis.map(([x, y]) => `${X(x).toFixed(1)},${Y(y).toFixed(1)}`).join(' L');
+      const area = path + ` L${X(4.5)},${Y(0)} L${X(-4.5)},${Y(0)} Z`;
+      const vline = (x, c, dash, t, ty) => `<line x1="${X(x)}" x2="${X(x)}" y1="${Y(0)}" y2="34" style="stroke:${c};stroke-width:2;${dash ? 'stroke-dasharray:' + dash : ''}"/><text x="${X(x)}" y="${ty}" text-anchor="middle" class="lab" style="fill:${c}">${t}</text>`;
+      const ref = mode === 'kurt' ? `<path d="M${vis.map(([x]) => `${X(x).toFixed(1)},${Y(phi(x)).toFixed(1)}`).join(' L')}" style="fill:none;stroke:var(--muted);stroke-width:1.5;stroke-dasharray:5 4"/>` : '';
+      svg.innerHTML = `<path d="${area}" style="fill:var(--accent);opacity:.15"/>${ref}<path d="${path}" style="fill:none;stroke:var(--accent);stroke-width:2.5"/>
+        <line class="ax" x1="16" x2="624" y1="${Y(0)}" y2="${Y(0)}"/>` +
+        (mode === 'skew' ? vline(m.mode, 'var(--s3)', '2 3', 'moda', 14) + vline(m.median, 'var(--s2)', '6 4', 'mediana', 28) + vline(m.mean, 'var(--ink)', '', 'média', 14) : '');
+      leg.innerHTML = mode === 'skew'
+        ? '<span><i style="background:var(--ink)"></i>média</span><span><i style="background:var(--s2)"></i>mediana</span><span><i style="background:var(--s3)"></i>moda</span>'
+        : '<span><i style="background:var(--accent)"></i>distribuição (variância 1)</span><span><i style="background:var(--muted)"></i>normal de referência</span>';
+      if (mode === 'skew') {
+        kp.innerHTML = kpi('assimetria (skew)', fmt(m.skew, 2), 1) + kpi('média', fmt(m.mean, 2)) + kpi('mediana', fmt(m.median, 2)) + kpi('moda', fmt(m.mode, 2));
+        out.innerHTML = Math.abs(m.skew) < 0.05 ? '<b>Simétrica</b>: média, mediana e moda coincidem.'
+          : m.skew > 0 ? '<b>Assimetria positiva</b> (cauda longa à direita): moda &lt; mediana &lt; média. Os valores altos raros puxam a média para a direita.'
+          : '<b>Assimetria negativa</b> (cauda longa à esquerda): média &lt; mediana &lt; moda.';
+      } else {
+        kp.innerHTML = kpi('curtose (excesso)', fmt(m.kurt, 2), 1);
+        out.innerHTML = Math.abs(m.kurt) < 0.05 ? '<b>Mesocúrtica</b> (como a normal): curtose ≈ 0.'
+          : m.kurt > 0 ? '<b>Leptocúrtica</b> (curtose &gt; 0): pico mais alto e caudas mais pesadas do que a normal — mais valores extremos.'
+          : '<b>Platicúrtica</b> (curtose &lt; 0): mais achatada, caudas leves — poucos valores extremos.';
+      }
+    }
+    el.addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (b) set(b.dataset.m); });
+    rg.addEventListener('input', draw);
+    set('skew');
+  };
+
+  /* =====================================================================
+     scale — Min-Max vs. standardização (z-score)
+     ===================================================================== */
+  W.scale = el => {
+    const initial = el.dataset.values || '127, 100, 101, 113, 118, 70, 162';
+    el.innerHTML = head(el, 'Normalização Min-Max vs. standardização', 'Edita os valores e compara as duas escalas. Experimenta acrescentar um outlier.') + `
+      <div class="row"><label class="f grow">Valores<input type="text" inputmode="decimal" value="${esc(initial)}"></label>
+        <button type="button" class="btn" data-a="out">+ Outlier</button><button type="button" class="btn" data-a="reset">↺ Repor</button></div>
+      <div class="two"><div class="tw"></div><div style="display:flex;flex-direction:column;gap:12px"><dl class="kpis"></dl><p class="w-out"></p></div></div>`;
+    const inp = el.querySelector('input'), tw = el.querySelector('.tw'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out');
+    function draw() {
+      const a = parseNums(inp.value);
+      if (a.length < 2) { tw.innerHTML = ''; kp.innerHTML = ''; out.textContent = 'Introduz pelo menos dois valores.'; return; }
+      const mn = Math.min(...a), mx = Math.max(...a), m = mean(a), sd = Math.sqrt(varPop(a));
+      tw.innerHTML = `<table><thead><tr><th class="num">x</th><th class="num">Min-Max</th><th class="num">z-score</th></tr></thead><tbody>
+        ${a.map(x => `<tr><td class="num">${fmt(x, 3)}</td><td class="num">${fmt((x - mn) / ((mx - mn) || 1), 3)}</td><td class="num">${fmt((x - m) / (sd || 1), 3)}</td></tr>`).join('')}</tbody></table>`;
+      kp.innerHTML = kpi('mín', fmt(mn)) + kpi('máx', fmt(mx)) + kpi('média μ', fmt(m)) + kpi('desvio σ', fmt(sd));
+      const mm = a.map(x => (x - mn) / ((mx - mn) || 1)).sort((p, q) => p - q);
+      out.innerHTML = `Min-Max põe tudo em [0, 1]; o z-score centra em 0 com desvio 1. ` +
+        (mm.length > 2 && mm[mm.length - 2] < 0.4 ? '<b>Com o outlier, quase todos os valores Min-Max ficam esmagados perto de 0</b> — o z-score sofre menos.' : '');
+    }
+    inp.addEventListener('input', draw);
+    el.addEventListener('click', e => {
+      const b = e.target.closest('[data-a]'); if (!b) return;
+      if (b.dataset.a === 'reset') inp.value = initial;
+      else { const a = parseNums(inp.value); inp.value = [...a, Math.round(Math.max(...a) * 5)].join(', '); }
+      draw();
+    });
+    draw();
+  };
+
+  /* =====================================================================
+     linfit — ajustar uma reta à mão vs. mínimos quadrados
+     ===================================================================== */
+  W.linfit = el => {
+    const r = rng(5), xs = Array.from({ length: 14 }, (_, i) => 1 + i * 0.7), ys = xs.map(x => 1.5 * x + 4 + gauss(r) * 2.2);
+    const mx = mean(xs), my = mean(ys);
+    const b1 = sum(xs.map((x, i) => (x - mx) * (ys[i] - my))) / sum(xs.map(x => (x - mx) ** 2)), b0 = my - b1 * mx;
+    const mse = (w, b) => mean(xs.map((x, i) => (ys[i] - (w * x + b)) ** 2));
+    el.innerHTML = head(el, 'Encontra a melhor reta', 'Ajusta o declive e a ordenada na origem. As linhas vermelhas são os erros (resíduos); a regressão linear escolhe a reta que minimiza a média dos seus quadrados (MSE).') + `
+      <div class="row">
+        <label class="f grow"><span>declive β₁ = <b data-wv></b></span><input type="range" min="-1" max="4" step="0.05" value="0.4" data-i="w"></label>
+        <label class="f grow"><span>ordenada na origem β₀ = <b data-bv></b></span><input type="range" min="-6" max="20" step="0.25" value="12" data-i="b"></label>
+        <button type="button" class="btn primary" data-a="fit">Mínimos quadrados</button>
+      </div>
+      <svg class="w-svg" viewBox="0 0 640 260" role="img" aria-label="Pontos e reta ajustada"></svg>
+      <dl class="kpis"></dl><p class="w-out"></p>`;
+    const svg = el.querySelector('svg'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out'), wI = el.querySelector('[data-i="w"]'), bI = el.querySelector('[data-i="b"]');
+    const X = scale(0, 11, 44, 624), Y = scale(0, 25, 236, 14);
+    function draw() {
+      const w = +wI.value, b = +bI.value;
+      el.querySelector('[data-wv]').textContent = fmt(w); el.querySelector('[data-bv]').textContent = fmt(b);
+      const yt = niceTicks(0, 25, 5);
+      svg.innerHTML = yt.map(t => `<line class="ax" x1="44" x2="624" y1="${Y(t)}" y2="${Y(t)}" style="opacity:.5"/><text x="38" y="${Y(t) + 4}" text-anchor="end">${t}</text>`).join('') +
+        xs.map((x, i) => `<line x1="${X(x)}" x2="${X(x)}" y1="${Y(ys[i])}" y2="${Y(w * x + b)}" style="stroke:var(--bad);stroke-width:1.5;opacity:.8"/>`).join('') +
+        `<line x1="${X(0)}" x2="${X(11)}" y1="${Y(b)}" y2="${Y(w * 11 + b)}" style="stroke:var(--accent);stroke-width:2.5"/>` +
+        xs.map((x, i) => `<circle cx="${X(x)}" cy="${Y(ys[i])}" r="5" style="fill:var(--s1);stroke:var(--card);stroke-width:1.5"/>`).join('');
+      const cur = mse(w, b), best = mse(b1, b0);
+      kp.innerHTML = kpi('MSE desta reta', fmt(cur, 2), 1) + kpi('MSE mínimo possível', fmt(best, 2)) + kpi('solução ótima', `ŷ = ${fmt(b0, 2)} + ${fmt(b1, 2)}x`);
+      out.innerHTML = cur - best < 0.01 ? '<b>Encontraste o mínimo</b>: é esta a reta que a regressão linear devolve.' : `Estás ${fmt(cur / best, 1)}× acima do erro mínimo.`;
+    }
+    wI.addEventListener('input', draw); bI.addEventListener('input', draw);
+    el.querySelector('[data-a="fit"]').addEventListener('click', () => { wI.value = b1.toFixed(2); bI.value = b0.toFixed(2); draw(); });
+    draw();
+  };
+
+  /* =====================================================================
+     sigmoid — regressão logística com uma feature, limiar e fronteira
+     ===================================================================== */
+  W.sigmoid = el => {
+    const r = rng(21), pts = Array.from({ length: 36 }, () => { const x = r() * 10; return { x, y: r() < 1 / (1 + Math.exp(-1.3 * (x - 5.2))) ? 1 : 0, j: (r() - 0.5) * 0.06 }; });
+    const sig = z => 1 / (1 + Math.exp(-z));
+    el.innerHTML = head(el, 'Da reta à probabilidade', 'A regressão logística calcula z = w·x + b e passa-o pela sigmoide, obtendo uma probabilidade entre 0 e 1. Acima do limiar, a previsão é a classe 1.') + `
+      <div class="row">
+        <label class="f grow"><span>peso w = <b data-wv></b></span><input type="range" min="0" max="4" step="0.05" value="0.6" data-i="w"></label>
+        <label class="f grow"><span>viés b = <b data-bv></b></span><input type="range" min="-16" max="2" step="0.25" value="-3" data-i="b"></label>
+        <label class="f grow"><span>limiar = <b data-tv></b></span><input type="range" min="0.05" max="0.95" step="0.05" value="0.5" data-i="t"></label>
+        <button type="button" class="btn primary" data-a="fit">Ajustar aos dados</button>
+      </div>
+      <svg class="w-svg" viewBox="0 0 640 250" role="img" aria-label="Curva sigmoide"></svg>
+      <div class="legend"><span><i class="dot" style="background:var(--s1)"></i>classe 0</span><span><i class="dot" style="background:var(--s2)"></i>classe 1</span><span><i style="background:var(--accent)"></i>P(classe 1)</span><span><i style="background:var(--ink)"></i>fronteira de decisão</span></div>
+      <dl class="kpis"></dl><p class="w-out"></p>`;
+    const svg = el.querySelector('svg'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out');
+    const I = k => el.querySelector(`[data-i="${k}"]`);
+    const X = scale(0, 10, 40, 624), Y = scale(0, 1, 222, 18);
+    function draw() {
+      const w = +I('w').value, b = +I('b').value, t = +I('t').value;
+      el.querySelector('[data-wv]').textContent = fmt(w); el.querySelector('[data-bv]').textContent = fmt(b); el.querySelector('[data-tv]').textContent = fmt(t);
+      const curve = Array.from({ length: 201 }, (_, i) => i * 0.05).map(x => `${X(x).toFixed(1)},${Y(sig(w * x + b)).toFixed(1)}`).join(' L');
+      const xb = w > 0 ? (Math.log(t / (1 - t)) - b) / w : NaN;
+      let ok = 0, ll = 0;
+      pts.forEach(p => { const q = sig(w * p.x + b); ok += ((q >= t ? 1 : 0) === p.y); ll -= p.y ? Math.log(Math.max(q, 1e-9)) : Math.log(Math.max(1 - q, 1e-9)); });
+      svg.innerHTML = [0, 0.5, 1].map(v => `<line class="ax" x1="40" x2="624" y1="${Y(v)}" y2="${Y(v)}" style="opacity:.5"/><text x="34" y="${Y(v) + 4}" text-anchor="end">${v}</text>`).join('') +
+        `<line x1="40" x2="624" y1="${Y(t)}" y2="${Y(t)}" style="stroke:var(--muted);stroke-dasharray:4 4"/>` +
+        (Number.isFinite(xb) && xb >= 0 && xb <= 10 ? `<rect x="${X(xb)}" y="18" width="${624 - X(xb)}" height="204" style="fill:var(--s2);opacity:.07"/><line x1="${X(xb)}" x2="${X(xb)}" y1="14" y2="222" style="stroke:var(--ink);stroke-width:2"/><text x="${X(xb) + 6}" y="30" class="lab">prevê classe 1 →</text>` : '') +
+        `<path d="M${curve}" style="fill:none;stroke:var(--accent);stroke-width:2.5"/>` +
+        pts.map(p => `<circle cx="${X(p.x)}" cy="${Y(p.y + p.j)}" r="5" style="fill:${p.y ? 'var(--s2)' : 'var(--s1)'};opacity:.85"/>`).join('') +
+        `<text x="332" y="246" text-anchor="middle">x (feature)</text>`;
+      kp.innerHTML = kpi('fronteira x*', Number.isFinite(xb) ? fmt(xb, 2) : '—', 1) + kpi('accuracy', fmt(ok / pts.length, 3), 1) + kpi('log-loss médio', fmt(ll / pts.length, 3));
+      out.innerHTML = `P(classe 1 | x) = σ(${fmt(w)}·x ${b < 0 ? '−' : '+'} ${fmt(Math.abs(b))}). A fronteira é o x onde a probabilidade cruza o limiar ${fmt(t)}. O treino escolhe w e b que minimizam o <b>log-loss</b>, não a accuracy.`;
+    }
+    ['w', 'b', 't'].forEach(k => I(k).addEventListener('input', draw));
+    el.querySelector('[data-a="fit"]').addEventListener('click', () => {
+      let w = 0.1, b = 0;
+      for (let it = 0; it < 4000; it++) { let gw = 0, gb = 0; pts.forEach(p => { const e = sig(w * p.x + b) - p.y; gw += e * p.x; gb += e; }); w -= 0.02 * gw / pts.length; b -= 0.2 * gb / pts.length; }
+      I('w').value = Math.min(4, w).toFixed(2); I('b').value = Math.max(-16, b).toFixed(2); I('t').value = 0.5; draw();
+    });
+    draw();
+  };
+
+  /* =====================================================================
+     lines — curvas pré-calculadas (afinação de hiperparâmetros, caminhos)
+     <script type="application/json">{xlabel, ylabel, x:[...], series:[{name,color,y:[...]}], best, notes:{i:"..."}}</script>
+     ===================================================================== */
+  W.lines = el => {
+    const c = readJSON(el), n = c.x.length;
+    el.innerHTML = head(el, c.title || 'Curva', c.hint || '') + `
+      <label class="f"><span>${esc(c.xlabel)} = <b data-xv></b></span><input type="range" min="0" max="${n - 1}" step="1" value="${c.start ?? c.best ?? 0}"></label>
+      <svg class="w-svg" viewBox="0 0 640 270" role="img" aria-label="${esc(c.title || 'Curva')}"></svg>
+      <div class="legend">${c.series.map(s => `<span><i style="background:${col(s.color)}"></i>${esc(s.name)}</span>`).join('')}</div>
+      <dl class="kpis"></dl><p class="w-out"></p>`;
+    const svg = el.querySelector('svg'), rg = el.querySelector('input'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out');
+    const all = c.series.flatMap(s => s.y);
+    const lo = c.ymin ?? Math.min(...all), hi = c.ymax ?? Math.max(...all), pad = (hi - lo) * 0.08 || 0.01;
+    const X = scale(0, n - 1, 56, 620), Y = scale(lo - pad, hi + pad, 232, 16), yt = niceTicks(lo - pad, hi + pad, 5);
+    const every = Math.ceil(n / 9);
+    function draw() {
+      const k = +rg.value;
+      el.querySelector('[data-xv]').textContent = c.x[k];
+      svg.innerHTML = yt.map(t => `<line class="ax" x1="56" x2="620" y1="${Y(t)}" y2="${Y(t)}" style="opacity:.5"/><text x="50" y="${Y(t) + 4}" text-anchor="end">${fmt(t, 3)}</text>`).join('') +
+        c.x.map((v, i) => i % every && i !== n - 1 ? '' : `<text x="${X(i)}" y="250" text-anchor="middle">${esc(v)}</text>`).join('') +
+        `<text x="338" y="267" text-anchor="middle">${esc(c.xlabel)}</text>` +
+        (c.best != null ? `<line x1="${X(c.best)}" x2="${X(c.best)}" y1="16" y2="232" style="stroke:var(--good);stroke-dasharray:3 4"/>` : '') +
+        `<line x1="${X(k)}" x2="${X(k)}" y1="16" y2="232" style="stroke:var(--ink);stroke-width:1.5;opacity:.6"/>` +
+        c.series.map(s => `<path d="M${s.y.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' L')}" style="fill:none;stroke:${col(s.color)};stroke-width:2.2"/>` +
+          s.y.map((v, i) => `<circle cx="${X(i)}" cy="${Y(v)}" r="${i === k ? 6 : 3.5}" style="fill:${col(s.color)};stroke:var(--card);stroke-width:1.5"/>`).join('')).join('');
+      kp.innerHTML = kpi(esc(c.xlabel), esc(c.x[k]), 1) + c.series.map(s => kpi(esc(s.name), fmt(s.y[k], c.digits ?? 3))).join('') + (c.extra ? c.extra.map(e => kpi(esc(e.name), esc(e.v[k]))).join('') : '');
+      out.innerHTML = (c.notes && c.notes[k]) || c.note || '';
+    }
+    rg.addEventListener('input', draw);
+    draw();
+  };
+
+  /* =====================================================================
+     encoding — comparar codificações de uma variável categórica
+     ===================================================================== */
+  W.encoding = el => {
+    const dv = el.dataset.values || 'Low, Very_High, High, Medium, None, Low', dord = el.dataset.order || 'None, Low, Medium, High, Very_High';
+    const M = [['map', 'Mapa ordinal'], ['label', 'LabelEncoder'], ['onehot', 'One-Hot'], ['binary', 'Binário'], ['fact', 'Factorize']];
+    el.innerHTML = head(el, 'Codificar uma variável categórica', 'Escolhe o método e vê que colunas numéricas resultam. Podes editar os valores.') + `
+      <div class="row"><label class="f grow">Valores da coluna<input type="text" data-i="v" value="${esc(dv)}"></label>
+        <label class="f grow">Ordem (só para o mapa ordinal)<input type="text" data-i="o" value="${esc(dord)}"></label></div>
+      <div class="seg">${M.map(([k, l], i) => `<button type="button" class="btn sm${i ? '' : ' on'}" data-m="${k}">${l}</button>`).join('')}</div>
+      <div class="tw"></div><p class="w-out"></p>`;
+    const tw = el.querySelector('.tw'), out = el.querySelector('.w-out');
+    const split = s => s.split(',').map(t => t.trim()).filter(Boolean);
+    let m = 'map';
+    const NOTE = {
+      map: 'Tu defines a ordem: ideal para variáveis <b>ordinais</b> (None &lt; Low &lt; … ). Uma só coluna.',
+      label: 'Números atribuídos por <b>ordem alfabética</b> (High = 0, Low = 1…), não pelo significado. Uma só coluna, mas cria uma ordem artificial.',
+      onehot: 'Uma coluna binária por categoria (colunas por ordem alfabética, como o <code>pd.get_dummies</code>). Sem ordem artificial, mas com muitas categorias gera muitas colunas.',
+      binary: 'Cada categoria recebe um inteiro (ordem de aparecimento, a começar em 1) escrito em binário: ⌈log₂(k+1)⌉ colunas em vez de k. Compromisso entre os dois anteriores.',
+      fact: 'Números por <b>ordem de aparecimento</b> nos dados (<code>pd.factorize(...)[0] + 1</code>). Rápido, mas a ordem é arbitrária.'
+    };
+    function draw() {
+      const vals = split(el.querySelector('[data-i="v"]').value), ord = split(el.querySelector('[data-i="o"]').value);
+      const uniq = [...new Set(vals)], alpha = [...uniq].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+      let cols, rows;
+      if (m === 'map') { cols = ['código']; rows = vals.map(v => [ord.indexOf(v) >= 0 ? ord.indexOf(v) : '?']); }
+      else if (m === 'label') { cols = ['código']; rows = vals.map(v => [alpha.indexOf(v)]); }
+      else if (m === 'fact') { cols = ['código']; rows = vals.map(v => [uniq.indexOf(v) + 1]); }
+      else if (m === 'onehot') { cols = alpha; rows = vals.map(v => alpha.map(a => +(a === v))); }
+      else { const nb = Math.max(1, Math.ceil(Math.log2(uniq.length + 1))); cols = Array.from({ length: nb }, (_, i) => `bit_${i}`); rows = vals.map(v => (uniq.indexOf(v) + 1).toString(2).padStart(nb, '0').split('').map(Number)); }
+      tw.innerHTML = `<table><thead><tr><th>valor</th>${cols.map(c2 => `<th class="num">${esc(c2)}</th>`).join('')}</tr></thead><tbody>
+        ${vals.map((v, i) => `<tr><td>${esc(v)}</td>${rows[i].map(x => `<td class="num">${x}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+      out.innerHTML = `${NOTE[m]} <b>${cols.length}</b> coluna(s) para ${uniq.length} categorias.`;
+    }
+    el.addEventListener('input', draw);
+    el.addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (!b) return; m = b.dataset.m; el.querySelectorAll('[data-m]').forEach(x => x.classList.toggle('on', x === b)); draw(); });
+    draw();
+  };
+
+  /* =====================================================================
+     voting — hard vs. soft voting com três modelos
+     ===================================================================== */
+  W.voting = el => {
+    const init = (el.dataset.values || '0.9,0.45,0.4').split(',').map(Number);
+    el.innerHTML = head(el, 'Hard voting vs. soft voting', 'Cada modelo dá a probabilidade de a amostra ser da classe 1. No hard voting cada modelo vota numa classe; no soft voting faz-se a média das probabilidades.') + `
+      <div class="vt">${init.map((v, i) => `<label class="f"><span>Modelo ${i + 1}: P(classe 1) = <b data-v="${i}"></b> → vota <b data-c="${i}"></b></span><input type="range" min="0" max="1" step="0.05" value="${v}" data-i="${i}"></label>`).join('')}</div>
+      <dl class="kpis"></dl><p class="w-out"></p>`;
+    const kp = el.querySelector('.kpis'), out = el.querySelector('.w-out');
+    function draw() {
+      const p = [0, 1, 2].map(i => +el.querySelector(`[data-i="${i}"]`).value);
+      p.forEach((v, i) => { el.querySelector(`[data-v="${i}"]`).textContent = fmt(v); el.querySelector(`[data-c="${i}"]`).textContent = v >= 0.5 ? '1' : '0'; });
+      const votes = p.filter(v => v >= 0.5).length, hard = votes >= 2 ? 1 : 0, avg = mean(p), soft = avg >= 0.5 ? 1 : 0;
+      kp.innerHTML = kpi('votos na classe 1', `${votes} de 3`) + kpi('hard voting', `classe ${hard}`, 1) + kpi('média das probabilidades', fmt(avg, 3)) + kpi('soft voting', `classe ${soft}`, 1);
+      out.innerHTML = hard === soft ? 'Os dois métodos concordam.' : `<b>Discordam!</b> ${hard ? 'A maioria vota 1, mas' : 'A maioria vota 0, mas'} ${soft ? 'um modelo muito confiante na classe 1 puxa a média para cima' : 'a confiança média na classe 1 fica abaixo de 0.5'}. O soft voting tem em conta <b>quão seguro</b> está cada modelo.`;
+    }
+    el.addEventListener('input', draw);
+    draw();
+  };
+
+  /* =====================================================================
+     bootstrap — amostragem com reposição (base do bagging)
+     ===================================================================== */
+  W.bootstrap = el => {
+    const N = +(el.dataset.n || 10), L = 'ABCDEFGHIJKLMNOPQRST'.slice(0, N).split('');
+    let r = rng(3);
+    el.innerHTML = head(el, 'Amostras bootstrap', `Cada árvore do bagging treina com uma amostra de ${N} elementos tirados <b>com reposição</b> dos ${N} originais: uns repetem-se, outros ficam de fora (out-of-bag).`) + `
+      <div class="row"><button type="button" class="btn primary" data-a="new">Novas amostras</button></div>
+      <div class="bs"></div><dl class="kpis"></dl><p class="w-out"></p>`;
+    const bs = el.querySelector('.bs'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out');
+    const chip = (l, cls) => `<span class="chip ${cls || ''}">${l}</span>`;
+    function draw() {
+      const samples = [0, 1, 2].map(() => Array.from({ length: N }, () => L[Math.floor(r() * N)]).sort());
+      bs.innerHTML = `<div class="bs-row"><span class="lbl-mono">Original</span>${L.map(l => chip(l)).join('')}</div>` +
+        samples.map((s, i) => { const oob = L.filter(l => !s.includes(l)); return `<div class="bs-row"><span class="lbl-mono">Árvore ${i + 1}</span>${s.map((l, j) => chip(l, s.indexOf(l) !== j ? 'rep' : 'in')).join('')}<span class="small muted">fora: ${oob.join(', ') || '—'}</span></div>`; }).join('');
+      const fr = samples.map(s => new Set(s).size / N);
+      kp.innerHTML = kpi('elementos distintos (média)', fmt(mean(fr) * 100, 0) + '%', 1) + kpi('teoria (N grande)', '≈ 63.2%');
+      out.innerHTML = 'Em média, cada amostra contém cerca de 63% dos elementos originais (1 − 1/e). Como cada árvore vê dados ligeiramente diferentes, os seus erros são diferentes — e a média das previsões é mais estável do que cada árvore sozinha.';
+    }
+    el.querySelector('[data-a="new"]').addEventListener('click', draw);
+    draw();
+  };
 })();

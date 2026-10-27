@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Poda de Árvores e Afinação de Hiperparâmetros · DAA · meiUM</title>
+<meta name="description" content="DAA · Tema 6: árvores de decisão no scikit-learn, parâmetros vs. hiperparâmetros, GridSearchCV, pré-poda (max_depth) e pós-poda (ccp_alpha).">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var t=JSON.parse(localStorage.getItem('meium:theme'));if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="daa" data-topic="06" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 6.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="6.0" data-title="Visão geral" data-desc="Porque é que uma árvore sem limites generaliza mal.">
+  <header class="ph">
+    <h1>Poda de Árvores e Afinação de Hiperparâmetros<span class="en">Decision Tree Pruning and Hyperparameter Tuning</span></h1>
+    <p class="lede">Uma árvore de decisão sem limites continua a dividir até acertar em todos os exemplos de treino — e decora o ruído. Este tema mostra como a <strong>limitar</strong> (poda) e como escolher os seus <strong>hiperparâmetros</strong> de forma sistemática.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">6.0.1</span>O problema em números</h2>
+    <p>Uma árvore sem restrições, treinada no dataset de tumores:</p>
+    <div class="kpis">
+      <div class="kpi"><dt>Profundidade</dt><dd>8</dd></div>
+      <div class="kpi"><dt>Folhas</dt><dd>19</dd></div>
+      <div class="kpi"><dt>Accuracy no treino</dt><dd>1.000</dd></div>
+      <div class="kpi hl"><dt>Accuracy no teste</dt><dd>0.901</dd></div>
+    </div>
+    <p>Perfeita no treino, bem pior em dados novos: <strong>overfitting</strong>. Uma árvore com apenas 3 níveis e 6 folhas chega a <strong>0.918</strong> no teste — mais simples e melhor.</p>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <div class="note"><span class="lbl">Exemplo usado</span>
+      <p><code>load_breast_cancer</code> (569 tumores, 30 features; 1 = maligno), dividido 70/30 de forma estratificada. Todo o código desta página é reprodutível com esse dataset.</p>
+    </div>
+    <p class="src">Baseado nas aulas de DAA (Decision Tree Pruning and Hyperparameter Tuning). Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 6.1 A ÁRVORE ============================ -->
+<article class="page" data-page="arvore" data-num="6.1" data-title="A árvore no scikit-learn" data-desc="Hiperparâmetros principais, critério de divisão e como ver a árvore.">
+  <header class="ph">
+    <h1>A árvore de decisão no scikit-learn<span class="en">Decision Tree Classifier</span></h1>
+    <p class="lede">Antes de afinar, convém conhecer os botões que o <code>DecisionTreeClassifier</code> oferece e como inspecionar a árvore treinada.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">6.1.1</span>Os hiperparâmetros principais</h2>
+    <pre data-title="Assinatura"><code class="language-python">DecisionTreeClassifier(*, criterion='gini', splitter='best', max_depth=None, min_samples_split=2,
+                       min_samples_leaf=1, max_features=None, random_state=None, max_leaf_nodes=None,
+                       min_impurity_decrease=0.0, class_weight=None, ccp_alpha=0.0)</code></pre>
+    <div class="tw"><table>
+      <thead><tr><th>Hiperparâmetro</th><th>O que controla</th><th>Efeito de o restringir</th></tr></thead>
+      <tbody>
+        <tr><td><code>criterion</code></td><td>Medida de qualidade da divisão: <code>'gini'</code> ou <code>'entropy'</code>.</td><td>—</td></tr>
+        <tr><td><code>max_depth</code></td><td>Profundidade máxima.</td><td>Árvore mais curta (pré-poda).</td></tr>
+        <tr><td><code>min_samples_split</code></td><td>Mínimo de amostras num nó para o poder dividir.</td><td>Para de dividir nós pequenos.</td></tr>
+        <tr><td><code>min_samples_leaf</code></td><td>Mínimo de amostras em cada folha.</td><td>Evita folhas com 1 ou 2 exemplos.</td></tr>
+        <tr><td><code>max_leaf_nodes</code></td><td>Número máximo de folhas.</td><td>Limita o tamanho total.</td></tr>
+        <tr><td><code>max_features</code></td><td>Quantas features considerar em cada divisão.</td><td>Mais aleatoriedade (usado nas Random Forests).</td></tr>
+        <tr><td><code>class_weight</code></td><td>Peso de cada classe.</td><td><code>'balanced'</code> ajuda com classes desequilibradas.</td></tr>
+        <tr><td><code>ccp_alpha</code></td><td>Força da pós-poda por custo-complexidade.</td><td>Corta ramos que pouco ajudam (6.4).</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">6.1.2</span>Como a árvore escolhe as divisões <span class="xtag">complemento</span></h2>
+    <p>Em cada nó, a árvore experimenta divisões ("feature ≤ limiar") e escolhe a que deixa os nós-filhos mais <strong>puros</strong> — com uma classe dominante. A impureza mede-se com:</p>
+    <div class="fgrid">
+      <div class="formula"><div class="cap">Gini</div>\[G=1-\sum_k p_k^2\]</div>
+      <div class="formula"><div class="cap">Entropia</div>\[H=-\sum_k p_k\log_2 p_k\]</div>
+    </div>
+    <p>\(p_k\) é a proporção da classe k no nó. Um nó só com uma classe tem G = H = 0; um nó 50/50 tem G = 0.5 e H = 1. Na prática, os dois critérios dão árvores parecidas.</p>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">6.1.3</span>Ver a árvore</h2>
+    <pre><code class="language-python">from sklearn import tree
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split
+
+data = load_breast_cancer(); X, y = data.data, 1 - data.target      # 1 = maligno
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, stratify=y)
+
+dt_model = DecisionTreeClassifier(random_state=42).fit(X_train, y_train)
+dt_model.get_depth(), dt_model.get_n_leaves()          # (8, 19)
+
+fig = plt.figure(figsize=(25, 20))
+tree.plot_tree(dt_model, max_depth=3, feature_names=data.feature_names)   # desenho (só 3 níveis)
+fig.savefig('dt_plot.png')
+print(tree.export_text(dt_model, feature_names=list(data.feature_names)))   # versão em texto</code></pre>
+    <p>Com <code>max_depth=2</code>, o <code>export_text</code> mostra as regras aprendidas:</p>
+    <pre data-title="export_text"><code class="language-text">|--- worst perimeter <= 112.80
+|   |--- worst concave points <= 0.18
+|   |   |--- class: 0
+|   |--- worst concave points >  0.18
+|   |   |--- class: 1
+|--- worst perimeter >  112.80
+|   |--- worst concave points <= 0.14
+|   |   |--- class: 1
+|   |--- worst concave points >  0.14
+|   |   |--- class: 1</code></pre>
+    <p>Dois testes chegam para uma primeira separação: tumores grandes (perímetro &gt; 112.8) são classificados como malignos; nos pequenos, decide a concavidade. Esta legibilidade é a grande vantagem das árvores.</p>
+  </section>
+</article>
+
+<!-- ============================ 6.2 PARÂMETROS VS HIPERPARÂMETROS ============================ -->
+<article class="page" data-page="hiper" data-num="6.2" data-title="Parâmetros vs. hiperparâmetros" data-desc="O que o modelo aprende vs. o que nós escolhemos.">
+  <header class="ph">
+    <h1>Parâmetros vs. hiperparâmetros<span class="en">Parameters and Hyperparameters</span></h1>
+    <p class="lede">Há valores que o modelo aprende sozinho a partir dos dados e valores que temos de escolher antes do treino. <strong>Afinar</strong> um modelo é encontrar a melhor configuração dos segundos.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="two">
+      <div class="card c1"><span class="tag">Parâmetro do modelo</span>
+        <p>Variável de configuração <strong>interna</strong>, <strong>estimada a partir dos dados</strong> de treino — não se define à mão.</p>
+        <ul><li>Pesos de uma rede neuronal.</li><li>Vetores de suporte de uma SVM.</li><li>Coeficientes de uma regressão (tema 4).</li><li>Os limiares de cada divisão de uma árvore.</li></ul></div>
+      <div class="card c2"><span class="tag">Hiperparâmetro</span>
+        <p>Variável de configuração <strong>externa</strong>, <strong>definida manualmente</strong>. É difícil saber à partida o valor ótimo.</p>
+        <ul><li>Otimizador e learning rate de uma rede neuronal.</li><li>C e gamma de uma SVM.</li><li>Medida de qualidade e método de poda de uma árvore.</li><li><code>alpha</code> do LASSO.</li></ul></div>
+    </div>
+    <p>Classifica cada um:</p>
+    <div class="classify" data-options="Parâmetro,Hiperparâmetro">
+      <div class="ci" data-answer="Hiperparâmetro" data-why="Escolhe-se antes do treino.">O <code>max_depth</code> de uma árvore.</div>
+      <div class="ci" data-answer="Parâmetro" data-why="É aprendido a partir dos dados (coef_).">Os coeficientes de uma regressão linear.</div>
+      <div class="ci" data-answer="Hiperparâmetro" data-why="É a força da regularização, escolhida por nós.">O <code>C</code> de uma regressão logística.</div>
+      <div class="ci" data-answer="Parâmetro" data-why="O treino escolhe o limiar que melhor separa as classes.">O limiar "worst perimeter ≤ 112.8" numa árvore treinada.</div>
+      <div class="ci" data-answer="Hiperparâmetro" data-why="É escolhido por quem treina a rede.">O learning rate de uma rede neuronal.</div>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 6.3 GRIDSEARCH ============================ -->
+<article class="page" data-page="grid" data-num="6.3" data-title="GridSearchCV" data-desc="Testar todas as combinações com validação cruzada.">
+  <header class="ph">
+    <h1>Afinação com GridSearch<span class="en">Hyperparameter Tuning with GridSearch</span></h1>
+    <p class="lede">Encontrar os hiperparâmetros certos pode ser difícil. A ideia de criar uma <strong>grelha</strong> de valores e experimentar <strong>todas as combinações</strong> chama-se GridSearch.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">6.3.1</span>Como funciona</h2>
+    <ul>
+      <li>O scikit-learn traz esta funcionalidade em <code>GridSearchCV</code> (CV = <em>cross validation</em>, tema 2).</li>
+      <li>Recebe o <strong>modelo</strong> e um <strong>dicionário</strong>: as chaves são os hiperparâmetros, os valores são as listas de valores a testar.</li>
+      <li>É um <strong>meta-estimador</strong>: cria um novo estimador que se comporta como o original (tem <code>fit</code>, <code>predict</code>, <code>score</code>).</li>
+      <li>Recomenda-se <code>refit=True</code> e um <code>verbose</code> à escolha (quanto texto mostra durante o processo).</li>
+    </ul>
+    <p>Ao chamar <code>fit</code>:</p>
+    <ol class="steps-list">
+      <li><div>Para cada combinação da grelha, corre validação cruzada e regista o score médio.</div></li>
+      <li><div>Escolhe a melhor combinação.</div></li>
+      <li><div>Com <code>refit=True</code>, volta a treinar <strong>uma vez</strong> com essa combinação em todos os dados passados ao <code>fit</code> (sem CV), criando o modelo final.</div></li>
+    </ol>
+    <div class="formula"><div class="cap">Quantos treinos?</div>\[\text{n.º de combinações}\times k\ \text{folds}\ (+1\ \text{refit})\]</div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">6.3.2</span>Exemplo</h2>
+    <p>Uma ideia para a grelha: a árvore completa tem profundidade 8, por isso faz sentido testar profundidades até perto desse valor.</p>
+    <pre><code class="language-python">from sklearn.model_selection import GridSearchCV
+
+param_grid_dt = {'criterion': ['gini', 'entropy'], 'max_depth': list(range(1, 11))}
+grid_dt = GridSearchCV(DecisionTreeClassifier(random_state=42), param_grid_dt, cv=5, refit=True, verbose=1)
+grid_dt.fit(X_train, y_train)          # 20 combinações × 5 folds = 100 treinos (+1 refit)
+
+grid_dt.best_params_                   # {'criterion': 'entropy', 'max_depth': 3}
+grid_dt.best_score_                    # 0.932   accuracy média na CV
+grid_dt.best_estimator_                # o modelo final, já treinado
+grid_dt.score(X_test, y_test)          # 0.918   no teste</code></pre>
+    <div class="note warn"><span class="lbl">Não afines no conjunto de teste</span>
+      <p>O GridSearch usa só os dados de treino (com CV dentro deles). O teste fica de fora até ao fim, para dar uma estimativa honesta. Se escolhesses os hiperparâmetros a olhar para o teste, essa estimativa ficaria otimista.</p>
+    </div>
+    <div class="note extra"><span class="lbl">Complemento · RandomizedSearchCV</span>
+      <p>Com muitos hiperparâmetros, a grelha cresce exponencialmente. O <code>RandomizedSearchCV</code> testa só <code>n_iter</code> combinações sorteadas e costuma encontrar uma boa configuração muito mais depressa.</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 6.4 PODA ============================ -->
+<article class="page" data-page="poda" data-num="6.4" data-title="Poda: max_depth e ccp_alpha" data-desc="Pré-poda e pós-poda.">
+  <header class="ph">
+    <h1>Poda da árvore<span class="en">Decision Tree Pruning</span></h1>
+    <p class="lede">Podar é <strong>substituir uma subárvore inteira por uma folha</strong>: se o erro esperado da subárvore for maior do que o de uma única folha, a subárvore sai.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">6.4.1</span>Quando e como podar</h2>
+    <ul>
+      <li>Se um nó fica muito pequeno, <strong>não o dividir mais</strong>.</li>
+      <li>A poda por <strong>erro mínimo (com CV)</strong>, sem paragem antecipada, é uma técnica eficaz.</li>
+      <li>Construir a árvore completa e <strong>trabalhar de trás para a frente</strong>, com um teste estatístico em cada etapa.</li>
+      <li>Podar um nó interno e <strong>subir a subárvore</strong> abaixo dele um nível.</li>
+    </ul>
+    <div class="two">
+      <div class="card c1"><span class="tag">Pré-poda · max_depth</span><p>Impede a árvore de crescer: para antes de chegar a uma certa profundidade (ou tamanho de nó).</p></div>
+      <div class="card c2"><span class="tag">Pós-poda · ccp_alpha</span><p>Deixa a árvore crescer toda e depois corta os ramos que custam mais complexidade do que o que ganham em pureza.</p></div>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">6.4.2</span>Pré-poda: max_depth</h2>
+    <pre><code class="language-python">max_depth = dt_model.get_depth()           # 8
+param_grid_pru = {'max_depth': [d for d in range(1, max_depth + 1)]}
+max_depth_gs = GridSearchCV(DecisionTreeClassifier(random_state=42), param_grid_pru).fit(X_train, y_train)
+max_depth_gs.best_params_                  # {'max_depth': 4}   0.927 na CV, 0.906 no teste</code></pre>
+    <p>A CV escolhe <strong>4</strong>, embora no teste a profundidade 3 seja ligeiramente melhor (0.918). É normal: com poucas centenas de exemplos, diferenças de 1% estão dentro do ruído. A escolha honesta é a da CV — escolher pelo teste seria usá-lo para treinar.</p>
+    <div class="widget" data-widget="lines" data-title="Accuracy vs. profundidade máxima">
+      <script type="application/json">{"hint":"A accuracy de treino sobe sempre com a profundidade; a de teste atinge o máximo cedo e depois oscila — o resto é overfitting.","xlabel":"max_depth","x":["1","2","3","4","5","6","7","8"],"series":[{"name":"treino","color":"s1","y":[0.93,0.95,0.962,0.977,0.985,0.992,0.997,1.0]},{"name":"teste","color":"s2","y":[0.895,0.906,0.918,0.906,0.906,0.912,0.895,0.901]}],"extra":[{"name":"folhas","v":["2","4","6","9","12","16","18","19"]}],"best":3,"start":3,"notes":{"2":"max_depth = 3: a melhor accuracy de teste (0.918), com só 6 folhas.","3":"<b>max_depth = 4</b>: o escolhido pela validação cruzada (0.927 de accuracy média). No teste dá 0.906.","7":"Árvore completa: 100% no treino, 0.901 no teste — overfitting."}}</script>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">6.4.3</span>Pós-poda: ccp_alpha</h2>
+    <p>A poda por custo-complexidade (<em>cost complexity pruning</em>) avalia cada subárvore T com <span class="xtag">complemento</span>:</p>
+    <div class="formula">\[R_\alpha(T)=R(T)+\alpha\,\lvert T\rvert\]</div>
+    <p>R(T) é a impureza total das folhas e |T| o número de folhas. Com α = 0 fica a árvore completa; à medida que α cresce, compensa cortar ramos, até restar só a raiz. O scikit-learn calcula os valores de α em que cada corte acontece:</p>
+    <pre><code class="language-python">path = dt_model.cost_complexity_pruning_path(X_train, y_train)
+ccp_alphas = path['ccp_alphas']             # [0, 0.0025, 0.0025, 0.0034, …, 0.0356, 0.3364]
+
+ccp_alpha_gs = GridSearchCV(DecisionTreeClassifier(random_state=42),
+                            {'ccp_alpha': list(ccp_alphas[:-1])}).fit(X_train, y_train)
+ccp_alpha_gs.best_params_                   # {'ccp_alpha': 0.0080}
+best_ccp_alpha_tree = ccp_alpha_gs.best_estimator_     # 6 folhas, profundidade 3, 0.918 no teste</code></pre>
+    <p class="small muted">O último α corta tudo até à raiz (um só nó), por isso fica de fora.</p>
+    <div class="widget" data-widget="lines" data-title="Accuracy vs. ccp_alpha">
+      <script type="application/json">{"hint":"Da esquerda (árvore completa, sem poda) para a direita (árvore quase só raiz). O ponto verde é o α escolhido por validação cruzada.","xlabel":"ccp_alpha","x":["0","0.0025","0.0025","0.0034","0.0041","0.0046","0.0048","0.0056","0.0071","0.0074","0.008","0.0082","0.0129","0.0133","0.0356"],"series":[{"name":"treino","color":"s1","y":[1.0,0.997,0.995,0.992,0.987,0.985,0.982,0.98,0.975,0.97,0.962,0.962,0.95,0.95,0.93]},{"name":"teste","color":"s2","y":[0.901,0.901,0.906,0.895,0.901,0.901,0.906,0.918,0.918,0.906,0.918,0.918,0.906,0.906,0.895]}],"extra":[{"name":"folhas","v":["19","17","16","15","12","11","10","9","8","7","6","5","4","3","2"]}],"best":10,"start":0,"notes":{"0":"α = 0: árvore completa (sem poda). Treino perfeito, teste 0.901.","10":"<b>α = 0.008</b>: o escolhido pela CV. 6 folhas e 0.918 no teste — igual à melhor pré-poda.","14":"α grande: sobra quase só a raiz e o modelo fica simples demais (underfitting)."}}</script>
+    </div>
+    <div class="note"><span class="lbl">Ler o gráfico</span>
+      <p>À esquerda o modelo é <strong>demasiado complexo</strong> (overfitting: treino alto, teste mais baixo); à direita é <strong>demasiado simples</strong> (underfitting: os dois descem). O ponto ótimo está entre os dois — a mesma ideia do compromisso entre bias e variância.</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo, armadilhas e perguntas para testar.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Conceito</th><th>Ideia-chave</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Parâmetro</strong></td><td>Aprendido a partir dos dados (pesos, coeficientes, limiares).</td></tr>
+        <tr><td><strong>Hiperparâmetro</strong></td><td>Escolhido antes do treino (max_depth, C, alpha, learning rate).</td></tr>
+        <tr><td><strong>GridSearchCV</strong></td><td>Todas as combinações × k folds; <code>best_params_</code>, <code>best_estimator_</code>, <code>best_score_</code>; refit no fim.</td></tr>
+        <tr><td><strong>Pré-poda</strong></td><td>Limitar o crescimento: <code>max_depth</code>, <code>min_samples_leaf</code>, <code>max_leaf_nodes</code>…</td></tr>
+        <tr><td><strong>Pós-poda</strong></td><td>Crescer tudo e cortar: <code>ccp_alpha</code> via <code>cost_complexity_pruning_path</code>.</td></tr>
+        <tr><td><strong>Gini / entropia</strong></td><td>Medidas de impureza de um nó; 0 = puro.</td></tr>
+        <tr><td><strong>Inspecionar</strong></td><td><code>plot_tree</code>, <code>export_text</code>, <code>get_depth()</code>, <code>get_n_leaves()</code>.</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">Σ.2</span>Armadilhas frequentes</h2>
+    <ul>
+      <li>Accuracy de 100% no treino numa árvore é sinal de overfitting, não de sucesso.</li>
+      <li>Escolher hiperparâmetros a olhar para o teste torna a avaliação otimista.</li>
+      <li>Grelhas grandes multiplicam o custo: combinações × folds.</li>
+      <li>α demasiado grande (ou max_depth demasiado pequeno) leva a underfitting.</li>
+    </ul>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.3</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">Uma grelha com 3 valores de <code>criterion</code> × 8 de <code>max_depth</code>, com <code>cv=5</code>. Quantos treinos faz o GridSearchCV (sem contar o refit)?</p>
+        <div class="opts"><button>24</button><button data-ok>120</button><button>40</button></div>
+        <p class="why">3 × 8 = 24 combinações, cada uma treinada 5 vezes = 120.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">O que faz <code>refit=True</code>?</p>
+        <div class="opts"><button>Repete a pesquisa com uma grelha mais fina</button><button data-ok>Treina o modelo final com a melhor combinação em todos os dados do fit</button><button>Avalia o modelo no conjunto de teste</button></div>
+        <p class="why">Depois de escolher a melhor combinação por CV, treina-a uma vez com todos os dados de treino; fica em <code>best_estimator_</code>.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual destas é uma técnica de <strong>pós</strong>-poda?</p>
+        <div class="opts"><button><code>max_depth</code></button><button><code>min_samples_split</code></button><button data-ok><code>ccp_alpha</code></button></div>
+        <p class="why">ccp_alpha corta ramos de uma árvore já crescida. As outras impedem-na de crescer (pré-poda).</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Ao aumentar <code>ccp_alpha</code>, a árvore…</p>
+        <div class="opts"><button>Fica maior</button><button data-ok>Fica mais pequena (menos folhas)</button><button>Não muda</button></div>
+        <p class="why">α maior penaliza mais cada folha, logo compensa cortar mais ramos.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Os pesos de uma rede neuronal são…</p>
+        <div class="opts"><button data-ok>Parâmetros</button><button>Hiperparâmetros</button></div>
+        <p class="why">São estimados a partir dos dados durante o treino.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Um nó tem 50% de cada classe. Qual é o seu índice de Gini?</p>
+        <div class="opts"><button>0</button><button data-ok>0.5</button><button>1</button></div>
+        <p class="why">1 − (0.5² + 0.5²) = 0.5, o máximo para duas classes.</p>
+      </div>
+    </div>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

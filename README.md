@@ -44,7 +44,9 @@ A barra lateral, a paginação, o "mapa do tema" e as ligações entre temas sã
 | Expansível | `<details class="ans"><summary>…</summary><div>…</div></details>` |
 | Quiz | `.quiz` com `.opts > button[data-ok]` e `.why`; agrupar em `[data-quizset]` para pontuação |
 | Classificar | `.classify[data-options]` com `.ci[data-answer][data-why]` |
-| Widgets | `<div class="widget" data-widget="stats|normal|pmf|boxplot|correlation">` |
+| Widgets | `<div class="widget" data-widget="…">` — `stats`, `normal`, `pmf`, `boxplot`, `correlation`, `confusion`, `roc`, `fscore`, `regerr`, `kfold`, `scale`, `shape`, `linfit`, `sigmoid`, `encoding`, `voting`, `bootstrap` |
+| Widgets com dados | `heatmap` e `lines` leem um `<script type="application/json">` dentro do div (ver `daa/06-decision-trees.html`) |
+| Pipeline de ML | `<ol class="pipeline"><li>…</li><li class="on">…</li></ol>` |
 
 Convenção: o conteúdo segue os slides; tudo o que não vem dos slides é marcado como **complemento**.
 
