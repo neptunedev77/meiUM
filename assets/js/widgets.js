@@ -113,7 +113,7 @@
         kpi('variância σ²', fmt(v)) + kpi('desvio σ', fmt(sd), 1) + kpi('s² (amostral)', fmt(vs));
       const far = a.filter(x => Math.abs(x - m) > sd + 1e-12);
       out.innerHTML = `Intervalo μ ± σ = [${fmt(m - sd)}, ${fmt(m + sd)}]. ` +
-        (far.length ? `Valores a mais de um desvio padrão da média (<b>invulgares</b>, no critério dos slides): <b>${far.map(x => fmt(x)).join(', ')}</b>.` : 'Nenhum valor está a mais de um desvio padrão da média.') +
+        (far.length ? `Valores a mais de um desvio padrão da média (<b>invulgares</b>, pelo critério de 1σ): <b>${far.map(x => fmt(x)).join(', ')}</b>.` : 'Nenhum valor está a mais de um desvio padrão da média.') +
         (Math.abs(m - md) > sd * 0.5 ? ` A média está bastante afastada da mediana: sinal de que há valores extremos a puxá-la.` : '');
       const rows = a.map(x => `<tr><td class="num">${fmt(x, 4)}</td><td class="num">${fmt(x - m, 3)}</td><td class="num">${fmt((x - m) ** 2, 3)}</td></tr>`).join('');
       steps.innerHTML = `<table><thead><tr><th class="num">xᵢ</th><th class="num">xᵢ − μ</th><th class="num">(xᵢ − μ)²</th></tr></thead><tbody>${rows}</tbody>
@@ -164,7 +164,7 @@
         a = -4; b = invPhi(v / 100); area = v / 100;
         lbl.innerHTML = `percentil <b>${v}</b>`;
         txt = `O percentil ${v} está em <b>μ ${b < 0 ? '−' : '+'} ${fmt(Math.abs(b), 3)}σ</b>: ${v}% dos valores ficam abaixo deste ponto.` +
-          (v === 25 || v === 75 ? ' (É o quartil ' + (v === 25 ? 'Q1' : 'Q3') + ', a ±0.6745σ, como na figura dos slides.)' : '') + (v === 50 ? ' É a mediana, que numa normal coincide com a média.' : '');
+          (v === 25 || v === 75 ? ' (É o quartil ' + (v === 25 ? 'Q1' : 'Q3') + ', a ±0.6745σ da média.)' : '') + (v === 50 ? ' É a mediana, que numa normal coincide com a média.' : '');
       }
       const xs = []; for (let x = Math.max(a, -4); x <= Math.min(b, 4) + 1e-9; x += 0.02) xs.push(x);
       const fillPath = xs.length ? `M${sx(xs[0])},${sy(0)} ` + xs.map(x => `L${sx(x).toFixed(1)},${sy(phi(x)).toFixed(1)}`).join(' ') + ` L${sx(xs[xs.length - 1])},${sy(0)} Z` : '';
@@ -317,6 +317,189 @@
       const s = e.target.closest('[data-u]'); if (s) { u = +s.dataset.u; el.querySelectorAll('[data-u]').forEach(x => x.classList.toggle('on', x === s)); draw(); }
     });
     rg.addEventListener('input', draw);
+    draw();
+  };
+
+  /* =====================================================================
+     confusion — matriz de confusão (linhas = previsto,
+     colunas = real) e métricas derivadas.  data-values="TP,FP,FN,TN"
+     ===================================================================== */
+  W.confusion = el => {
+    const initial = (el.dataset.values || '40,15,10,135').split(',').map(Number);
+    const PRE = [['Exemplo do rastreio', initial.join(',')],['Classe rara: diz sempre "negativo"', '0,0,10,990'], ['Diz "positivo" a quase tudo', '10,90,0,900']];
+    const cell = (k, cls, name) => `<label class="c ${cls}"><span>${name}</span><input type="number" min="0" step="1" data-k="${k}"></label>`;
+    el.innerHTML = head(el, 'Matriz de confusão e métricas', 'Altera as quatro contagens, ou escolhe um cenário, e vê como cada métrica reage.') + `
+      <div class="seg">${PRE.map(([l, v]) => `<button type="button" class="btn sm" data-pre="${v}">${esc(l)}</button>`).join('')}</div>
+      <div class="cm-wrap">
+        <div class="cm">
+          <span></span><span class="h">Real: positivo</span><span class="h">Real: negativo</span>
+          <span class="h v">Previsto: positivo</span>${cell('tp', 'ok', 'TP')}${cell('fp', 'err', 'FP · erro tipo I')}
+          <span class="h v">Previsto: negativo</span>${cell('fn', 'err', 'FN · erro tipo II')}${cell('tn', 'ok', 'TN')}
+        </div>
+        <dl class="kpis"></dl>
+      </div>
+      <p class="w-out"></p>`;
+    const inp = k => el.querySelector(`[data-k="${k}"]`), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out');
+    const set = v => ['tp', 'fp', 'fn', 'tn'].forEach((k, i) => { inp(k).value = v[i]; });
+    const div = (a, b) => b ? a / b : NaN;
+    function draw() {
+      const [tp, fp, fn, tn] = ['tp', 'fp', 'fn', 'tn'].map(k => Math.max(0, +inp(k).value || 0));
+      const n = tp + fp + fn + tn;
+      const acc = div(tp + tn, n), prec = div(tp, tp + fp), rec = div(tp, tp + fn), spec = div(tn, tn + fp), f1 = div(2 * prec * rec, prec + rec);
+      const f = x => fmt(x, 3);
+      kp.innerHTML = kpi('Accuracy', f(acc), 1) + kpi('Precision', f(prec), 1) + kpi('Recall (sensibilidade)', f(rec), 1) + kpi('Especificidade', f(spec)) + kpi('F1', f(f1));
+      let msg = `Accuracy = (${tp} + ${tn}) / ${n} = <b>${f(acc)}</b> · Precision = ${tp} / (${tp} + ${fp}) = <b>${f(prec)}</b> · Recall = ${tp} / (${tp} + ${fn}) = <b>${f(rec)}</b>.`;
+      if (acc > 0.9 && (rec < 0.5 || !Number.isFinite(rec) || rec === 0)) msg += ' <b>Accuracy alta, recall baixo:</b> com uma classe rara, acertar nos negativos chega para uma accuracy enganadora.';
+      else if (rec > 0.9 && prec < 0.5) msg += ' <b>Recall alto, precision baixa:</b> o modelo apanha quase todos os positivos, mas à custa de muitos falsos alarmes.';
+      if (!Number.isFinite(prec)) msg += ' A precision não está definida (o modelo nunca prevê positivo); o sklearn devolve 0 com um aviso.';
+      msg += `<br><span class="small muted">No sklearn, <code>confusion_matrix(y_test, predictions)</code> mostra [[TN, FP], [FN, TP]] = [[${tn}, ${fp}], [${fn}, ${tp}]].</span>`;
+      out.innerHTML = msg;
+    }
+    el.addEventListener('input', draw);
+    el.addEventListener('click', e => { const b = e.target.closest('[data-pre]'); if (b) { set(b.dataset.pre.split(',').map(Number)); draw(); } });
+    set(initial); draw();
+  };
+
+  /* =====================================================================
+     roc — duas classes com pontuações normais; limiar → ponto na curva ROC
+     ===================================================================== */
+  W.roc = el => {
+    el.innerHTML = head(el, 'Limiar de decisão e curva ROC', 'O modelo dá uma pontuação a cada item; acima do limiar, classifica-o como positivo. Mexe no limiar e na separação entre as classes.') + `
+      <div class="row">
+        <label class="f grow"><span>limiar = <b data-tv></b></span><input type="range" min="-3" max="5" step="0.05" value="0.6" data-i="t"></label>
+        <label class="f grow"><span>separação entre classes = <b data-dv></b></span><input type="range" min="0" max="3.5" step="0.1" value="1.2" data-i="d"></label>
+      </div>
+      <svg class="w-svg" viewBox="0 0 640 270" role="img" aria-label="Distribuições das pontuações e curva ROC"></svg>
+      <div class="legend"><span><i style="background:var(--s1)"></i>negativos reais</span><span><i style="background:var(--s2)"></i>positivos reais</span><span><i style="background:var(--good);opacity:.5;height:10px"></i>TP</span><span><i style="background:var(--bad);opacity:.45;height:10px"></i>FP</span></div>
+      <dl class="kpis"></dl><p class="w-out"></p>`;
+    const svg = el.querySelector('svg'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out');
+    const tI = el.querySelector('[data-i="t"]'), dI = el.querySelector('[data-i="d"]');
+    function draw() {
+      const t = +tI.value, d = +dI.value;
+      el.querySelector('[data-tv]').textContent = fmt(t); el.querySelector('[data-dv]').textContent = fmt(d, 1);
+      const X = scale(-4, 6.5, 14, 330), Y = scale(0, 0.42, 232, 20);
+      const curve = (m, from = -4, to = 6.5) => { const p = []; for (let x = from; x <= to + 1e-9; x += 0.05) p.push(`${X(x).toFixed(1)},${Y(phi(x, m)).toFixed(1)}`); return p; };
+      const area = m => { const p = curve(m, Math.min(Math.max(t, -4), 6.5)); return p.length ? `M${X(Math.max(t, -4))},${Y(0)} L${p.join(' L')} L${X(6.5)},${Y(0)} Z` : ''; };
+      const fpr = 1 - Phi(t), tpr = 1 - Phi(t - d), auc = Phi(d / Math.SQRT2);
+      const RX = scale(0, 1, 392, 620), RY = scale(0, 1, 232, 20);
+      const rp = []; for (let s = 7; s >= -5; s -= 0.08) rp.push(`${RX(1 - Phi(s)).toFixed(1)},${RY(1 - Phi(s - d)).toFixed(1)}`);
+      svg.innerHTML = `
+        <path d="${area(0)}" style="fill:var(--bad);opacity:.35"/><path d="${area(d)}" style="fill:var(--good);opacity:.4"/>
+        <path d="M${curve(0).join(' L')}" style="fill:none;stroke:var(--s1);stroke-width:2"/>
+        <path d="M${curve(d).join(' L')}" style="fill:none;stroke:var(--s2);stroke-width:2"/>
+        <line class="ax" x1="14" x2="330" y1="${Y(0)}" y2="${Y(0)}"/>
+        <line x1="${X(t)}" x2="${X(t)}" y1="14" y2="${Y(0)}" style="stroke:var(--ink);stroke-width:2;stroke-dasharray:5 4"/>
+        <text x="${X(t)}" y="12" text-anchor="middle" class="lab">limiar</text>
+        <text x="${X(t) - 6}" y="${Y(0) + 18}" text-anchor="end">← negativo</text><text x="${X(t) + 6}" y="${Y(0) + 18}">positivo →</text>
+        <path d="M${RX(0)},${RY(0)} L${rp.join(' L')} L${RX(1)},${RY(0)} Z" style="fill:var(--accent);opacity:.12"/>
+        <rect x="${RX(0)}" y="${RY(1)}" width="${RX(1) - RX(0)}" height="${RY(0) - RY(1)}" style="fill:none;stroke:var(--rule)"/>
+        <line x1="${RX(0)}" y1="${RY(0)}" x2="${RX(1)}" y2="${RY(1)}" style="stroke:var(--muted);stroke-dasharray:4 4"/>
+        <path d="M${rp.join(' L')}" style="fill:none;stroke:var(--accent);stroke-width:2.5"/>
+        <circle cx="${RX(fpr)}" cy="${RY(tpr)}" r="6" style="fill:var(--ink);stroke:var(--card);stroke-width:2"/>
+        <text x="${(RX(0) + RX(1)) / 2}" y="252" text-anchor="middle">FPR (taxa de falsos positivos)</text>
+        <text x="380" y="${(RY(0) + RY(1)) / 2}" text-anchor="middle" transform="rotate(-90 380 ${(RY(0) + RY(1)) / 2})">TPR (recall)</text>
+        <text x="${RX(0.62)}" y="${RY(0.2)}" text-anchor="middle" class="lab">AUC = ${fmt(auc, 3)}</text>
+        <text x="${RX(0)}" y="246" text-anchor="middle">0</text><text x="${RX(1)}" y="246" text-anchor="middle">1</text>`;
+      kp.innerHTML = kpi('TPR = recall', fmt(tpr, 3), 1) + kpi('FPR', fmt(fpr, 3), 1) + kpi('AUC', fmt(auc, 3));
+      out.innerHTML = `Com este limiar, o modelo apanha <b>${fmt(tpr * 100, 1)}%</b> dos positivos e marca erradamente <b>${fmt(fpr * 100, 1)}%</b> dos negativos. Baixar o limiar aumenta os dois (o ponto sobe e anda para a direita). ` +
+        (d < 0.15 ? 'Sem separação, o modelo não distingue as classes: a curva cola-se à diagonal (AUC ≈ 0.5).' : `A AUC (${fmt(auc, 3)}) não depende do limiar: mede quão bem as pontuações <b>ordenam</b> positivos acima de negativos.`);
+    }
+    tI.addEventListener('input', draw); dI.addEventListener('input', draw);
+    draw();
+  };
+
+  /* =====================================================================
+     fscore — F1 / Fβ como média harmónica de precision e recall
+     ===================================================================== */
+  W.fscore = el => {
+    el.innerHTML = head(el, 'F1 e Fβ', 'A F1 é uma média harmónica: fica perto do <em>menor</em> dos dois valores. O β decide qual pesa mais.') + `
+      <div class="row">
+        <label class="f grow"><span>precision = <b data-pv></b></span><input type="range" min="0.01" max="1" step="0.01" value="0.9" data-i="p"></label>
+        <label class="f grow"><span>recall = <b data-rv></b></span><input type="range" min="0.01" max="1" step="0.01" value="0.3" data-i="r"></label>
+        <label class="f grow"><span>β = <b data-bv></b></span><input type="range" min="0.25" max="4" step="0.25" value="0.5" data-i="b"></label>
+      </div>
+      <svg class="w-svg" viewBox="0 0 640 190" role="img" aria-label="Comparação de médias"></svg>
+      <p class="w-out"></p>`;
+    const svg = el.querySelector('svg'), out = el.querySelector('.w-out');
+    const I = k => el.querySelector(`[data-i="${k}"]`);
+    function draw() {
+      const p = +I('p').value, r = +I('r').value, b = +I('b').value;
+      el.querySelector('[data-pv]').textContent = fmt(p); el.querySelector('[data-rv]').textContent = fmt(r); el.querySelector('[data-bv]').textContent = fmt(b);
+      const f1 = 2 * p * r / (p + r), fb = (1 + b * b) * p * r / (b * b * p + r);
+      const rows = [['Precision', p, 'var(--s1)'], ['Recall', r, 'var(--s2)'], ['Média aritmética', (p + r) / 2, 'var(--muted)'], ['F1', f1, 'var(--accent)'], [`Fβ (β = ${fmt(b)})`, fb, 'var(--s3)']];
+      const X = scale(0, 1, 150, 600);
+      svg.innerHTML = rows.map(([l, v, c], i) => `<text x="142" y="${24 + i * 34}" text-anchor="end" class="${i > 2 ? 'lab' : ''}">${l}</text>
+        <rect x="150" y="${10 + i * 34}" width="${X(v) - 150}" height="20" rx="3" style="fill:${c};opacity:${i === 2 ? .45 : .85}"/>
+        <text x="${X(v) + 6}" y="${24 + i * 34}">${fmt(v, 3)}</text>`).join('') + `<line class="ax" x1="150" x2="150" y1="6" y2="182"/>`;
+      out.innerHTML = `A média aritmética daria ${fmt((p + r) / 2, 3)}, mas a F1 é <b>${fmt(f1, 3)}</b>: um valor baixo em qualquer um dos dois arrasta-a para baixo. ` +
+        (b > 1 ? `Com β = ${fmt(b)} &gt; 1 o recall pesa mais, e Fβ aproxima-se do recall.` : b < 1 ? `Com β = ${fmt(b)} &lt; 1 o recall pesa menos, e Fβ aproxima-se da precision.` : 'Com β = 1, Fβ = F1.');
+    }
+    ['p', 'r', 'b'].forEach(k => I(k).addEventListener('input', draw));
+    draw();
+  };
+
+  /* =====================================================================
+     regerr — MAE, MSE e RMSE a partir de uma lista de erros
+     ===================================================================== */
+  W.regerr = el => {
+    const initial = el.dataset.values || '1, -1, 3, 3';
+    el.innerHTML = head(el, 'MAE, MSE e RMSE', 'Escreve os erros (real − previsto) ou usa os modelos A e B do exemplo. Repara no que acontece quando o erro está concentrado num só ponto.') + `
+      <div class="row">
+        <label class="f grow">Erros<input type="text" inputmode="decimal" value="${esc(initial)}"></label>
+        <span class="seg"><button type="button" class="btn sm" data-pre="1, -1, 3, 3">Exemplo A</button><button type="button" class="btn sm" data-pre="0, 0, 0, 10">Exemplo B</button></span>
+      </div>
+      <div class="two"><div class="tw"></div><div style="display:flex;flex-direction:column;gap:12px"><dl class="kpis"></dl><p class="w-out"></p></div></div>`;
+    const inp = el.querySelector('input'), tw = el.querySelector('.tw'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out');
+    function draw() {
+      const e = parseNums(inp.value);
+      if (!e.length) { tw.innerHTML = ''; kp.innerHTML = ''; out.textContent = 'Introduz pelo menos um erro.'; return; }
+      const mae = mean(e.map(Math.abs)), mse = mean(e.map(x => x * x)), rmse = Math.sqrt(mse);
+      tw.innerHTML = `<table><thead><tr><th class="num">#</th><th class="num">erro</th><th class="num">|erro|</th><th class="num">erro²</th></tr></thead><tbody>
+        ${e.map((x, i) => `<tr><td class="num">${i + 1}</td><td class="num">${fmt(x, 3)}</td><td class="num">${fmt(Math.abs(x), 3)}</td><td class="num">${fmt(x * x, 3)}</td></tr>`).join('')}</tbody>
+        <tfoot><tr><td>média</td><td></td><td class="num">${fmt(mae, 3)}</td><td class="num">${fmt(mse, 3)}</td></tr></tfoot></table>`;
+      kp.innerHTML = kpi('MAE', fmt(mae, 3), 1) + kpi('MSE', fmt(mse, 3)) + kpi('RMSE', fmt(rmse, 3), 1) + kpi('RMSE / MAE', fmt(rmse / mae, 2));
+      out.innerHTML = `RMSE = √${fmt(mse, 3)} = ${fmt(rmse, 3)}. ` + (rmse / mae > 1.6 ? 'O RMSE está bem acima do MAE: há poucos erros grandes a dominar (o quadrado amplifica-os).' : 'RMSE próximo do MAE: os erros têm tamanhos parecidos.');
+    }
+    inp.addEventListener('input', draw);
+    el.addEventListener('click', e => { const b = e.target.closest('[data-pre]'); if (b) { inp.value = b.dataset.pre; draw(); } });
+    draw();
+  };
+
+  /* =====================================================================
+     kfold — partição em k folds (como KFold sem shuffle) e leave-one-out
+     ===================================================================== */
+  W.kfold = el => {
+    const N = +(el.dataset.n || 20);
+    el.innerHTML = head(el, 'Hold-out, k-fold e leave-one-out', `Cada círculo é uma observação (N = ${N}). Em cada iteração, o fold destacado é o teste e o resto é treino.`) + `
+      <div class="row">
+        <label class="f grow"><span>k = <b data-kv></b></span><input type="range" min="2" max="${N}" step="1" value="5"></label>
+        <span class="seg"><button type="button" class="btn sm" data-k="5">k = 5</button><button type="button" class="btn sm" data-k="10">k = 10</button><button type="button" class="btn sm" data-k="${N}">LOOCV (k = N)</button></span>
+      </div>
+      <svg class="w-svg" role="img" aria-label="Divisão em folds"></svg>
+      <div class="legend"><span><i class="dot" style="background:var(--accent)"></i>teste</span><span><i class="dot" style="background:var(--rule)"></i>treino</span></div>
+      <dl class="kpis"></dl>`;
+    const svg = el.querySelector('svg'), rg = el.querySelector('input'), kp = el.querySelector('.kpis');
+    function draw() {
+      const k = +rg.value;
+      el.querySelector('[data-kv]').textContent = k;
+      /* tamanhos como no sklearn: os primeiros N % k folds têm mais um elemento */
+      const sizes = Array.from({ length: k }, (_, i) => Math.floor(N / k) + (i < N % k ? 1 : 0));
+      const starts = sizes.map((_, i) => sum(sizes.slice(0, i)));
+      const rowH = k > 12 ? 16 : 24, r = Math.min(9, rowH / 2 - 2), x0 = 112, dx = (620 - x0) / N;
+      const rows = [{ lbl: 'Hold-out 75/25', a: Math.round(N * 0.75), b: N, ho: true }, ...sizes.map((s, i) => ({ lbl: k === N ? `Iteração ${i + 1}/N` : `Iteração ${i + 1}`, a: starts[i], b: starts[i] + s }))];
+      const H = 14 + rows.length * rowH + 14;
+      svg.setAttribute('viewBox', `0 0 640 ${H}`);
+      svg.innerHTML = rows.map((rw, j) => {
+        const y = 14 + j * rowH + rowH / 2 + (j ? 10 : 0);
+        return `<text x="${x0 - 10}" y="${y + 4}" text-anchor="end" class="${rw.ho ? 'lab' : ''}">${rw.lbl}</text>` +
+          Array.from({ length: N }, (_, i) => `<circle cx="${x0 + dx * (i + .5)}" cy="${y}" r="${r}" style="fill:${i >= rw.a && i < rw.b ? 'var(--accent)' : 'var(--rule)'}"/>`).join('');
+      }).join('') + `<line class="ax" x1="20" x2="620" y1="${14 + rowH + 5}" y2="${14 + rowH + 5}" style="stroke-dasharray:3 4"/>`;
+      svg.setAttribute('viewBox', `0 0 640 ${H + 10}`);
+      kp.innerHTML = kpi('modelos treinados', k, 1) + kpi('treino / iteração', sizes.length && N - sizes[0] === N - sizes[sizes.length - 1] ? N - sizes[0] : `${N - sizes[0]}–${N - sizes[sizes.length - 1]}`) +
+        kpi('teste / iteração', sizes[0] === sizes[sizes.length - 1] ? sizes[0] : `${sizes[sizes.length - 1]}–${sizes[0]}`) + kpi('vezes que cada ponto é teste', 1, 1);
+    }
+    rg.addEventListener('input', draw);
+    el.addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (b) { rg.value = b.dataset.k; draw(); } });
     draw();
   };
 })();

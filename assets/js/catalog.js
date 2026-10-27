@@ -20,7 +20,7 @@ window.CATALOG = {
       staff: 'Filipa Ferraz, Victor Alves, Dalila Durães, Francisco Marcondes, Guilherme Barbosa',
       topics: [
         { id: '01', file: '01-data-science-concepts.html', title: 'Conceitos de Ciência de Dados', en: 'Introduction to Data Science Concepts', status: 'ready', source: 'DAA_PL_1' },
-        { id: '02', file: '02-quality-metrics.html', title: 'Métricas de Qualidade e Validação de Modelos', en: 'Quality Metrics and Model Validation', status: 'soon' },
+        { id: '02', file: '02-quality-metrics.html', title: 'Métricas de Qualidade e Validação de Modelos', en: 'Quality Metrics and Model Validation', status: 'ready', source: 'DAA_PL_2' },
         { id: '03', file: '03-data-exploration.html', title: 'Exploração e Preparação de Dados', en: 'Data Exploration and Preparation', status: 'soon' },
         { id: '04', file: '04-regression.html', title: 'Regressão Linear e Logística', en: 'Linear and Logistic Regression', status: 'soon' },
         { id: '05', file: '05-feature-engineering.html', title: 'Feature Engineering', en: 'Feature Engineering', status: 'soon' },

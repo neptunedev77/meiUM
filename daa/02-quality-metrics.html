@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Métricas de Qualidade e Validação de Modelos · DAA · meiUM</title>
+<meta name="description" content="DAA · Tema 2: árvores de decisão, matriz de confusão, accuracy, precision, recall, ROC/AUC, F1, MAE, MSE, RMSE, hold-out e validação cruzada.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var t=JSON.parse(localStorage.getItem('meium:theme'));if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="daa" data-topic="02" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 2.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="2.0" data-title="Visão geral" data-desc="Porque é preciso medir e validar, e o fluxo base de um modelo.">
+  <header class="ph">
+    <h1>Métricas de Qualidade e Validação de Modelos<span class="en">Quality Metrics and Model Validation</span></h1>
+    <p class="lede">Treinar um modelo é fácil; saber se ele é <em>bom</em> é que é difícil. Este tema responde a duas perguntas: <strong>como medir</strong> a qualidade de um modelo (métricas) e <strong>em que dados</strong> a medir para que o resultado seja de confiança (validação).</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.0.1</span>Porque não basta treinar</h2>
+    <p>Uma árvore de decisão treinada para distinguir tumores malignos de benignos acerta em <strong>100%</strong> dos casos com que foi treinada. Em casos novos, acerta em <strong>95%</strong>. O primeiro número só diz que o modelo memorizou os exemplos; o segundo é o que interessa, porque mede o desempenho em dados que o modelo nunca viu.</p>
+    <div class="kpis">
+      <div class="kpi"><dt>Accuracy nos dados de treino</dt><dd>1.000</dd></div>
+      <div class="kpi hl"><dt>Accuracy em dados novos</dt><dd>0.951</dd></div>
+    </div>
+    <p>Daqui saem as duas ideias do tema: escolher uma <strong>métrica</strong> adequada ao problema e avaliá-la em <strong>dados que o modelo não viu</strong>.</p>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.0.2</span>O fluxo base</h2>
+    <ol class="steps-list">
+      <li><div><strong>Definir</strong> o input <strong>X</strong> (as features) e o target <strong>y</strong> (o que se quer prever).</div></li>
+      <li><div><strong>Separar</strong> dados de treino e de teste (ou usar validação cruzada).</div></li>
+      <li><div><strong>Treinar</strong> o modelo (<code>fit</code>) só com os dados de treino.</div></li>
+      <li><div><strong>Prever</strong> (<code>predict</code>) os dados de teste.</div></li>
+      <li><div><strong>Avaliar</strong>: comparar as previsões com os valores reais, com a métrica certa para o tipo de problema.</div></li>
+    </ol>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <div class="note"><span class="lbl">Exemplos usados</span>
+      <p>Os conceitos são explicados com exemplos pequenos, que dá para calcular à mão. O código usa dois datasets que vêm com o scikit-learn, por isso qualquer pessoa o pode correr sem descarregar nada:</p>
+      <ul>
+        <li><code>load_breast_cancer</code> — 569 tumores, 30 medições numéricas cada; prever se é <strong>maligno</strong> ou benigno (classificação).</li>
+        <li><code>load_diabetes</code> — 442 pacientes, 10 medições; prever a <strong>progressão da doença</strong> um ano depois, um valor entre 25 e 346 (regressão).</li>
+      </ul>
+    </div>
+    <p class="src">Baseado nas aulas de DAA (Quality Metrics and Model Validation). Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 2.1 ÁRVORES DE DECISÃO ============================ -->
+<article class="page" data-page="arvores" data-num="2.1" data-title="Árvores de decisão" data-desc="O algoritmo usado no tema: classificador vs. regressor.">
+  <header class="ph">
+    <h1>Árvores de decisão<span class="en">Decision Trees</span></h1>
+    <p class="lede">Uma árvore de decisão (<em>Decision Tree</em>, DT) prevê o valor de uma feature alvo através de uma sequência de perguntas. É o modelo usado neste tema para gerar previsões que depois se avaliam.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.1.1</span>O que é</h2>
+    <ul>
+      <li>É um <strong>grafo hierárquico</strong> (uma árvore).</li>
+      <li>Cada <strong>ramo</strong> representa uma escolha entre um conjunto de alternativas.</li>
+      <li>Cada <strong>folha</strong> representa o resultado: uma classe (ou, na regressão, um valor).</li>
+    </ul>
+    <div class="card">
+      <h3>Exemplo: "vou almoçar fora?"</h3>
+      <svg class="w-svg" viewBox="0 0 640 250" role="img" aria-label="Árvore de decisão de exemplo">
+        <g style="stroke:var(--muted);stroke-width:1.5;fill:none">
+          <path d="M320 46 L170 112"/><path d="M320 46 L470 112"/>
+          <path d="M470 134 L380 200"/><path d="M470 134 L560 200"/>
+        </g>
+        <g style="font-family:var(--f-mono);font-size:12px">
+          <text x="236" y="72" style="fill:var(--muted)">não</text><text x="388" y="72" style="fill:var(--muted)">sim</text>
+          <text x="406" y="172" style="fill:var(--muted)">não</text><text x="520" y="172" style="fill:var(--muted)">sim</text>
+        </g>
+        <rect x="230" y="18" width="180" height="34" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+        <text x="320" y="40" text-anchor="middle" class="lab">Tenho fome?</text>
+        <rect x="110" y="112" width="120" height="34" rx="17" style="fill:var(--bad-bg);stroke:var(--bad)"/>
+        <text x="170" y="134" text-anchor="middle" class="lab">Não</text>
+        <rect x="370" y="112" width="200" height="34" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+        <text x="470" y="134" text-anchor="middle" class="lab">Tenho mais de 30 min?</text>
+        <rect x="320" y="200" width="120" height="34" rx="17" style="fill:var(--bad-bg);stroke:var(--bad)"/>
+        <text x="380" y="222" text-anchor="middle" class="lab">Não</text>
+        <rect x="500" y="200" width="120" height="34" rx="17" style="fill:var(--good-bg);stroke:var(--good)"/>
+        <text x="560" y="222" text-anchor="middle" class="lab">Sim</text>
+      </svg>
+      <p class="small muted">Retângulos = perguntas (nós); cápsulas = folhas (a previsão). Num modelo real as perguntas são sobre features, por exemplo "raio do tumor &gt; 16?", e são escolhidas automaticamente a partir dos dados. Como a árvore é construída e podada fica para o tema 6.</p>
+    </div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">2.1.2</span>Classificador vs. regressor</h2>
+    <div class="two">
+      <div class="card c1">
+        <span class="tag">DT Classifier · classificação</span>
+        <p>O target é uma <strong>classe</strong>.</p>
+        <ul>
+          <li><strong>Binária</strong> (duas classes): almoçar ou não; um tumor é maligno ou benigno.</li>
+          <li><strong>Multiclasse</strong> (mais de duas): classificar imagens de fruta em laranja, maçã ou pera.</li>
+        </ul>
+        <p class="small muted">Avaliado com: matriz de confusão, accuracy, precision, recall, F1, ROC/AUC.</p>
+      </div>
+      <div class="card c2">
+        <span class="tag">DT Regressor · regressão</span>
+        <p>O target é um <strong>valor real ou contínuo</strong>.</p>
+        <ul>
+          <li>Prever o fluxo de tráfego em km/h.</li>
+          <li>Prever o preço de uma ação em €.</li>
+          <li>Prever a progressão de uma doença numa escala numérica.</li>
+        </ul>
+        <p class="small muted">Avaliado com: MAE, MSE, RMSE.</p>
+      </div>
+    </div>
+    <p>Classifica cada problema:</p>
+    <div class="classify" data-options="Binária,Multiclasse,Regressão">
+      <div class="ci" data-answer="Binária" data-why="Duas classes possíveis: sim ou não.">Decidir se vou almoçar fora.</div>
+      <div class="ci" data-answer="Regressão" data-why="O target é um valor contínuo (km/h).">Prever o fluxo de tráfego em km/h.</div>
+      <div class="ci" data-answer="Multiclasse" data-why="Mais de duas classes: laranja, maçã ou pera.">Classificar fotografias de fruta.</div>
+      <div class="ci" data-answer="Binária" data-why="Duas classes: spam ou não spam.">Detetar se um email é spam.</div>
+      <div class="ci" data-answer="Regressão" data-why="O preço é um valor real.">Prever o preço de venda de uma casa.</div>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 2.2 TREINAR E PREVER ============================ -->
+<article class="page" data-page="pipeline" data-num="2.2" data-title="Treinar e prever" data-desc="X e y, hold-out, fit, dados categóricos e predict.">
+  <header class="ph">
+    <h1>Treinar e prever<span class="en">Training, hold-out and predictions</span></h1>
+    <p class="lede">Antes de medir seja o que for, é preciso organizar os dados em input e target, pôr uma parte de lado para teste, treinar e prever.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.2.1</span>Input (X) e target (y)</h2>
+    <p>Por convenção, <strong>X</strong> representa o input (as features usadas para prever) e <strong>y</strong> o target (o que queremos prever). Numa tabela, y é uma coluna e X são as restantes.</p>
+    <div class="tw"><table>
+      <thead><tr><th class="num">raio médio</th><th class="num">textura</th><th class="num">área</th><th>…</th><th>maligno <span class="pill p-acc">y</span></th></tr></thead>
+      <tbody>
+        <tr><td class="num">17.99</td><td class="num">10.38</td><td class="num">1001.0</td><td>…</td><td class="num">1</td></tr>
+        <tr><td class="num">13.54</td><td class="num">14.36</td><td class="num">566.3</td><td>…</td><td class="num">0</td></tr>
+        <tr><td class="num">20.57</td><td class="num">17.77</td><td class="num">1326.0</td><td>…</td><td class="num">1</td></tr>
+      </tbody></table></div>
+    <p class="small muted">Excerto do dataset de tumores: as colunas da esquerda formam X (569 × 30), a da direita é y (569 valores).</p>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.2.2</span>Hold-out: separar treino e teste</h2>
+    <p>Antes de treinar, põe-se de parte uma porção dos dados para <strong>testar</strong> o modelo. A divisão é feita <strong>uma única vez</strong> e o modelo é avaliado em dados que não viu durante o treino. Divisões comuns: 80/20, 75/25, 65/35.</p>
+    <div class="kpis">
+      <div class="kpi"><dt>Total</dt><dd>569</dd></div>
+      <div class="kpi hl"><dt>Treino (75%)</dt><dd>426</dd></div>
+      <div class="kpi hl"><dt>Teste (25%)</dt><dd>143</dd></div>
+    </div>
+    <ul>
+      <li><code>test_size=0.25</code>: a fração dos dados que vai para teste.</li>
+      <li><code>random_state</code>: a semente aleatória. Fixá-la garante que a divisão é sempre a mesma e que os resultados são reprodutíveis.</li>
+    </ul>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.2.3</span>Dados categóricos: o erro clássico</h2>
+    <p>As árvores de decisão do scikit-learn <strong>só aceitam números</strong>. Se X tiver uma coluna de texto (um nome, uma cidade, "M"/"F"), o <code>fit</code> falha com um erro deste género:</p>
+    <pre data-title="Erro"><code class="language-text">ValueError: could not convert string to float: 'Braga'</code></pre>
+    <p>Há três saídas: converter as categorias em números com <strong>Label Encoding</strong> ou <strong>One-Hot Encoding</strong>, ou simplesmente <strong>retirar</strong> essas colunas (o mais rápido, mas perde-se informação).</p>
+    <details class="ans"><summary>Como ficam as duas codificações <span class="xtag">complemento</span></summary>
+      <div><div class="tw"><table>
+        <thead><tr><th>Cidade</th><th>Label Encoding</th><th>One-Hot: Braga</th><th>One-Hot: Lisboa</th><th>One-Hot: Porto</th></tr></thead>
+        <tbody>
+          <tr><td>Braga</td><td class="num">0</td><td class="num">1</td><td class="num">0</td><td class="num">0</td></tr>
+          <tr><td>Porto</td><td class="num">2</td><td class="num">0</td><td class="num">0</td><td class="num">1</td></tr>
+          <tr><td>Lisboa</td><td class="num">1</td><td class="num">0</td><td class="num">1</td><td class="num">0</td></tr>
+        </tbody></table></div>
+        <p>O Label Encoding cria uma ordem artificial (Porto &gt; Lisboa &gt; Braga); o One-Hot evita isso à custa de mais colunas. Os detalhes ficam para Feature Engineering.</p></div>
+    </details>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.2.4</span>Treinar e prever</h2>
+    <p>Cria-se uma instância do modelo, treina-se com <code>fit</code> e obtém-se uma previsão por linha do teste com <code>predict</code>. Como os valores reais do teste são conhecidos (<code>y_test</code>), dá para comparar.</p>
+    <pre><code class="language-python">from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+
+X, y = load_breast_cancer(return_X_y=True)
+y = 1 - y                      # no dataset original 1 = benigno; invertemos para 1 = maligno
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+# X_train: (426, 30)   X_test: (143, 30)
+
+clf = DecisionTreeClassifier(random_state=42)
+clf.fit(X_train, y_train)               # treinar só com os dados de treino
+predictions = clf.predict(X_test)       # array de 0/1, um por tumor do teste</code></pre>
+    <div class="note warn"><span class="lbl">Regra de ouro</span>
+      <p>O <code>fit</code> usa <strong>só os dados de treino</strong>. Este modelo tem accuracy 1.0 no treino e 0.951 no teste: avaliar com os dados de treino mede a capacidade de memorizar, não de generalizar.</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 2.3 MÉTRICAS ============================ -->
+<article class="page" data-page="metricas" data-num="2.3" data-title="Métricas: porquê e quais" data-desc="A métrica depende do tipo de problema.">
+  <header class="ph">
+    <h1>Métricas de qualidade<span class="en">Quality Metrics and Model Evaluation</span></h1>
+    <p class="lede">As métricas servem para <strong>monitorizar e medir</strong> o desempenho de um modelo. A escolha depende do problema: classificação, regressão, séries temporais…</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="two">
+      <div class="card c1"><span class="tag">Classificação</span>
+        <p>Previsões certas ou erradas.</p>
+        <ul><li>Matriz de confusão</li><li>Accuracy</li><li>Precision e Recall</li><li>ROC e AUC</li><li>F1 Score e Fβ Score</li></ul></div>
+      <div class="card c2"><span class="tag">Regressão</span>
+        <p>Previsões mais perto ou mais longe do valor real.</p>
+        <ul><li>MAE — Mean Absolute Error</li><li>MSE — Mean Squared Error</li><li>RMSE — Root Mean Squared Error</li></ul></div>
+    </div>
+    <p>Funções do scikit-learn (todas em <code>sklearn.metrics</code>):</p>
+    <div class="tw"><table>
+      <thead><tr><th>Função</th><th>Para</th><th>Recebe</th></tr></thead>
+      <tbody>
+        <tr><td><code>confusion_matrix</code></td><td>classificação</td><td><code>(y_test, predictions)</code></td></tr>
+        <tr><td><code>accuracy_score</code>, <code>precision_score</code>, <code>recall_score</code></td><td>classificação</td><td><code>(y_test, predictions)</code></td></tr>
+        <tr><td><code>f1_score</code>, <code>fbeta_score(…, beta=)</code></td><td>classificação</td><td><code>(y_test, predictions)</code></td></tr>
+        <tr><td><code>roc_curve</code>, <code>roc_auc_score</code>, <code>auc</code></td><td>classificação</td><td><code>(y_test, pontuações)</code></td></tr>
+        <tr><td><code>mean_absolute_error</code>, <code>mean_squared_error</code>, <code>root_mean_squared_error</code></td><td>regressão</td><td><code>(y_test, predictions)</code></td></tr>
+        <tr><td><code>make_scorer</code></td><td>transformar uma métrica num "scorer" para validação e afinação</td><td>a função da métrica</td></tr>
+      </tbody></table></div>
+    <div class="note"><span class="lbl">Ordem dos argumentos</span>
+      <p>Em todas: primeiro os valores <strong>reais</strong>, depois os <strong>previstos</strong>. Em métricas simétricas (accuracy, MAE) trocar não muda nada, mas em precision, recall e na matriz de confusão muda tudo.</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 2.4 MATRIZ DE CONFUSÃO ============================ -->
+<article class="page" data-page="confusao" data-num="2.4" data-title="Matriz de confusão, accuracy, precision e recall" data-desc="As quatro contagens e as métricas que saem delas.">
+  <header class="ph">
+    <h1>Matriz de confusão, accuracy, precision e recall<span class="en">Classification Models</span></h1>
+    <p class="lede">A matriz de confusão é uma tabela que descreve o desempenho de um classificador num conjunto de teste cujos valores reais são conhecidos. Quase todas as métricas de classificação saem dela.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.4.1</span>Exemplo: um teste de rastreio</h2>
+    <p>Um teste de rastreio de uma doença é aplicado a <strong>200 pessoas</strong>, das quais <strong>50 estão doentes</strong>. "Positivo" = o teste diz que a pessoa está doente.</p>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Real: doente (50)</th><th>Real: saudável (150)</th></tr></thead>
+      <tbody>
+        <tr><th>Teste: positivo</th><td><span class="pill p-good">TP = 40</span><br>doentes detetados</td><td><span class="pill p-bad">FP = 15</span><br>falsos alarmes · <em>erro tipo I</em></td></tr>
+        <tr><th>Teste: negativo</th><td><span class="pill p-bad">FN = 10</span><br>doentes que escaparam · <em>erro tipo II</em></td><td><span class="pill p-good">TN = 135</span><br>saudáveis bem identificados</td></tr>
+      </tbody></table></div>
+    <ul>
+      <li><strong>Falso positivo (erro tipo I)</strong>: o modelo diz "sim" e é "não". Ex.: dizer a um homem que está grávido.</li>
+      <li><strong>Falso negativo (erro tipo II)</strong>: o modelo diz "não" e é "sim". Ex.: dizer a uma grávida que não está grávida.</li>
+    </ul>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.4.2</span>Accuracy, precision e recall</h2>
+    <div class="fgrid">
+      <div class="formula"><div class="cap">Accuracy — acertos ÷ total</div>\[\text{Accuracy}=\frac{TP+TN}{TP+TN+FP+FN}=\frac{40+135}{200}=0.875\]</div>
+      <div class="formula"><div class="cap">Precision — exatidão</div>\[\text{Precision}=\frac{TP}{TP+FP}=\frac{40}{55}\approx 0.727\]</div>
+      <div class="formula"><div class="cap">Recall — completude</div>\[\text{Recall}=\frac{TP}{TP+FN}=\frac{40}{50}=0.80\]</div>
+    </div>
+    <div class="two">
+      <div class="card"><h3>Precision: "dos que eu disse positivo, quantos eram?"</h3><p>Medida de <strong>exatidão</strong>: a proporção de casos relevantes entre os selecionados. No exemplo, 27% dos positivos do teste são falsos alarmes. Desce quando há muitos <strong>falsos positivos</strong>.</p></div>
+      <div class="card"><h3>Recall: "dos positivos que existiam, quantos apanhei?"</h3><p>Medida de <strong>completude</strong>: a fração dos casos relevantes que foi encontrada. No exemplo, o teste deteta 80% dos doentes. Desce quando há muitos <strong>falsos negativos</strong>.</p></div>
+    </div>
+    <div class="note warn"><span class="lbl">Cuidado com os nomes</span>
+      <ul>
+        <li><strong>Sensibilidade</strong> (sensitivity, TPR) é outro nome do <strong>recall</strong>: \(TP/(TP+FN)\).</li>
+        <li><strong>Especificidade</strong> (specificity) é o "recall dos negativos": \(TN/(TN+FP) = 135/150 = 0.90\).</li>
+      </ul>
+      <p>Há materiais que associam "sensitivity" à precision e "specificity" ao recall — está trocado.</p>
+    </div>
+    <div class="widget" data-widget="confusion" data-values="40,15,10,135"></div>
+    <div class="note extra"><span class="lbl">Complemento · quando a accuracy engana</span>
+      <p>Com classes desequilibradas (ex.: 1% de fraudes), um modelo que diz sempre "não é fraude" tem 99% de accuracy e recall 0. Experimenta o cenário "Classe rara" acima. Nesses casos olha para precision, recall e F1.</p>
+      <p>Qual priorizar depende do custo de cada erro: num rastreio, um FN (doente não detetado) é grave → privilegiar o <strong>recall</strong>; num filtro de spam, um FP (email legítimo perdido) é grave → privilegiar a <strong>precision</strong>.</p>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.4.3</span>No scikit-learn</h2>
+    <p>Com o modelo de tumores de 2.2 (positivo = maligno):</p>
+    <pre><code class="language-python">from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score
+
+confusion_matrix(y_test, predictions)   # [[85, 4], [3, 51]]
+accuracy_score(y_test, predictions)     # 0.951  = (51 + 85) / 143
+precision_score(y_test, predictions)    # 0.927  = 51 / (51 + 4)
+recall_score(y_test, predictions)       # 0.944  = 51 / (51 + 3)</code></pre>
+    <div class="note warn"><span class="lbl">A matriz do sklearn está "ao contrário"</span>
+      <p>Na tabela acima as <strong>linhas são a previsão</strong>. No <code>confusion_matrix</code> do sklearn as <strong>linhas são o valor real</strong> e as colunas a previsão, com a classe 0 primeiro:</p>
+      <div class="formula">\[\begin{bmatrix}TN & FP\\ FN & TP\end{bmatrix}=\begin{bmatrix}85 & 4\\ 3 & 51\end{bmatrix}\]</div>
+      <p>Ou seja: 51 malignos detetados, 3 malignos que escaparam, 4 falsos alarmes.</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 2.5 ROC E AUC ============================ -->
+<article class="page" data-page="roc" data-num="2.5" data-title="Curva ROC e AUC" data-desc="Desempenho em todos os limiares de decisão.">
+  <header class="ph">
+    <h1>Curva ROC e AUC<span class="en">ROC and AUC</span></h1>
+    <p class="lede">Muitos classificadores não dão só "sim" ou "não": dão uma <strong>pontuação</strong> (ex.: probabilidade de ser spam = 0.73). O "sim/não" sai de um <strong>limiar de decisão</strong>. A curva ROC mostra o desempenho em <strong>todos</strong> os limiares de uma vez.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.5.1</span>O limiar de decisão</h2>
+    <p>Um filtro de spam que marca como spam tudo acima de 0.5 vai apanhar mais spam se o limiar descer para 0.3 — mas também vai marcar mais emails legítimos. <strong>Baixar o limiar</strong> classifica mais itens como positivos, o que aumenta <strong>tanto os TP como os FP</strong>.</p>
+    <p>A curva <strong>ROC (Receiver Operating Characteristics)</strong> desenha, para cada limiar, a taxa de verdadeiros positivos contra a taxa de falsos positivos:</p>
+    <div class="fgrid">
+      <div class="formula"><div class="cap">TPR (= recall) — eixo y</div>\[TPR=\frac{TP}{TP+FN}\]</div>
+      <div class="formula"><div class="cap">FPR — eixo x</div>\[FPR=\frac{FP}{FP+TN}=1-\text{especificidade}\]</div>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.5.2</span>AUC: a área debaixo da curva</h2>
+    <p>A <strong>AUC (Area Under the Curve)</strong> é a área debaixo da curva ROC (pensa num integral). Em vez de medir os valores absolutos das previsões, mede <strong>quão bem elas estão ordenadas</strong>. Varia entre 0 e 1: um modelo 100% errado tem AUC = 0; um 100% certo tem AUC = 1.</p>
+    <div class="widget" data-widget="roc"></div>
+    <div class="note"><span class="lbl">Como ler a AUC</span>
+      <p>AUC = 0.5 corresponde à diagonal: o modelo não distingue as classes melhor do que o acaso. A AUC é a probabilidade de um positivo escolhido ao acaso ter pontuação maior do que um negativo escolhido ao acaso — daí "mede a ordenação". Como não depende de um limiar, é útil para comparar modelos. <span class="xtag">complemento</span></p>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.5.3</span>No scikit-learn: usa pontuações, não classes</h2>
+    <p>A curva ROC precisa das <strong>pontuações</strong> do modelo (<code>predict_proba</code>), não das classes finais (<code>predict</code>). Com só 0 e 1 há um único limiar, e a "curva" fica reduzida a um ponto ligado aos cantos.</p>
+    <pre><code class="language-python">from sklearn.metrics import roc_curve, roc_auc_score
+import matplotlib.pyplot as plt
+
+proba = clf.predict_proba(X_test)[:, 1]         # probabilidade da classe 1 (maligno)
+fpr, tpr, thresholds = roc_curve(y_test, proba)
+roc_auc_score(y_test, proba)
+
+plt.plot(fpr, tpr); plt.plot([0, 1], [0, 1], '--')   # diagonal = acaso
+plt.xlabel('FPR'); plt.ylabel('TPR'); plt.title('ROC curve'); plt.show()</code></pre>
+    <div class="note warn"><span class="lbl">Armadilha com árvores</span>
+      <p>Uma árvore sem limite de profundidade tem folhas "puras", por isso o <code>predict_proba</code> só devolve 0 ou 1 — o mesmo problema. No exemplo dos tumores a árvore completa tem um único limiar (AUC 0.950); limitada a 3 níveis (<code>max_depth=3</code>) dá 6 limiares e uma curva a sério (AUC 0.953). <span class="xtag">complemento</span></p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 2.6 F1 E Fβ ============================ -->
+<article class="page" data-page="fscore" data-num="2.6" data-title="F1 e Fβ" data-desc="Juntar precision e recall num só número.">
+  <header class="ph">
+    <h1>F1 e Fβ<span class="en">F1 and Fβ Scores</span></h1>
+    <p class="lede">Precision e recall puxam em sentidos opostos. A F1 junta-as num único valor, útil para comparar modelos com uma visão mais equilibrada do desempenho.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="fgrid">
+      <div class="formula"><div class="cap">F1 — peso igual a precision e recall</div>\[F_1=2\cdot\frac{\text{Precision}\cdot\text{Recall}}{\text{Precision}+\text{Recall}}\]</div>
+      <div class="formula"><div class="cap">Fβ — o recall pesa β vezes mais</div>\[F_\beta=(1+\beta^2)\cdot\frac{\text{Precision}\cdot\text{Recall}}{\beta^2\cdot\text{Precision}+\text{Recall}}\]</div>
+    </div>
+    <ul>
+      <li>Com <strong>β = 1</strong>, F1 e Fβ são equivalentes.</li>
+      <li><strong>β &gt; 1</strong> dá mais peso ao recall (rastreio médico: F2); <strong>β &lt; 1</strong> dá mais peso à precision (filtro de spam: F0.5).</li>
+    </ul>
+    <p>No exemplo do rastreio (precision 0.727, recall 0.80): \(F_1 = 2\cdot\frac{0.727\cdot 0.80}{0.727+0.80}\approx 0.762\).</p>
+    <div class="widget" data-widget="fscore"></div>
+    <div class="note"><span class="lbl">Porquê média harmónica</span>
+      <p>A F1 é a média harmónica de precision e recall. Ao contrário da média aritmética, fica sempre perto do <strong>menor</strong> dos dois: com precision 1.0 e recall 0.01, a média aritmética é ≈ 0.5, mas a F1 é ≈ 0.02. Não há forma de "esconder" uma métrica má atrás de outra boa. <span class="xtag">complemento</span></p>
+    </div>
+    <pre><code class="language-python">from sklearn.metrics import f1_score, fbeta_score
+
+f1_score(y_test, predictions)               # 0.936
+fbeta_score(y_test, predictions, beta=2)    # 0.941  mais peso ao recall (0.944)
+fbeta_score(y_test, predictions, beta=0.5)  # 0.931  mais peso à precision (0.927)</code></pre>
+  </section>
+</article>
+
+<!-- ============================ 2.7 REGRESSÃO ============================ -->
+<article class="page" data-page="regressao" data-num="2.7" data-title="Regressão: MAE, MSE e RMSE" data-desc="Medir o tamanho do erro quando o target é contínuo.">
+  <header class="ph">
+    <h1>Métricas de regressão<span class="en">MAE, MSE, RMSE</span></h1>
+    <p class="lede">Quando o target é contínuo (preços, temperaturas, tempos), usa-se um <strong>regressor</strong> e não há previsões "certas" ou "erradas": há erros maiores ou menores. As métricas resumem o tamanho desses erros.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.7.1</span>As três métricas</h2>
+    <p>Em todas, n é o número de observações, \(y_j\) o valor real e \(\hat{y}_j\) o valor previsto.</p>
+    <div class="fgrid">
+      <div class="formula"><div class="cap">MAE — média dos erros absolutos</div>\[\text{MAE}=\frac{1}{n}\sum_{j=1}^{n}\lvert y_j-\hat{y}_j\rvert\]</div>
+      <div class="formula"><div class="cap">MSE — média dos erros ao quadrado</div>\[\text{MSE}=\frac{1}{n}\sum_{j=1}^{n}(y_j-\hat{y}_j)^2\]</div>
+      <div class="formula"><div class="cap">RMSE — raiz do MSE</div>\[\text{RMSE}=\sqrt{\frac{1}{n}\sum_{j=1}^{n}(y_j-\hat{y}_j)^2}\]</div>
+    </div>
+    <ul>
+      <li><strong>MAE</strong>: magnitude média dos erros, sem considerar a direção.</li>
+      <li><strong>MSE</strong>: média dos erros ao quadrado, independentemente da direção.</li>
+      <li><strong>RMSE</strong>: raiz quadrada do MSE, que devolve o erro às unidades do target.</li>
+    </ul>
+    <div class="tw"><table>
+      <thead><tr><th>Propriedade</th><th>MAE</th><th>MSE</th><th>RMSE</th></tr></thead>
+      <tbody>
+        <tr><td>Erro médio de previsão; quanto menor, melhor</td><td>✓</td><td>✓</td><td>✓</td></tr>
+        <tr><td>Varia de 0 a ∞ e ignora a direção do erro</td><td>✓</td><td>✓</td><td>✓</td></tr>
+        <tr><td>Nas unidades da variável (ex.: €)</td><td>✓</td><td>✗ (unidades²)</td><td>✓</td></tr>
+        <tr><td>Dá peso relativamente alto a erros grandes</td><td>✗</td><td>✓</td><td>✓</td></tr>
+      </tbody></table></div>
+    <p>Por isso, <strong>MSE e RMSE são mais úteis quando erros grandes são particularmente indesejáveis</strong>.</p>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.7.2</span>Exemplo: dois modelos com o mesmo MAE?</h2>
+    <p>Dois modelos preveem o preço de 4 casas (em milhares de €). Os erros (real − previsto) são:</p>
+    <div class="tw"><table>
+      <thead><tr><th>Modelo</th><th>Erros</th><th class="num">MAE</th><th class="num">MSE</th><th class="num">RMSE</th></tr></thead>
+      <tbody>
+        <tr><td>A — erros espalhados</td><td class="mono">1, −1, 3, 3</td><td class="num">2</td><td class="num">5</td><td class="num">2.24</td></tr>
+        <tr><td>B — um erro grande</td><td class="mono">0, 0, 0, 10</td><td class="num">2.5</td><td class="num">25</td><td class="num">5</td></tr>
+      </tbody></table></div>
+    <p>O MAE quase não muda de A para B (2 → 2.5), mas o RMSE mais do que duplica (2.24 → 5): o quadrado amplifica o erro de 10. Se um erro de 10 mil € numa casa for inaceitável, o RMSE é a métrica que o mostra.</p>
+    <div class="widget" data-widget="regerr"></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.7.3</span>No scikit-learn</h2>
+    <p>O fluxo é o mesmo do classificador, trocando para <code>DecisionTreeRegressor</code>. Com o dataset de diabetes (target entre 25 e 346, média ≈ 152):</p>
+    <pre><code class="language-python">from sklearn.datasets import load_diabetes
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, root_mean_squared_error
+
+X, y = load_diabetes(return_X_y=True)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+
+reg = DecisionTreeRegressor(random_state=42)
+reg.fit(X_train, y_train)
+predictions = reg.predict(X_test)
+
+mean_absolute_error(y_test, predictions)       # 58.84
+mean_squared_error(y_test, predictions)        # 5941.70
+root_mean_squared_error(y_test, predictions)   # 77.08</code></pre>
+    <p>Lê-se assim: em média, a previsão falha a progressão da doença por cerca de <strong>59 pontos</strong> (MAE), e o RMSE de <strong>77</strong> diz que há erros grandes a pesar. Para uma escala de 25 a 346, é um modelo fraco — limitar a árvore a 4 níveis (<code>max_depth=4</code>, tema 6) baixa o RMSE para 59.65.</p>
+    <div class="note"><span class="lbl">Ler MAE e RMSE juntos</span>
+      <p>O RMSE é sempre ≥ MAE. Quanto maior a distância entre eles, mais o erro está concentrado em poucos casos muito mal previstos. <span class="xtag">complemento</span></p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 2.8 VALIDAÇÃO ============================ -->
+<article class="page" data-page="validacao" data-num="2.8" data-title="Validação de modelos" data-desc="Hold-out, k-fold e leave-one-out.">
+  <header class="ph">
+    <h1>Validação de modelos<span class="en">Model Validation</span></h1>
+    <p class="lede">É preciso confirmar que o modelo cumpre o seu objetivo, avaliando-o em <strong>dados que não conhece</strong>. O hold-out faz isso, mas de forma muito básica.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.8.1</span>O problema do hold-out</h2>
+    <p>Vês algum problema em dividir os dados uma única vez? Pensa antes de abrir.</p>
+    <details class="ans"><summary>Ver resposta</summary>
+      <div>
+        <p>O resultado depende de <strong>qual</strong> divisão calhou. O mesmo modelo, nos mesmos dados de tumores, com cinco sementes diferentes:</p>
+        <div class="tw"><table>
+          <thead><tr><th>random_state</th><th class="num">0</th><th class="num">1</th><th class="num">2</th><th class="num">3</th><th class="num">4</th></tr></thead>
+          <tbody><tr><td>accuracy no teste</td><td class="num">0.916</td><td class="num">0.965</td><td class="num">0.916</td><td class="num">0.930</td><td class="num">0.909</td></tr></tbody></table></div>
+        <ul>
+          <li>Uma <strong>única divisão</strong> pode dar uma estimativa otimista ou pessimista por sorte (aqui, entre 0.909 e 0.965).</li>
+          <li>Os dados de teste nunca servem para treinar, e os de treino nunca são testados — desperdício, sobretudo com poucos dados.</li>
+        </ul>
+      </div>
+    </details>
+    <p>Técnicas de validação: <strong>hold-out</strong>, <strong>cross validation</strong>, <strong>k-fold cross validation</strong>, <strong>leave-one-out cross validation</strong>, …</p>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.8.2</span>Validação cruzada k-fold</h2>
+    <p>O objetivo é obter uma medida <strong>precisa</strong> de como o modelo se vai comportar na prática. Divide-se o dataset em <strong>k folds</strong> (partes). Em cada execução, <strong>k − 1 folds treinam</strong> e o fold restante <strong>testa</strong>. Repete-se até todos os folds terem sido usados para teste. A métrica final é a média das k métricas:</p>
+    <div class="formula">\[E=\frac{1}{k}\sum_{i=1}^{k}E_i\]</div>
+    <div class="widget" data-widget="kfold" data-n="20"></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.8.3</span>Quantos folds?</h2>
+    <ul>
+      <li>Mais folds → estimativa de erro mais precisa e com menos bias, mas <strong>maior custo computacional</strong> (treinam-se k modelos).</li>
+      <li><strong>Dataset grande</strong>: um k mais pequeno pode chegar, porque cada treino já tem muitos dados.</li>
+      <li><strong>Dataset pequeno</strong>: pode valer a pena o <strong>leave-one-out</strong>, para maximizar os dados de treino.</li>
+      <li>Na prática, k depende de N. <strong>Regra prática: k = 10.</strong></li>
+    </ul>
+    <div class="two">
+      <div class="card"><span class="tag">k-fold</span><p>Normalmente k = 10. Cada observação é testada exatamente uma vez e usada para treino nas restantes k − 1 iterações.</p></div>
+      <div class="card"><span class="tag">Leave-one-out (k = N)</span><p>Caso especial: cada fold tem <strong>uma só observação</strong>. É caro (N treinos), mas é uma boa abordagem para <strong>datasets pequenos</strong>.</p></div>
+    </div>
+    <div class="note extra"><span class="lbl">Complemento</span>
+      <p>Além da média, o <strong>desvio padrão</strong> das k métricas diz quão estável é o modelo entre folds.</p>
+      <p><code>StratifiedKFold</code> cria folds com a <strong>mesma proporção de classes</strong> do dataset completo — importante com classes desequilibradas. O <code>cross_val_score</code> usa-o automaticamente em classificação.</p>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.8.4</span>No scikit-learn</h2>
+    <p>Classes úteis em <code>sklearn.model_selection</code>: <code>train_test_split</code>, <code>KFold</code>, <code>LeaveOneOut</code>, <code>StratifiedKFold</code>, <code>GridSearchCV</code> e <code>RandomizedSearchCV</code> (estas duas ficam para a afinação de hiperparâmetros).</p>
+    <pre data-title="Com cross_val_score"><code class="language-python">from sklearn.model_selection import cross_val_score
+
+clf = DecisionTreeClassifier(random_state=42)
+scores = cross_val_score(clf, X, y, cv=10)       # 10 folds → 10 accuracies (sobre os 569 tumores)
+print("%0.3f accuracy with a standard deviation of %0.3f" % (scores.mean(), scores.std()))
+# 0.928 accuracy with a standard deviation of 0.033</code></pre>
+    <pre data-title="Iterando manualmente com KFold"><code class="language-python">from sklearn.model_selection import KFold
+import numpy as np
+
+kf = KFold(n_splits=10)
+scores = []
+for train, test in kf.split(X):                  # índices de treino e de teste de cada fold
+    clf.fit(X[train], y[train])
+    scores.append(clf.score(X[test], y[test]))   # accuracy neste fold
+    print(confusion_matrix(y[test], clf.predict(X[test])))
+print(np.mean(scores), np.std(scores))           # 0.937, 0.032</code></pre>
+    <p>A versão manual dá mais controlo — por exemplo, ver a matriz de confusão de cada fold. A diferença entre 0.928 e 0.937 vem dos folds serem diferentes: o primeiro usa folds estratificados, o segundo não.</p>
+    <p>Em regressão, a métrica escolhe-se com <code>scoring</code>. O sklearn maximiza sempre, por isso os erros vêm com sinal negativo:</p>
+    <pre><code class="language-python">X, y = load_diabetes(return_X_y=True)
+reg = DecisionTreeRegressor(max_depth=4, random_state=42)
+scores = cross_val_score(reg, X, y, cv=10, scoring='neg_root_mean_squared_error')
+-scores.mean(), scores.std()     # RMSE médio nos 10 folds: 64.23, desvio 5.29</code></pre>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo de fórmulas, armadilhas e perguntas para testar.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Métrica</th><th>Fórmula</th><th>Ideia-chave</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Accuracy</strong></td><td>\(\frac{TP+TN}{TP+TN+FP+FN}\)</td><td>Acertos ÷ total. Engana com classes desequilibradas.</td></tr>
+        <tr><td><strong>Precision</strong></td><td>\(\frac{TP}{TP+FP}\)</td><td>Exatidão: dos previstos positivos, quantos o são.</td></tr>
+        <tr><td><strong>Recall</strong> (sensibilidade, TPR)</td><td>\(\frac{TP}{TP+FN}\)</td><td>Completude: dos positivos reais, quantos apanhei.</td></tr>
+        <tr><td><strong>F1</strong></td><td>\(2\frac{P\cdot R}{P+R}\)</td><td>Média harmónica; perto do menor dos dois.</td></tr>
+        <tr><td><strong>Fβ</strong></td><td>\((1+\beta^2)\frac{P\cdot R}{\beta^2P+R}\)</td><td>β &gt; 1 favorece recall; β &lt; 1 favorece precision.</td></tr>
+        <tr><td><strong>ROC / AUC</strong></td><td>TPR vs. FPR em todos os limiares</td><td>AUC ∈ [0, 1]; mede a ordenação; 0.5 = acaso.</td></tr>
+        <tr><td><strong>MAE</strong></td><td>\(\frac{1}{n}\sum\lvert y-\hat{y}\rvert\)</td><td>Nas unidades do target; pouco sensível a erros grandes.</td></tr>
+        <tr><td><strong>MSE</strong></td><td>\(\frac{1}{n}\sum(y-\hat{y})^2\)</td><td>Unidades²; penaliza muito erros grandes.</td></tr>
+        <tr><td><strong>RMSE</strong></td><td>\(\sqrt{\text{MSE}}\)</td><td>Nas unidades do target; penaliza erros grandes.</td></tr>
+        <tr><td><strong>k-fold CV</strong></td><td>\(E=\frac{1}{k}\sum E_i\)</td><td>k treinos; cada ponto testado uma vez; k = 10 é a regra prática.</td></tr>
+        <tr><td><strong>LOOCV</strong></td><td>k = N</td><td>Caro; bom para datasets pequenos.</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">Σ.2</span>Armadilhas frequentes</h2>
+    <ul>
+      <li>Avaliar com os dados de treino mede memorização, não generalização.</li>
+      <li><strong>Recall = sensibilidade</strong>; especificidade = TN/(TN+FP). A precision não é a sensibilidade.</li>
+      <li>No sklearn a matriz de confusão é [[TN, FP], [FN, TP]] (linhas = valor real).</li>
+      <li>ROC/AUC calculadas com classes 0/1 (<code>predict</code>) dão um só ponto; usa pontuações (<code>predict_proba</code>).</li>
+      <li>MSE não está nas unidades do target; RMSE e MAE estão.</li>
+      <li>Um único hold-out pode dar um resultado otimista ou pessimista por sorte.</li>
+      <li>Árvores do sklearn não aceitam texto: é preciso codificar ou retirar as colunas categóricas.</li>
+    </ul>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.3</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">Prever a temperatura máxima de amanhã em °C é um problema de…</p>
+        <div class="opts"><button>Classificação binária</button><button>Classificação multiclasse</button><button data-ok>Regressão</button></div>
+        <p class="why">O target é um valor contínuo → regressor e métricas como MAE/RMSE.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Num teste de uma doença, dizer a uma pessoa doente que está saudável é um…</p>
+        <div class="opts"><button>Falso positivo (erro tipo I)</button><button data-ok>Falso negativo (erro tipo II)</button><button>Verdadeiro negativo</button></div>
+        <p class="why">Era positivo (doente) e foi previsto negativo → falso negativo. Para os evitar, privilegia-se o recall.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual destas métricas é também chamada sensibilidade?</p>
+        <div class="opts"><button>Precision</button><button data-ok>Recall</button><button>Especificidade</button><button>Accuracy</button></div>
+        <p class="why">Sensibilidade = recall = TPR = TP/(TP+FN).</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">TP = 30, FP = 10, FN = 20, TN = 40. Qual é a precision?</p>
+        <div class="opts"><button>0.60</button><button data-ok>0.75</button><button>0.70</button><button>0.67</button></div>
+        <p class="why">Precision = 30/(30+10) = 0.75. Recall = 30/(30+20) = 0.60; accuracy = 70/100 = 0.70.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Um modelo tem AUC = 0.5. Isto significa que…</p>
+        <div class="opts"><button>Acerta metade das vezes, logo é razoável</button><button data-ok>Não ordena positivos e negativos melhor do que o acaso</button><button>Está sempre errado</button></div>
+        <p class="why">AUC 0.5 corresponde à diagonal da ROC. AUC 0 seria "sempre errado" (e invertendo as previsões ficaria perfeito).</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Precision = 1.0 e recall = 0.1. A F1 é aproximadamente…</p>
+        <div class="opts"><button>0.55</button><button data-ok>0.18</button><button>0.10</button><button>1.0</button></div>
+        <p class="why">F1 = 2·1·0.1/(1+0.1) ≈ 0.18. A média aritmética seria 0.55 — a F1 penaliza o recall baixo.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Erros de dois modelos: A = (2, 2, 2, 2), B = (0, 0, 0, 8). Qual afirmação é verdadeira?</p>
+        <div class="opts"><button>A tem MAE menor</button><button data-ok>MAE igual (2), mas B tem RMSE maior (4 vs. 2)</button><button>RMSE igual, MAE diferente</button></div>
+        <p class="why">MAE: 8/4 = 2 em ambos. RMSE A = √4 = 2; RMSE B = √(64/4) = 4. O RMSE penaliza o erro grande de B.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Com 10-fold cross validation, quantas vezes é treinado o modelo e quantas vezes cada observação é usada para teste?</p>
+        <div class="opts"><button>1 treino; cada observação testada 10 vezes</button><button data-ok>10 treinos; cada observação testada 1 vez</button><button>10 treinos; cada observação testada 9 vezes</button></div>
+        <p class="why">Cada fold é teste exatamente uma vez; nas outras 9 iterações essa observação está no treino.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Tens um dataset com 40 observações. Que validação é mais indicada?</p>
+        <div class="opts"><button>Hold-out 90/10</button><button data-ok>Leave-one-out (k = N)</button><button>2-fold</button></div>
+        <p class="why">Com poucos dados, o LOOCV maximiza os dados de treino em cada iteração; o custo (40 treinos) é aceitável.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.4</span>Exercícios de cálculo</h2>
+    <details class="ans"><summary>1. Matriz: TP = 80, FP = 20, FN = 40, TN = 860. Calcula accuracy, precision, recall e F1.</summary>
+      <div><p>Total = 1000. Accuracy = 940/1000 = <strong>0.94</strong>. Precision = 80/100 = <strong>0.80</strong>. Recall = 80/120 ≈ <strong>0.667</strong>. F1 = 2·0.8·0.667/(1.467) ≈ <strong>0.727</strong>. A accuracy é alta porque há muitos negativos; o recall mostra que um terço dos positivos escapa.</p></div>
+    </details>
+    <details class="ans"><summary>2. O sklearn devolveu [[50, 10], [5, 35]]. Quais são TP, FP, FN e TN?</summary>
+      <div><p>Formato [[TN, FP], [FN, TP]] → <strong>TN = 50, FP = 10, FN = 5, TP = 35</strong>. Precision = 35/45 ≈ 0.78; recall = 35/40 = 0.875.</p></div>
+    </details>
+    <details class="ans"><summary>3. Com precision = 0.6 e recall = 0.9, calcula F1 e F2.</summary>
+      <div><p>F1 = 2·0.54/1.5 = <strong>0.72</strong>. F2 = 5·0.54/(4·0.6 + 0.9) = 2.7/3.3 ≈ <strong>0.818</strong> — mais alto, porque β = 2 valoriza o recall, que é o valor mais alto.</p></div>
+    </details>
+    <details class="ans"><summary>4. Reais (10, 20, 30) e previstos (12, 18, 36). Calcula MAE, MSE e RMSE.</summary>
+      <div><p>Erros: −2, 2, −6. MAE = (2+2+6)/3 ≈ <strong>3.33</strong>. MSE = (4+4+36)/3 ≈ <strong>14.67</strong>. RMSE = √14.67 ≈ <strong>3.83</strong>.</p></div>
+    </details>
+    <details class="ans"><summary>5. Dataset de 1000 observações com 5-fold CV: quantas observações treinam e testam em cada iteração?</summary>
+      <div><p>Cada fold tem 200. Em cada iteração: <strong>800 treino, 200 teste</strong>; 5 modelos treinados no total.</p></div>
+    </details>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>
