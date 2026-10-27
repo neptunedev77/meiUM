@@ -36,10 +36,10 @@
       <li><strong>Descrever a forma</strong> da distribuição (densidade para dados contínuos, massa de probabilidade para discretos) e <strong>a relação entre duas variáveis</strong> (covariância, correlação — que não é causalidade).</li>
       <li><strong>Isolar o ambiente de trabalho</strong> com ambientes virtuais (Conda/Miniconda, venv) e instalar as bibliotecas da UC.</li>
     </ul>
-    <div class="note extra"><span class="lbl">Complemento · porque importa em ML</span>
-      <p>Estes conceitos voltam ao longo da UC: o tipo de dados decide como uma variável é codificada; média e desvio padrão aparecem na normalização de features; percentis/IQR na deteção de outliers; a correlação na escolha de features. (Ligação aos temas seguintes, não está nos slides deste tema.)</p>
+    <div class="note"><span class="lbl">Porque importa em ML</span>
+      <p>Estes conceitos voltam ao longo da UC: o tipo de dados decide como uma variável é codificada; média e desvio padrão aparecem na normalização de features; percentis/IQR na deteção de outliers; a correlação na escolha de features.</p>
     </div>
-    <p class="src">Fonte principal: slides DAA_PL_1 (DAA 2026/2027). Caixas e etiquetas <span class="xtag">complemento</span> acrescentam informação que não está nos slides.</p>
+    <p class="src">Baseado nas aulas de DAA (Introduction to Data Science Concepts). Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
   </section>
 </article>
 
@@ -95,7 +95,7 @@
   </section>
 
   <section class="blk">
-    <h2><span class="sn">1.1.2</span>Quick quiz dos slides</h2>
+    <h2><span class="sn">1.1.2</span>Teste rápido</h2>
     <p>Classifica cada exemplo como numérico, categórico ou ordinal.</p>
     <div class="classify" data-options="Numérico,Categórico,Ordinal">
       <div class="ci" data-answer="Numérico" data-why="Quantidade medida que pode tomar qualquer valor (litros): numérico contínuo.">Quanta gasolina tens no depósito?</div>
@@ -115,7 +115,7 @@
   </header>
 
   <section class="blk prose">
-    <h2><span class="sn">1.2.1</span>Definições, com o exemplo dos slides</h2>
+    <h2><span class="sn">1.2.1</span>Definições, com um exemplo</h2>
     <p>Número de crianças em cada casa de uma rua: <code>0, 2, 3, 2, 1, 0, 0, 2, 0</code> (n = 9).</p>
     <div class="three">
       <div class="card c1">
@@ -144,8 +144,12 @@
     <p>A mediana é <strong>menos sensível a outliers</strong> do que a média. Nos EUA, o rendimento familiar <em>médio</em> é $72,641 mas a <em>mediana</em> é só $51,939: a média é puxada para cima por um punhado de bilionários. Aqui a mediana representa melhor o americano "típico".</p>
     <p>Experimenta: carrega em <strong>+ Acrescentar outlier</strong> e vê a média a fugir enquanto a mediana quase não se mexe.</p>
     <div class="widget" data-widget="stats" data-values="0, 2, 3, 2, 1, 0, 0, 2, 0" data-title="O efeito de um outlier"></div>
-    <div class="note extra"><span class="lbl">Complemento · ligação ao histograma dos slides</span>
-      <p>O histograma de salários mensais dos slides tem uma <strong>cauda longa à direita</strong> (poucos salários muito altos). Em distribuições assim, a média fica acima da mediana — exatamente o efeito do exemplo dos rendimentos.</p>
+    <div class="card">
+      <h3>Distribuições assimétricas</h3>
+      <p>Um histograma de salários mensais costuma ter uma <strong>cauda longa à direita</strong>: a maioria ganha perto de 900 €, poucos ganham muito mais. Esses poucos puxam a média para a direita da mediana.</p>
+      <svg class="w-svg" viewBox="0 0 640 196" role="img" aria-label="Histograma de salários com cauda à direita"><rect x="41.0" y="124.1" width="27" height="45.9" style="fill:var(--s1);opacity:.8"/><rect x="70.0" y="55.3" width="27" height="114.7" style="fill:var(--s1);opacity:.8"/><rect x="99.0" y="40.0" width="27" height="130.0" style="fill:var(--s1);opacity:.8"/><rect x="128.0" y="70.6" width="27" height="99.4" style="fill:var(--s1);opacity:.8"/><rect x="157.0" y="101.2" width="27" height="68.8" style="fill:var(--s1);opacity:.8"/><rect x="186.0" y="124.1" width="27" height="45.9" style="fill:var(--s1);opacity:.8"/><rect x="215.0" y="139.4" width="27" height="30.6" style="fill:var(--s1);opacity:.8"/><rect x="244.0" y="148.6" width="27" height="21.4" style="fill:var(--s1);opacity:.8"/><rect x="273.0" y="154.7" width="27" height="15.3" style="fill:var(--s1);opacity:.8"/><rect x="302.0" y="159.3" width="27" height="10.7" style="fill:var(--s1);opacity:.8"/><rect x="331.0" y="162.4" width="27" height="7.6" style="fill:var(--s1);opacity:.8"/><rect x="360.0" y="163.9" width="27" height="6.1" style="fill:var(--s1);opacity:.8"/><rect x="389.0" y="165.4" width="27" height="4.6" style="fill:var(--s1);opacity:.8"/><rect x="418.0" y="166.2" width="27" height="3.8" style="fill:var(--s1);opacity:.8"/><rect x="447.0" y="166.9" width="27" height="3.1" style="fill:var(--s1);opacity:.8"/><rect x="476.0" y="167.7" width="27" height="2.3" style="fill:var(--s1);opacity:.8"/><rect x="505.0" y="167.7" width="27" height="2.3" style="fill:var(--s1);opacity:.8"/><rect x="534.0" y="168.5" width="27" height="1.5" style="fill:var(--s1);opacity:.8"/><rect x="563.0" y="168.5" width="27" height="1.5" style="fill:var(--s1);opacity:.8"/><rect x="592.0" y="169.2" width="27" height="0.8" style="fill:var(--s1);opacity:.8"/><line class="ax" x1="40" x2="620" y1="170" y2="170"/><text x="40.0" y="188" text-anchor="middle">800 €</text><text x="156.0" y="188" text-anchor="middle">1000 €</text><text x="272.0" y="188" text-anchor="middle">1200 €</text><text x="388.0" y="188" text-anchor="middle">1400 €</text><text x="504.0" y="188" text-anchor="middle">1600 €</text><text x="620.0" y="188" text-anchor="middle">1800 €</text><line x1="132.2" x2="132.2" y1="28" y2="170" style="stroke:var(--s2);stroke-width:2;stroke-dasharray:5 4"/><line x1="156.0" x2="156.0" y1="28" y2="170" style="stroke:var(--accent);stroke-width:2.5"/><text class="lab" x="128.2" y="20" text-anchor="end" style="fill:var(--s2)">mediana ≈ 959 €</text><text class="lab" x="160.0" y="20" style="fill:var(--accent)">média ≈ 1000 €</text>
+</svg>
+      <p class="small muted">Histograma ilustrativo de 806 salários. Numa distribuição simétrica, média e mediana coincidem.</p>
     </div>
   </section>
 
@@ -185,7 +189,7 @@ pd.Series(x).mode()   # 0  (devolve todas as modas, se houver empate)</code></pr
       <div class="formula"><div class="cap">Variância (σ²) — média dos quadrados das diferenças à média</div>\[\sigma^2=\frac{1}{N}\sum_{i=1}^{N}(x_i-\mu)^2\]</div>
       <div class="formula"><div class="cap">Desvio padrão (σ) — raiz quadrada da variância</div>\[\sigma=\sqrt{\sigma^2}\]</div>
     </div>
-    <p>Exemplo dos slides: variância de <code>(1, 4, 5, 4, 8)</code>.</p>
+    <p>Exemplo: variância de <code>(1, 4, 5, 4, 8)</code>.</p>
     <div class="tw"><table>
       <thead><tr><th>Passo</th><th>Cálculo</th></tr></thead>
       <tbody>
@@ -210,7 +214,7 @@ pd.Series(x).mode()   # 0  (devolve todas as modas, se houver empate)</code></pr
 
   <section class="blk prose">
     <h2><span class="sn">1.3.3</span>População vs. amostra <span class="xtag">complemento</span></h2>
-    <p>A fórmula acima divide por N: é a variância da <strong>população</strong>. Quando os dados são uma <strong>amostra</strong> e queremos estimar a variância da população, divide-se por n − 1 (a mesma ideia aparece nos slides para a covariância, em 1.6).</p>
+    <p>A fórmula acima divide por N: é a variância da <strong>população</strong>. Quando os dados são uma <strong>amostra</strong> e queremos estimar a variância da população, divide-se por n − 1 (a mesma ideia aparece na covariância, em 1.6).</p>
     <div class="formula">\[s^2=\frac{1}{n-1}\sum_{i=1}^{n}(x_i-\bar{x})^2\qquad\text{ex.: } (1,4,5,4,8)\Rightarrow s^2=25.2/4=6.3,\ s\approx 2.51\]</div>
     <div class="note warn"><span class="lbl">Armadilha em Python</span>
       <p>O NumPy e o pandas não usam o mesmo divisor por omissão: <code>np.var(x)</code> divide por n (<code>ddof=0</code>), mas <code>pd.Series(x).var()</code> divide por n − 1 (<code>ddof=1</code>).</p>
@@ -234,7 +238,7 @@ pd.Series(x).std()            # 2.51           pandas: ddof=1 por omissão</code
     <p>A <strong>função densidade de probabilidade</strong> dá a probabilidade de um valor cair <strong>dentro de um intervalo</strong> à volta de um valor específico. A mais conhecida é a <strong>distribuição normal</strong> (curva em sino). Uma PDF normal pode ser calculada a partir dos valores de um histograma (estimando a média e o desvio padrão).</p>
     <div class="two">
       <div class="card">
-        <h3>A regra da figura dos slides</h3>
+        <h3>A regra 68–95–99.7</h3>
         <div class="tw"><table class="mini">
           <thead><tr><th>Intervalo</th><th class="num">% dos dados</th></tr></thead>
           <tbody>
@@ -258,7 +262,7 @@ pd.Series(x).std()            # 2.51           pandas: ddof=1 por omissão</code
 
   <section class="blk prose">
     <h2><span class="sn">1.4.2</span>Massa de probabilidade (PMF) — para dados discretos</h2>
-    <p>Para dados <strong>discretos</strong> usa-se a <strong>função massa de probabilidade</strong>: atribui uma probabilidade P[X = k] a cada valor possível. A figura dos slides compara uma PMF binomial (barras) com uma PDF normal (curva).</p>
+    <p>Para dados <strong>discretos</strong> usa-se a <strong>função massa de probabilidade</strong>: atribui uma probabilidade P[X = k] a cada valor possível. Por exemplo, ao lançar uma moeda 6 vezes, o número de "caras" só pode ser 0, 1, …, 6, e cada valor tem a sua probabilidade (distribuição binomial). O gráfico compara essas barras com a curva normal mais parecida.</p>
     <div class="widget" data-widget="pmf" data-n="6" data-p="0.5"></div>
     <div class="tw"><table>
       <thead><tr><th></th><th>PDF (densidade)</th><th>PMF (massa)</th></tr></thead>
@@ -280,7 +284,7 @@ pd.Series(x).std()            # 2.51           pandas: ddof=1 por omissão</code
 
   <section class="blk prose">
     <h2><span class="sn">1.5.1</span>Percentis</h2>
-    <p>Exemplo dos slides: ordenar os rendimentos de todos os habitantes de um país. O <strong>percentil 99</strong> é o rendimento abaixo do qual ganha 99% da população (no exemplo, $506,553).</p>
+    <p>Exemplo: ordenar os rendimentos de todos os habitantes de um país. O <strong>percentil 99</strong> é o rendimento abaixo do qual ganha 99% da população (nos EUA, cerca de $506,553).</p>
     <div class="tw"><table>
       <thead><tr><th>Nome</th><th>Percentil</th><th>Significado</th></tr></thead>
       <tbody>
@@ -295,9 +299,9 @@ pd.Series(x).std()            # 2.51           pandas: ddof=1 por omissão</code
     <p>A área entre Q1 e Q3 contém <strong>50% dos dados</strong>. O <strong>IQR (Inter-Quartile Range)</strong> representa essa zona central, onde os dados estão mais concentrados.</p>
     <div class="fgrid">
       <div class="formula"><div class="cap">Amplitude interquartil</div>\[\text{IQR}=Q_3-Q_1\]</div>
-      <div class="formula"><div class="cap">Limites dos bigodes (figura dos slides)</div>\[[\,Q_1-1.5\cdot\text{IQR},\ \ Q_3+1.5\cdot\text{IQR}\,]\]</div>
+      <div class="formula"><div class="cap">Limites dos bigodes</div>\[[\,Q_1-1.5\cdot\text{IQR},\ \ Q_3+1.5\cdot\text{IQR}\,]\]</div>
     </div>
-    <p>Na figura dos slides, para uma distribuição normal: Q1 e Q3 ficam a <strong>±0.6745σ</strong> da média (cada lado da mediana leva 25%), e os limites de 1.5·IQR ficam a <strong>±2.698σ</strong>. Compara com a regra μ ± 1σ, que abrange 68.27%.</p>
+    <p>Numa distribuição normal, Q1 e Q3 ficam a <strong>±0.6745σ</strong> da média (cada lado da mediana leva 25%), e os limites de 1.5·IQR ficam a <strong>±2.698σ</strong>. Compara com a regra μ ± 1σ, que abrange 68.27%.</p>
     <div class="widget" data-widget="boxplot"></div>
     <div class="note extra"><span class="lbl">Complemento</span>
       <p>Os pontos fora dos limites de 1.5·IQR são habitualmente tratados como <strong>outliers</strong> (critério de Tukey). Ao contrário do critério com σ, este não é afetado pelos próprios outliers, porque Q1 e Q3 são robustos.</p>
@@ -319,7 +323,7 @@ outliers = x[(x &lt; q1 - 1.5*iqr) | (x &gt; q3 + 1.5*iqr)]   # [1750]</code></p
 
   <section class="blk prose">
     <h2><span class="sn">1.6.1</span>Covariância</h2>
-    <p>Como se calcula, segundo os slides:</p>
+    <p>Como se calcula:</p>
     <ol class="steps-list">
       <li><div>Imaginar os dados de cada variável como <strong>vetores</strong> de alta dimensão (um elemento por observação).</div></li>
       <li><div>Converter cada um num vetor de <strong>desvios à média</strong>: \(x_i-\bar{x}\) e \(y_i-\bar{y}\).</div></li>
@@ -333,6 +337,20 @@ outliers = x[(x &lt; q1 - 1.5*iqr) | (x &gt; q3 + 1.5*iqr)]   # [1750]</code></p
     <div class="note"><span class="lbl">Intuição</span>
       <p>Cada termo \((x_i-\bar{x})(y_i-\bar{y})\) é <strong>positivo</strong> quando x e y estão do mesmo lado das suas médias (ambos acima ou ambos abaixo) e <strong>negativo</strong> quando estão em lados opostos. A covariância é o saldo: se dominam os positivos, as variáveis sobem juntas.</p>
     </div>
+    <details class="ans" open><summary>Exemplo: horas de estudo vs. nota</summary>
+      <div>
+        <div class="tw"><table>
+          <thead><tr><th class="num">horas x</th><th class="num">nota y</th><th class="num">x − x̄</th><th class="num">y − ȳ</th><th class="num">produto</th></tr></thead>
+          <tbody>
+            <tr><td class="num">1</td><td class="num">8</td><td class="num">−1.5</td><td class="num">−3</td><td class="num">4.5</td></tr>
+            <tr><td class="num">2</td><td class="num">10</td><td class="num">−0.5</td><td class="num">−1</td><td class="num">0.5</td></tr>
+            <tr><td class="num">3</td><td class="num">11</td><td class="num">0.5</td><td class="num">0</td><td class="num">0</td></tr>
+            <tr><td class="num">4</td><td class="num">15</td><td class="num">1.5</td><td class="num">4</td><td class="num">6</td></tr>
+          </tbody>
+          <tfoot><tr><td class="num">x̄ = 2.5</td><td class="num">ȳ = 11</td><td></td><td></td><td class="num">Σ = 11</td></tr></tfoot></table></div>
+        <p>Cov(x, y) = 11 / 4 = <strong>2.75</strong> (população). Todos os produtos são ≥ 0: quem estuda mais horas tende a ter nota acima da média. Mas 2.75 é muito ou pouco? Se a nota estivesse em escala 0–100 em vez de 0–20, a covariância seria 5× maior para a mesma relação. É isso que a correlação resolve.</p>
+      </div>
+    </details>
     <p><strong>Interpretar a covariância é difícil</strong>: perto de 0 indica pouca relação; longe de 0 (negativa para relações inversas) indica relação. Mas "longe" depende das unidades — o valor muda se mudarmos a escala dos dados.</p>
   </section>
 
@@ -340,6 +358,7 @@ outliers = x[(x &lt; q1 - 1.5*iqr) | (x &gt; q3 + 1.5*iqr)]   # [1750]</code></p
     <h2><span class="sn">1.6.2</span>Correlação: a covariância normalizada</h2>
     <p>A correlação é <strong>mais fácil de interpretar</strong>: divide a covariância pelos desvios padrão das duas variáveis, o que a deixa sempre entre −1 e 1.</p>
     <div class="formula">\[\rho_{x,y}=\frac{\operatorname{Cov}(x,y)}{\sigma_x\,\sigma_y}\in[-1,\,1]\]</div>
+    <p>No exemplo das horas de estudo: σ<sub>x</sub> = √1.25 ≈ 1.12 e σ<sub>y</sub> = √6.5 ≈ 2.55, logo ρ = 2.75 / (1.12 · 2.55) ≈ <strong>0.96</strong> — uma relação positiva muito forte, e o valor seria o mesmo com notas de 0 a 100.</p>
     <div class="three">
       <div class="card"><span class="pill p-bad">ρ = −1</span><p>Correlação inversa perfeita: quando uma sobe, a outra desce, sempre em linha reta.</p></div>
       <div class="card"><span class="pill p-mid">ρ = 0</span><p>Sem correlação (linear).</p></div>
@@ -347,9 +366,9 @@ outliers = x[(x &lt; q1 - 1.5*iqr) | (x &gt; q3 + 1.5*iqr)]   # [1750]</code></p
     </div>
     <div class="widget" data-widget="correlation"></div>
     <div class="note extra"><span class="lbl">Complemento · precisão sobre o "cosseno"</span>
-      <p>Os slides dizem que o produto escalar é "o cosseno do ângulo" entre os vetores. Rigorosamente, o produto escalar é \(\lVert a\rVert\lVert b\rVert\cos\theta\); é a <strong>correlação</strong> que é exatamente o cosseno do ângulo entre os vetores de desvios:</p>
+      <p>É comum ler-se que o produto escalar é "o cosseno do ângulo" entre os vetores. Rigorosamente, o produto escalar é \(\lVert a\rVert\lVert b\rVert\cos\theta\); é a <strong>correlação</strong> que é exatamente o cosseno do ângulo entre os vetores de desvios:</p>
       <div class="formula">\[\rho=\frac{a\cdot b}{\lVert a\rVert\,\lVert b\rVert}=\cos\theta,\qquad a_i=x_i-\bar{x},\ \ b_i=y_i-\bar{y}\]</div>
-      <p>Daí a intuição: vetores alinhados → ρ ≈ 1; perpendiculares → ρ ≈ 0; opostos → ρ ≈ −1. Os limiares "forte/moderada/fraca" do exemplo são indicativos, não vêm dos slides.</p>
+      <p>Daí a intuição: vetores alinhados → ρ ≈ 1; perpendiculares → ρ ≈ 0; opostos → ρ ≈ −1. Os limiares "forte/moderada/fraca" do exemplo interativo são indicativos.</p>
     </div>
   </section>
 
@@ -370,9 +389,9 @@ df.corr()             # pandas: matriz de correlações entre todas as colunas n
 </article>
 
 <!-- ============================ 1.7 AMBIENTE PYTHON ============================ -->
-<article class="page" data-page="ambiente" data-num="1.7" data-title="Ambientes virtuais e setup" data-desc="Conda/Miniconda, venv, WSL, Jupyter e o Hands On da aula.">
+<article class="page" data-page="ambiente" data-num="1.7" data-title="Ambientes virtuais e setup" data-desc="Conda/Miniconda, venv, WSL, Jupyter e um guia de instalação.">
   <header class="ph">
-    <h1>Ambientes virtuais e setup<span class="en">Virtual Environments · Environment Setup · Hands On</span></h1>
+    <h1>Ambientes virtuais e setup<span class="en">Virtual Environments · Environment Setup</span></h1>
     <p class="lede">Um ambiente virtual é uma instalação isolada de Python e das suas bibliotecas. Permite ter várias versões lado a lado e ativar ou desativar cada uma conforme o projeto.</p>
   </header>
 
@@ -398,7 +417,7 @@ df.corr()             # pandas: matriz de correlações entre todas as colunas n
         <tr><td>Desativar o ambiente</td><td><code>conda deactivate</code></td></tr>
         <tr><td>Apagar o ambiente</td><td><code>conda env remove --name myenv</code></td></tr>
       </tbody></table></div>
-    <details class="ans"><summary>A sessão de exemplo dos slides, passo a passo</summary>
+    <details class="ans"><summary>Uma sessão de exemplo, passo a passo</summary>
       <div>
         <p>O ambiente é criado só com numpy; importar pandas falha até o instalarmos <em>dentro</em> do ambiente.</p>
         <pre><code class="language-bash">conda create --name myenv python=3.14 numpy
@@ -442,28 +461,28 @@ conda env remove --name myenv</code></pre>
     <h2><span class="sn">1.7.4</span>WSL e ferramentas de trabalho</h2>
     <p>O <strong>Windows Subsystem for Linux (WSL)</strong> corre um ambiente Linux dentro do Windows (ferramentas de linha de comando, utilitários e aplicações) sem máquina virtual nem dual-boot. Instalação: abrir o PowerShell como administrador, correr <code>wsl --install</code> e reiniciar.</p>
     <ul>
-      <li>Nas aulas usam-se <strong>Jupyter Notebooks / Spyder</strong>, mas podes usar o IDE que preferires (Spyder, PyCharm, VS Code…).</li>
+      <li>Na UC usam-se <strong>Jupyter Notebooks / Spyder</strong>, mas podes usar o IDE que preferires (Spyder, PyCharm, VS Code…).</li>
       <li>A UC usa <strong>Python 3.14 através do Miniconda</strong>.</li>
       <li>Utilizadores experientes que já têm Python podem instalar o Jupyter com <code>pip install jupyter</code>; a quem está a começar recomenda-se Miniconda ou Anaconda.</li>
     </ul>
   </section>
 
   <section class="blk prose">
-    <h2><span class="sn">1.7.5</span>Hands On (T1–T4)</h2>
+    <h2><span class="sn">1.7.5</span>Guia: preparar o ambiente da UC</h2>
     <ol class="steps-list">
-      <li><div><strong>T1</strong> — Instalar o Miniconda (Python 3.14) para o teu sistema operativo. As bibliotecas de Deep Learning (Theano, TensorFlow, Keras) não são necessárias.</div></li>
-      <li><div><strong>T2</strong> — Criar um ambiente Python 3.14 e instalar: <code>numpy</code>, <code>pandas</code>, <code>matplotlib</code>, <code>seaborn</code>, <code>scikit-learn</code>, <code>jupyterlab</code>.</div></li>
-      <li><div><strong>T3</strong> — Ativar o ambiente e confirmar que as bibliotecas ficaram instaladas.</div></li>
-      <li><div><strong>T4</strong> — Ver a documentação de cada biblioteca e identificar a sua relevância para Machine Learning.</div></li>
+      <li><div><strong>Instalar o Miniconda</strong> (Python 3.14) para o teu sistema operativo, a partir do site da Anaconda. Bibliotecas de Deep Learning (TensorFlow, Keras…) não são necessárias.</div></li>
+      <li><div><strong>Criar um ambiente</strong> e instalar <code>numpy</code>, <code>pandas</code>, <code>matplotlib</code>, <code>seaborn</code>, <code>scikit-learn</code> e <code>jupyterlab</code>.</div></li>
+      <li><div><strong>Confirmar</strong>, com o ambiente ativo, que as bibliotecas ficaram instaladas.</div></li>
+      <li><div><strong>Conhecer as bibliotecas</strong>: o que cada uma faz num projeto de Machine Learning (tabela abaixo).</div></li>
     </ol>
-    <pre data-title="T2 · Terminal"><code class="language-bash">conda create --name daa python=3.14
+    <pre data-title="Passo 2 · Terminal"><code class="language-bash">conda create --name daa python=3.14
 conda activate daa
 conda install numpy pandas matplotlib seaborn scikit-learn jupyterlab
 jupyter lab                 # abre o JupyterLab no browser</code></pre>
-    <pre data-title="T3 · Python"><code class="language-python">import numpy, pandas, matplotlib, seaborn, sklearn   # scikit-learn importa-se como sklearn
+    <pre data-title="Passo 3 · Python"><code class="language-python">import numpy, pandas, matplotlib, seaborn, sklearn   # scikit-learn importa-se como sklearn
 for lib in (numpy, pandas, matplotlib, seaborn, sklearn):
     print(lib.__name__, lib.__version__)</code></pre>
-    <details class="ans"><summary>T4 · Para que serve cada biblioteca em ML <span class="xtag">complemento</span></summary>
+    <details class="ans"><summary>Passo 4 · Para que serve cada biblioteca em ML</summary>
       <div><div class="tw"><table>
         <thead><tr><th>Biblioteca</th><th>Papel em Machine Learning</th></tr></thead>
         <tbody>
@@ -571,7 +590,7 @@ for lib in (numpy, pandas, matplotlib, seaborn, sklearn):
       <div><p>μ = 12. Desvios: −2, 0, 2 → quadrados 4, 0, 4 → soma 8. <strong>σ² = 8/3 ≈ 2.67</strong>, <strong>σ ≈ 1.63</strong>. <strong>s² = 8/2 = 4</strong>.</p></div>
     </details>
     <details class="ans"><summary>3. Uma variável tem μ = 50 e σ = 5. O valor 63 é invulgar? A quantos sigmas está?</summary>
-      <div><p>(63 − 50)/5 = <strong>2.6σ</strong> acima da média. Está fora de μ ± 1σ = [45, 55], logo é invulgar segundo o critério dos slides. Numa normal, menos de 1% dos valores ficam tão acima da média.</p></div>
+      <div><p>(63 − 50)/5 = <strong>2.6σ</strong> acima da média. Está fora de μ ± 1σ = [45, 55], logo é invulgar pelo critério de 1σ. Numa normal, menos de 1% dos valores ficam tão acima da média.</p></div>
     </details>
     <details class="ans"><summary>4. Q1 = 20 e Q3 = 30. Quais são os limites dos bigodes? O valor 48 é outlier?</summary>
       <div><p>IQR = 10. Limites: 20 − 15 = <strong>5</strong> e 30 + 15 = <strong>45</strong>. 48 &gt; 45 → <strong>sim</strong>, fica fora do bigode superior.</p></div>

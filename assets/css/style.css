@@ -128,7 +128,7 @@ p code,li code,td code,dd code,summary code{background:var(--card-2);padding:1px
 
 .kpis{display:flex;flex-wrap:wrap;gap:8px;margin:0}
 .kpi{display:flex;flex-direction:column;padding:8px 12px;background:var(--card);border:1px solid var(--rule);border-radius:6px;min-width:92px}
-.kpi dt{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.kpi dt{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.02em;color:var(--muted)}
 .kpi dd{margin:0;font-family:var(--f-mono);font-weight:600;font-size:16px;font-variant-numeric:tabular-nums}
 .kpi.hl{border-color:var(--accent);background:var(--accent-soft)}
 

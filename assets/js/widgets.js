@@ -113,7 +113,7 @@
         kpi('variância σ²', fmt(v)) + kpi('desvio σ', fmt(sd), 1) + kpi('s² (amostral)', fmt(vs));
       const far = a.filter(x => Math.abs(x - m) > sd + 1e-12);
       out.innerHTML = `Intervalo μ ± σ = [${fmt(m - sd)}, ${fmt(m + sd)}]. ` +
-        (far.length ? `Valores a mais de um desvio padrão da média (<b>invulgares</b>, pelo critério de 1σ): <b>${far.map(x => fmt(x)).join(', ')}</b>.` : 'Nenhum valor está a mais de um desvio padrão da média.') +
+        (far.length ? `Valores a mais de um desvio padrão da média (<b>invulgares</b>, pelo critério de 1σ): <b>${[...new Set(far)].sort((p, q) => p - q).map(x => { const c = far.filter(y => y === x).length; return fmt(x) + (c > 1 ? ` (×${c})` : ''); }).join(', ')}</b>.` : 'Nenhum valor está a mais de um desvio padrão da média.') +
         (Math.abs(m - md) > sd * 0.5 ? ` A média está bastante afastada da mediana: sinal de que há valores extremos a puxá-la.` : '');
       const rows = a.map(x => `<tr><td class="num">${fmt(x, 4)}</td><td class="num">${fmt(x - m, 3)}</td><td class="num">${fmt((x - m) ** 2, 3)}</td></tr>`).join('');
       steps.innerHTML = `<table><thead><tr><th class="num">xᵢ</th><th class="num">xᵢ − μ</th><th class="num">(xᵢ − μ)²</th></tr></thead><tbody>${rows}</tbody>
