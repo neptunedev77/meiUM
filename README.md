@@ -1,65 +1,118 @@
+<div align="center">
+
 # meiUM
 
-Apontamentos interativos do Mestrado em Engenharia Informática (Universidade do Minho).
-Site estático (HTML + CSS + JS, sem build), pronto para GitHub e Vercel.
+**Interactive study notes for the MSc in Informatics Engineering (MEI) at the University of Minho.**
 
-## Estrutura
+[**meium.space**](https://meium.space/index.html) · Academic year 2026/2027
+
+</div>
+
+---
+
+meiUM turns course slides into structured, self-contained study notes: concise explanations, the intuition behind each method, formulas, worked examples, interactive visualisations and review quizzes. It is built to be read and studied — on a laptop before an exam or on a phone on the bus.
+
+The site is fully static: plain HTML, CSS and JavaScript, no build step, no framework, no backend.
+
+## Courses
+
+| Course | Topics |
+| --- | --- |
+| **DAA** — Dados e Aprendizagem Automática *(Data and Machine Learning)* | Data science concepts · Quality metrics and model validation · Data exploration and preparation · Linear and logistic regression · Feature engineering · Decision tree pruning and hyperparameter tuning · Ensemble learning |
+| **ASCN** — Aplicações e Serviços de Computação em Nuvem *(Cloud Computing Applications and Services)* | DevOps and infrastructure as code · Distributed applications · System provisioning (Ansible) · Cloud computing (IaaS, PaaS, SaaS, OpenStack) · Virtualisation (VMs) |
+
+More courses are added as the master's progresses.
+
+## Features
+
+- **Self-contained notes** — each topic stands on its own, with examples that can be worked through by hand and code that runs on datasets bundled with scikit-learn, so readers do not need the original slides.
+- **Interactive widgets** — more than 20 SVG-based visualisations: confusion matrices, ROC curves, the LASSO path, decision-tree pruning, k-fold cross-validation, bootstrap sampling, distributed architectures with simulated node failures, Ansible idempotency, VM overcommit, and more.
+- **Review built in** — every topic ends with a cheat sheet, common pitfalls, multiple-choice questions with explanations and worked exercises.
+- **Clear sourcing** — material that goes beyond what was taught in class is tagged as *supplementary*, and can be hidden with one toggle.
+- **Formulas** rendered with KaTeX; **code** with syntax highlighting and a copy button.
+- **Reader settings** — light/dark theme, interface in Portuguese or English, adjustable text size; preferences are stored locally in the browser.
+- **Responsive** — a sidebar on desktop, a drawer and top bar on mobile.
+- **Keyboard navigation** between sections with <kbd>←</kbd> <kbd>→</kbd>.
+
+## Tech stack
+
+| Layer | Choice |
+| --- | --- |
+| Pages | Static HTML, one file per topic; each `<article class="page">` is a section routed by URL hash |
+| Styling | A single CSS file with design tokens, light/dark themes and a per-course accent colour |
+| Behaviour | Vanilla JavaScript (no dependencies) |
+| Maths | [KaTeX](https://katex.org/) via CDN |
+| Fonts | Archivo, Source Serif 4 and JetBrains Mono (Google Fonts) |
+| Hosting | [Vercel](https://vercel.com/), deployed on every push to `main` |
+
+## Project structure
 
 ```
-index.html                     página inicial (lista de UCs, gerada a partir do catálogo)
-daa/
-  index.html                   página da UC (lista de temas)
-  01-data-science-concepts.html   um tema = um ficheiro; cada <article class="page"> é uma sub-página (#hash)
-ascn/                          Aplicações e Serviços de Computação em Nuvem (mesma estrutura)
+index.html                 Home page (course list, generated from the catalogue)
+daa/                       Data and Machine Learning
+  index.html               Course page (topic list)
+  01-…html … 07-…html      One file per topic
+ascn/                      Cloud Computing Applications and Services
 assets/
-  css/style.css                estilos (tema claro/escuro, layout, componentes)
-  js/catalog.js                ← registo de UCs e temas: a única fonte da navegação
-  js/app.js                    navegação, paginação, quizzes, blocos de código, definições
-  js/i18n.js                   textos da interface em PT e EN (o conteúdo dos temas não passa por aqui)
-  js/widgets.js                exemplos interativos reutilizáveis (gráficos SVG)
+  css/style.css            Styles, themes and components
+  js/catalog.js            Course and topic registry — the single source of navigation
+  js/app.js                Navigation, routing, pagination, quizzes, code blocks, settings
+  js/i18n.js               Interface strings in Portuguese and English
+  js/widgets.js            Reusable interactive widgets
   img/favicon.svg
-templates/topic.html           modelo com todos os componentes
+templates/topic.html       Starter file showing every available component
 vercel.json
 ```
 
-## Acrescentar conteúdo
+## Running locally
 
-**Novo tema numa UC existente**
-1. Copiar `templates/topic.html` para `daa/NN-slug.html`.
-2. Ajustar `data-uc` e `data-topic` no `<body>`.
-3. Em `assets/js/catalog.js`, pôr o tema com `status: 'ready'` (o nome do ficheiro tem de coincidir com `file`).
-
-A barra lateral, a paginação, o "mapa do tema" e as ligações entre temas são gerados automaticamente.
-
-**Nova UC**
-1. Criar a pasta `<id>/` com um `index.html` (copiar `daa/index.html` e mudar `data-uc`).
-2. Acrescentar a UC em `catalog.js`, com um `hue` (0–360) para a cor de destaque.
-
-## Componentes
-
-| Componente | Markup |
-| --- | --- |
-| Fórmula | `\( … \)` inline, `<div class="formula">\[ … \]</div>` em bloco (KaTeX) |
-| Notas | `.note` (intuição), `.note.warn` (armadilha), `.note.extra` (complemento fora dos slides) |
-| Complemento inline | `<span class="xtag">complemento</span>` |
-| Código | `<pre><code class="language-python">…</code></pre>` (também `language-bash`) |
-| Expansível | `<details class="ans"><summary>…</summary><div>…</div></details>` |
-| Quiz | `.quiz` com `.opts > button[data-ok]` e `.why`; agrupar em `[data-quizset]` para pontuação |
-| Classificar | `.classify[data-options]` com `.ci[data-answer][data-why]` |
-| Widgets | `<div class="widget" data-widget="…">` — `stats`, `normal`, `pmf`, `boxplot`, `correlation`, `confusion`, `roc`, `fscore`, `regerr`, `kfold`, `scale`, `shape`, `linfit`, `sigmoid`, `encoding`, `voting`, `bootstrap` |
-| Widgets com dados | `heatmap` e `lines` leem um `<script type="application/json">` dentro do div (ver `daa/06-decision-trees.html`) |
-| Pipeline de ML | `<ol class="pipeline"><li>…</li><li class="on">…</li></ol>` |
-
-Convenção: o conteúdo segue os slides; tudo o que não vem dos slides é marcado como **complemento**.
-
-## Ver localmente
-
-Abrir `index.html` diretamente no browser funciona. Para um servidor local:
+Open `index.html` directly in a browser, or serve the folder:
 
 ```bash
 python -m http.server 5173
 ```
 
-## Publicar no Vercel
+Then visit <http://localhost:5173>.
 
-Importar o repositório no Vercel com o preset **Other** (sem build command, output = raiz). Cada `git push` para `main` publica automaticamente.
+## Adding content
+
+**A new topic in an existing course**
+
+1. Copy `templates/topic.html` to `<course>/NN-slug.html`.
+2. Set `data-uc` and `data-topic` on the `<body>` element.
+3. Register the topic in `assets/js/catalog.js` with `status: 'ready'` (the `file` field must match the file name).
+
+The sidebar, pagination, topic map and links between topics are generated automatically.
+
+**A new course**
+
+1. Create a `<course-id>/` folder with an `index.html` (copy `daa/index.html` and change `data-uc`).
+2. Add the course to `catalog.js`, including a `hue` (0–360) for its accent colour and English names (`en`, `desc_en`).
+
+### Components
+
+| Component | Markup |
+| --- | --- |
+| Formula | `\( … \)` inline; `<div class="formula">\[ … \]</div>` as a block |
+| Notes | `.note` (intuition), `.note.warn` (pitfall), `.note.extra` (supplementary) |
+| Supplementary tag | `<span class="xtag">complemento</span>` |
+| Code | `<pre><code class="language-python">…</code></pre>` — also `bash`, `yaml`, `text` |
+| Collapsible | `<details class="ans"><summary>…</summary><div>…</div></details>` |
+| Quiz | `.quiz` with `.opts > button[data-ok]` and `.why`; group in `[data-quizset]` for scoring |
+| Classification exercise | `.classify[data-options]` with `.ci[data-answer][data-why]` |
+| Widget | `<div class="widget" data-widget="name">` — see `assets/js/widgets.js` for the full list |
+| Data-driven widget | `heatmap` and `lines` read a `<script type="application/json">` inside the element |
+
+## Deployment
+
+The repository is connected to Vercel with the **Other** preset (no build command, output directory = repository root). Every push to `main` is deployed to [meium.space](https://meium.space/index.html).
+
+## Disclaimer
+
+These are personal study notes written by a student. They are based on the course materials of the University of Minho but are not official course material, and they may contain mistakes. When in doubt, the lectures and the teaching staff are the reference.
+
+Content is written in Portuguese; the interface is available in Portuguese and English.
+
+## Author
+
+Maintained by [@neptunedev77](https://github.com/neptunedev77). Suggestions and corrections are welcome — open an issue.
