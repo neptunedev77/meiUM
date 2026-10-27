@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Conceitos de Ciência de Dados · DAA · meiUM</title>
+<meta name="description" content="DAA · Tema 1: tipos de dados, média, mediana, moda, variância, desvio padrão, distribuições, percentis, covariância, correlação e ambiente Python.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var t=JSON.parse(localStorage.getItem('meium:theme'));if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="daa" data-topic="01" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 1.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="1.0" data-title="Visão geral" data-desc="O que este tema cobre e como está organizado.">
+  <header class="ph">
+    <h1>Conceitos de Ciência de Dados<span class="en">Introduction to Data Science Concepts · Part I</span></h1>
+    <p class="lede">Antes de treinar qualquer modelo é preciso saber <em>descrever</em> os dados: que tipo de valores temos, onde fica o centro, quão espalhados estão, como se distribuem e como variam em conjunto. Este tema reúne essa estatística de base e prepara o ambiente Python usado no resto da UC.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">1.0</span>Mapa do tema</h2>
+    <div data-map></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">⌁</span>Em três frases</h2>
+    <ul>
+      <li><strong>Descrever o centro</strong> (média, mediana, moda) e <strong>a dispersão</strong> (variância, desvio padrão, percentis/IQR) de uma variável.</li>
+      <li><strong>Descrever a forma</strong> da distribuição (densidade para dados contínuos, massa de probabilidade para discretos) e <strong>a relação entre duas variáveis</strong> (covariância, correlação — que não é causalidade).</li>
+      <li><strong>Isolar o ambiente de trabalho</strong> com ambientes virtuais (Conda/Miniconda, venv) e instalar as bibliotecas da UC.</li>
+    </ul>
+    <div class="note extra"><span class="lbl">Complemento · porque importa em ML</span>
+      <p>Estes conceitos voltam ao longo da UC: o tipo de dados decide como uma variável é codificada; média e desvio padrão aparecem na normalização de features; percentis/IQR na deteção de outliers; a correlação na escolha de features. (Ligação aos temas seguintes, não está nos slides deste tema.)</p>
+    </div>
+    <p class="src">Fonte principal: slides DAA_PL_1 (DAA 2026/2027). Caixas e etiquetas <span class="xtag">complemento</span> acrescentam informação que não está nos slides.</p>
+  </section>
+</article>
+
+<!-- ============================ 1.1 TIPOS DE DADOS ============================ -->
+<article class="page" data-page="tipos" data-num="1.1" data-title="Tipos de dados" data-desc="Numéricos (discretos e contínuos), categóricos e ordinais.">
+  <header class="ph">
+    <h1>Tipos de dados<span class="en">Data Types</span></h1>
+    <p class="lede">Os três tipos mais comuns são <strong>numéricos</strong>, <strong>categóricos</strong> e <strong>ordinais</strong>. Identificar o tipo é o primeiro passo: decide que operações e estatísticas fazem sentido.</p>
+  </header>
+
+  <section class="blk">
+    <div class="three">
+      <div class="card c1">
+        <span class="tag">Numérico · Numerical</span>
+        <p>Representa uma <strong>medição quantitativa</strong>. Ex.: alturas, tempos de carregamento de uma página, preços de ações.</p>
+        <ul>
+          <li><strong>Discreto</strong>: inteiro, normalmente conta ocorrências de um evento. <em>Quantas compras fez um cliente num ano? Quantas vezes saiu "cara"?</em></li>
+          <li><strong>Contínuo</strong>: pode tomar uma infinidade de valores. <em>Quanto tempo demorou o checkout? Quanta chuva caiu num dia?</em></li>
+        </ul>
+      </div>
+      <div class="card c2">
+        <span class="tag">Categórico · Categorical</span>
+        <p>Dados <strong>qualitativos sem significado matemático</strong> inerente. Ex.: género, sim/não (dados binários), raça, região de residência, categoria de produto, partido político.</p>
+        <p>Podemos atribuir números às categorias para as representar de forma compacta, mas <strong>esses números não têm significado matemático</strong>.</p>
+      </div>
+      <div class="card c3">
+        <span class="tag">Ordinal · Ordinal</span>
+        <p>Mistura dos dois: <strong>dados categóricos com significado matemático</strong> — a ordem.</p>
+        <p>Ex.: classificação de filmes de 1 a 5. Só pode valer 1, 2, 3, 4 ou 5, e esses valores têm significado: um filme com 1 é pior do que um com 2.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.1.1</span>Como distinguir</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Pergunta</th><th>Numérico</th><th>Categórico</th><th>Ordinal</th></tr></thead>
+      <tbody>
+        <tr><td>É uma quantidade medida ou contada?</td><td><span class="pill p-good">sim</span></td><td><span class="pill p-bad">não</span></td><td><span class="pill p-bad">não</span> são níveis</td></tr>
+        <tr><td>Os valores têm uma ordem natural?</td><td><span class="pill p-good">sim</span></td><td><span class="pill p-bad">não</span></td><td><span class="pill p-good">sim</span></td></tr>
+        <tr><td>Os números atribuídos têm significado matemático?</td><td><span class="pill p-good">sim</span></td><td><span class="pill p-bad">não</span> são só rótulos</td><td><span class="pill p-mid">só a ordem</span></td></tr>
+      </tbody></table></div>
+    <ol class="steps-list">
+      <li><div>É uma <strong>medição ou contagem</strong>? → <strong>numérico</strong> (contagem de ocorrências → discreto; medição que pode tomar qualquer valor → contínuo).</div></li>
+      <li><div>Se não, as categorias têm uma <strong>ordem com significado</strong>? → <strong>ordinal</strong>. Caso contrário → <strong>categórico</strong>.</div></li>
+    </ol>
+    <div class="note warn"><span class="lbl">Armadilha</span>
+      <p>Estar escrito com números não torna um dado numérico. Se codificarmos "Norte = 1, Centro = 2, Sul = 3", continua a ser categórico: "Sul − Norte = 2" não quer dizer nada.</p>
+    </div>
+    <div class="note extra"><span class="lbl">Complemento</span>
+      <p>Num dado ordinal a ordem conta, mas a distância entre níveis não é necessariamente igual: de "moderado" para "bom" não é obrigatoriamente o mesmo salto que de "bom" para "excelente".</p>
+    </div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">1.1.2</span>Quick quiz dos slides</h2>
+    <p>Classifica cada exemplo como numérico, categórico ou ordinal.</p>
+    <div class="classify" data-options="Numérico,Categórico,Ordinal">
+      <div class="ci" data-answer="Numérico" data-why="Quantidade medida que pode tomar qualquer valor (litros): numérico contínuo.">Quanta gasolina tens no depósito?</div>
+      <div class="ci" data-answer="Ordinal" data-why="Categorias (pobre, moderada, boa, excelente) com uma ordem com significado: 1 é pior do que 2.">Avalia a tua saúde de 1 a 4 (1 = "pobre", 2 = "moderada", 3 = "boa", 4 = "excelente").</div>
+      <div class="ci" data-answer="Categórico" data-why="Qualitativo, sem ordem nem significado matemático.">As nacionalidades dos teus colegas.</div>
+      <div class="ci" data-answer="Numérico" data-why="Quantidade. Registada em anos inteiros comporta-se como discreta; a idade em si é uma grandeza contínua.">Idades em anos.</div>
+      <div class="ci" data-answer="Numérico" data-why="Quantidade de dinheiro: numérico (tratado como contínuo).">Dinheiro gasto numa loja.</div>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 1.2 MÉDIA, MEDIANA E MODA ============================ -->
+<article class="page" data-page="tendencia" data-num="1.2" data-title="Média, mediana e moda" data-desc="Três formas de resumir o centro dos dados, e qual resiste a outliers.">
+  <header class="ph">
+    <h1>Média, mediana e moda<span class="en">Mean, Median &amp; Mode</span></h1>
+    <p class="lede">Três maneiras de responder a "qual é o valor típico?". Dão respostas diferentes quando há valores extremos, e é aí que interessa saber qual escolher.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.2.1</span>Definições, com o exemplo dos slides</h2>
+    <p>Número de crianças em cada casa de uma rua: <code>0, 2, 3, 2, 1, 0, 0, 2, 0</code> (n = 9).</p>
+    <div class="three">
+      <div class="card c1">
+        <span class="tag">Média · Mean</span>
+        <p>A "média" do dia-a-dia: <strong>soma ÷ número de amostras</strong>.</p>
+        <div class="formula">\[\bar{x}=\frac{1}{n}\sum_{i=1}^{n}x_i\]</div>
+        <p>\((0+2+3+2+1+0+0+2+0)/9 = 10/9 \approx\) <strong>1.11</strong></p>
+      </div>
+      <div class="card c2">
+        <span class="tag">Mediana · Median</span>
+        <p><strong>Ordenar</strong> os valores e escolher o do <strong>meio</strong>. Se n for par, é a média dos dois centrais.</p>
+        <p><code>0, 0, 0, 0, <b>1</b>, 2, 2, 2, 3</code></p>
+        <p>O 5.º de 9 valores: <strong>1</strong>.</p>
+      </div>
+      <div class="card c3">
+        <span class="tag">Moda · Mode</span>
+        <p>O <strong>valor mais frequente</strong>. Não é relevante para dados numéricos contínuos (raramente há valores repetidos).</p>
+        <p>Contagens: 0 → 4, 1 → 1, 2 → 3, 3 → 1</p>
+        <p>Moda = <strong>0</strong>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.2.2</span>Outliers: a mediana resiste, a média não</h2>
+    <p>A mediana é <strong>menos sensível a outliers</strong> do que a média. Nos EUA, o rendimento familiar <em>médio</em> é $72,641 mas a <em>mediana</em> é só $51,939: a média é puxada para cima por um punhado de bilionários. Aqui a mediana representa melhor o americano "típico".</p>
+    <p>Experimenta: carrega em <strong>+ Acrescentar outlier</strong> e vê a média a fugir enquanto a mediana quase não se mexe.</p>
+    <div class="widget" data-widget="stats" data-values="0, 2, 3, 2, 1, 0, 0, 2, 0" data-title="O efeito de um outlier"></div>
+    <div class="note extra"><span class="lbl">Complemento · ligação ao histograma dos slides</span>
+      <p>O histograma de salários mensais dos slides tem uma <strong>cauda longa à direita</strong> (poucos salários muito altos). Em distribuições assim, a média fica acima da mediana — exatamente o efeito do exemplo dos rendimentos.</p>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.2.3</span>Qual usar?</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Medida</th><th>Usa quando…</th><th>Cuidado com…</th></tr></thead>
+      <tbody>
+        <tr><td class="big">Média</td><td>Dados numéricos sem valores extremos.</td><td>Outliers e distribuições assimétricas: puxam-na.</td></tr>
+        <tr><td class="big">Mediana</td><td>Há outliers ou a distribuição é assimétrica (rendimentos, salários).</td><td>Ignora a magnitude dos extremos (o que às vezes é o objetivo).</td></tr>
+        <tr><td class="big">Moda</td><td>Dados discretos; também categóricos <span class="xtag">complemento</span></td><td>Não é relevante para dados contínuos; pode haver várias modas.</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">1.2.4</span>Em Python <span class="xtag">complemento</span></h2>
+    <pre><code class="language-python">import numpy as np
+import pandas as pd
+
+x = np.array([0, 2, 3, 2, 1, 0, 0, 2, 0])
+np.mean(x)            # 1.111...
+np.median(x)          # 1.0
+pd.Series(x).mode()   # 0  (devolve todas as modas, se houver empate)</code></pre>
+  </section>
+</article>
+
+<!-- ============================ 1.3 VARIÂNCIA E DESVIO PADRÃO ============================ -->
+<article class="page" data-page="dispersao" data-num="1.3" data-title="Variância e desvio padrão" data-desc="Medir quão espalhados estão os dados e identificar valores invulgares.">
+  <header class="ph">
+    <h1>Variância e desvio padrão<span class="en">Standard Deviation &amp; Variance</span></h1>
+    <p class="lede">Duas listas podem ter a mesma média e ser muito diferentes. A variância mede quão <strong>espalhados</strong> ("spread-out") estão os dados à volta da média.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.3.1</span>Definições</h2>
+    <div class="fgrid">
+      <div class="formula"><div class="cap">Variância (σ²) — média dos quadrados das diferenças à média</div>\[\sigma^2=\frac{1}{N}\sum_{i=1}^{N}(x_i-\mu)^2\]</div>
+      <div class="formula"><div class="cap">Desvio padrão (σ) — raiz quadrada da variância</div>\[\sigma=\sqrt{\sigma^2}\]</div>
+    </div>
+    <p>Exemplo dos slides: variância de <code>(1, 4, 5, 4, 8)</code>.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Passo</th><th>Cálculo</th></tr></thead>
+      <tbody>
+        <tr><td>1. Média</td><td>(1 + 4 + 5 + 4 + 8) / 5 = <b class="mono">4.4</b></td></tr>
+        <tr><td>2. Diferenças à média</td><td class="mono">(−3.4, −0.4, 0.6, −0.4, 3.6)</td></tr>
+        <tr><td>3. Quadrados das diferenças</td><td class="mono">(11.56, 0.16, 0.36, 0.16, 12.96)</td></tr>
+        <tr><td>4. Média dos quadrados</td><td>σ² = (11.56 + 0.16 + 0.36 + 0.16 + 12.96) / 5 = <b class="mono">5.04</b></td></tr>
+        <tr><td>5. Desvio padrão</td><td>σ = √5.04 ≈ <b class="mono">2.24</b></td></tr>
+      </tbody></table></div>
+    <div class="note"><span class="lbl">Intuição · porquê ao quadrado?</span>
+      <p>Repara no passo 2: as diferenças somam <strong>0</strong> (−3.4 − 0.4 + 0.6 − 0.4 + 3.6 = 0). Isso acontece sempre — os desvios positivos e negativos anulam-se. Elevar ao quadrado torna-os todos positivos e dá mais peso aos desvios grandes. A raiz no desvio padrão devolve a medida às <strong>mesmas unidades dos dados</strong>. <span class="xtag">complemento</span></p>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.3.2</span>Usar σ para encontrar valores invulgares</h2>
+    <p>O desvio padrão é normalmente usado para <strong>identificar outliers</strong>: pontos a <strong>mais de um desvio padrão</strong> da média podem considerar-se invulgares. A distância de um ponto à média pode exprimir-se em "quantos sigmas" está afastado.</p>
+    <p>Para <code>(1, 4, 5, 4, 8)</code>: μ ± σ = 4.4 ± 2.24 = [2.16, 6.64]. Os valores <strong>1</strong> e <strong>8</strong> ficam fora: são os invulgares. O 8 está a (8 − 4.4) / 2.24 ≈ <strong>1.6 sigmas</strong> da média.</p>
+    <div class="formula"><div class="cap">"Quantos sigmas" — conhecido como z-score <span class="xtag">complemento</span></div>\[z_i=\frac{x_i-\mu}{\sigma}\]</div>
+    <div class="widget" data-widget="stats" data-values="1, 4, 5, 4, 8" data-title="Média, σ e valores invulgares"></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.3.3</span>População vs. amostra <span class="xtag">complemento</span></h2>
+    <p>A fórmula acima divide por N: é a variância da <strong>população</strong>. Quando os dados são uma <strong>amostra</strong> e queremos estimar a variância da população, divide-se por n − 1 (a mesma ideia aparece nos slides para a covariância, em 1.6).</p>
+    <div class="formula">\[s^2=\frac{1}{n-1}\sum_{i=1}^{n}(x_i-\bar{x})^2\qquad\text{ex.: } (1,4,5,4,8)\Rightarrow s^2=25.2/4=6.3,\ s\approx 2.51\]</div>
+    <div class="note warn"><span class="lbl">Armadilha em Python</span>
+      <p>O NumPy e o pandas não usam o mesmo divisor por omissão: <code>np.var(x)</code> divide por n (<code>ddof=0</code>), mas <code>pd.Series(x).var()</code> divide por n − 1 (<code>ddof=1</code>).</p>
+    </div>
+    <pre><code class="language-python">x = np.array([1, 4, 5, 4, 8])
+np.var(x), np.std(x)          # (5.04, 2.245)  população
+np.var(x, ddof=1)             # 6.3            amostra
+pd.Series(x).std()            # 2.51           pandas: ddof=1 por omissão</code></pre>
+  </section>
+</article>
+
+<!-- ============================ 1.4 DISTRIBUIÇÕES ============================ -->
+<article class="page" data-page="distribuicoes" data-num="1.4" data-title="Funções de probabilidade" data-desc="Densidade (contínuos), massa de probabilidade (discretos) e a distribuição normal.">
+  <header class="ph">
+    <h1>Funções de densidade e de massa de probabilidade<span class="en">Probability Density Functions</span></h1>
+    <p class="lede">Um histograma mostra quantos valores caem em cada intervalo. Uma função de probabilidade é a versão "idealizada": diz quão provável é um valor cair numa certa zona.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.4.1</span>Densidade de probabilidade (PDF) e a distribuição normal</h2>
+    <p>A <strong>função densidade de probabilidade</strong> dá a probabilidade de um valor cair <strong>dentro de um intervalo</strong> à volta de um valor específico. A mais conhecida é a <strong>distribuição normal</strong> (curva em sino). Uma PDF normal pode ser calculada a partir dos valores de um histograma (estimando a média e o desvio padrão).</p>
+    <div class="two">
+      <div class="card">
+        <h3>A regra da figura dos slides</h3>
+        <div class="tw"><table class="mini">
+          <thead><tr><th>Intervalo</th><th class="num">% dos dados</th></tr></thead>
+          <tbody>
+            <tr><td>μ ± 1σ</td><td class="num">34.1 + 34.1 ≈ 68%</td></tr>
+            <tr><td>μ ± 2σ</td><td class="num">+ 13.6 + 13.6 ≈ 95%</td></tr>
+            <tr><td>μ ± 3σ</td><td class="num">+ 2.1 + 2.1 ≈ 99.7%</td></tr>
+            <tr><td>fora de μ ± 3σ</td><td class="num">≈ 0.1% de cada lado</td></tr>
+          </tbody></table></div>
+      </div>
+      <div class="note"><span class="lbl">Intuição</span>
+        <p>Numa variável contínua, a probabilidade é a <strong>área sob a curva</strong> num intervalo, e a área total é 1. Por isso a pergunta certa é "qual a probabilidade de ficar entre a e b?", não "qual a probabilidade de ser exatamente a?" (essa é 0). <span class="xtag">complemento</span></p>
+        <p>É também por isto que o critério "a mais de 1σ" de 1.3 marca como invulgares cerca de 32% dos valores numa normal; com 2σ seriam só ~5%.</p>
+      </div>
+    </div>
+    <div class="widget" data-widget="normal"></div>
+    <details class="ans"><summary>Fórmula da densidade normal (para referência) <span class="xtag">complemento</span></summary>
+      <div><div class="formula">\[f(x)=\frac{1}{\sigma\sqrt{2\pi}}\,e^{-\frac{1}{2}\left(\frac{x-\mu}{\sigma}\right)^2}\]</div>
+      <p>Só dois parâmetros: μ define o centro e σ a largura do sino.</p></div>
+    </details>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.4.2</span>Massa de probabilidade (PMF) — para dados discretos</h2>
+    <p>Para dados <strong>discretos</strong> usa-se a <strong>função massa de probabilidade</strong>: atribui uma probabilidade P[X = k] a cada valor possível. A figura dos slides compara uma PMF binomial (barras) com uma PDF normal (curva).</p>
+    <div class="widget" data-widget="pmf" data-n="6" data-p="0.5"></div>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>PDF (densidade)</th><th>PMF (massa)</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Tipo de dados</strong></td><td>Contínuos</td><td>Discretos</td></tr>
+        <tr><td><strong>O que dá</strong></td><td>Probabilidade de cair num intervalo (área)</td><td>Probabilidade de cada valor, P[X = k]</td></tr>
+        <tr><td><strong>Soma total</strong> <span class="xtag">complemento</span></td><td>Área total = 1</td><td>Σ P[X = k] = 1</td></tr>
+        <tr><td><strong>Exemplo</strong></td><td>Distribuição normal</td><td>Distribuição binomial</td></tr>
+      </tbody></table></div>
+  </section>
+</article>
+
+<!-- ============================ 1.5 PERCENTIS ============================ -->
+<article class="page" data-page="percentis" data-num="1.5" data-title="Percentis e quartis" data-desc="Percentis, quartis, IQR e a caixa de bigodes.">
+  <header class="ph">
+    <h1>Percentis e quartis<span class="en">Percentiles</span></h1>
+    <p class="lede">O percentil responde a: <strong>em que ponto é que X% dos valores ficam abaixo?</strong> É uma forma de descrever posição e dispersão que não se deixa enganar por extremos.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.5.1</span>Percentis</h2>
+    <p>Exemplo dos slides: ordenar os rendimentos de todos os habitantes de um país. O <strong>percentil 99</strong> é o rendimento abaixo do qual ganha 99% da população (no exemplo, $506,553).</p>
+    <div class="tw"><table>
+      <thead><tr><th>Nome</th><th>Percentil</th><th>Significado</th></tr></thead>
+      <tbody>
+        <tr><td class="big">Q1 (1.º quartil)</td><td class="num">P25</td><td>25% dos valores abaixo</td></tr>
+        <tr><td class="big">Mediana (Q2)</td><td class="num">P50</td><td>metade abaixo, metade acima</td></tr>
+        <tr><td class="big">Q3 (3.º quartil)</td><td class="num">P75</td><td>75% dos valores abaixo</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.5.2</span>IQR e a caixa de bigodes</h2>
+    <p>A área entre Q1 e Q3 contém <strong>50% dos dados</strong>. O <strong>IQR (Inter-Quartile Range)</strong> representa essa zona central, onde os dados estão mais concentrados.</p>
+    <div class="fgrid">
+      <div class="formula"><div class="cap">Amplitude interquartil</div>\[\text{IQR}=Q_3-Q_1\]</div>
+      <div class="formula"><div class="cap">Limites dos bigodes (figura dos slides)</div>\[[\,Q_1-1.5\cdot\text{IQR},\ \ Q_3+1.5\cdot\text{IQR}\,]\]</div>
+    </div>
+    <p>Na figura dos slides, para uma distribuição normal: Q1 e Q3 ficam a <strong>±0.6745σ</strong> da média (cada lado da mediana leva 25%), e os limites de 1.5·IQR ficam a <strong>±2.698σ</strong>. Compara com a regra μ ± 1σ, que abrange 68.27%.</p>
+    <div class="widget" data-widget="boxplot"></div>
+    <div class="note extra"><span class="lbl">Complemento</span>
+      <p>Os pontos fora dos limites de 1.5·IQR são habitualmente tratados como <strong>outliers</strong> (critério de Tukey). Ao contrário do critério com σ, este não é afetado pelos próprios outliers, porque Q1 e Q3 são robustos.</p>
+      <p>Há vários métodos para calcular percentis em amostras pequenas (com ou sem interpolação); podem dar valores ligeiramente diferentes. Este exemplo usa interpolação linear, o mesmo que <code>np.percentile</code> por omissão.</p>
+    </div>
+    <pre><code class="language-python">x = np.array([820, 850, 870, 900, 910, 930, 950, 980, 1000, 1050, 1100, 1200, 1750])
+q1, q2, q3 = np.percentile(x, [25, 50, 75])   # 900, 950, 1050
+iqr = q3 - q1                                  # 150
+outliers = x[(x &lt; q1 - 1.5*iqr) | (x &gt; q3 + 1.5*iqr)]   # [1750]</code></pre>
+  </section>
+</article>
+
+<!-- ============================ 1.6 COVARIÂNCIA E CORRELAÇÃO ============================ -->
+<article class="page" data-page="correlacao" data-num="1.6" data-title="Covariância e correlação" data-desc="Como duas variáveis variam em conjunto. Correlação não é causalidade.">
+  <header class="ph">
+    <h1>Covariância e correlação<span class="en">Covariance &amp; Correlation</span></h1>
+    <p class="lede">Até aqui olhámos para uma variável de cada vez. A covariância e a correlação medem como <strong>duas variáveis variam em conjunto</strong> em relação às suas médias — ou seja, quão dependentes são uma da outra.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.6.1</span>Covariância</h2>
+    <p>Como se calcula, segundo os slides:</p>
+    <ol class="steps-list">
+      <li><div>Imaginar os dados de cada variável como <strong>vetores</strong> de alta dimensão (um elemento por observação).</div></li>
+      <li><div>Converter cada um num vetor de <strong>desvios à média</strong>: \(x_i-\bar{x}\) e \(y_i-\bar{y}\).</div></li>
+      <li><div>Fazer o <strong>produto escalar</strong> dos dois vetores.</div></li>
+      <li><div>Dividir pelo tamanho da população (N) — ou por N − 1 numa amostra.</div></li>
+    </ol>
+    <div class="fgrid">
+      <div class="formula"><div class="cap">Covariância populacional</div>\[\operatorname{Cov}(x,y)=\frac{\sum_i (x_i-\bar{x})(y_i-\bar{y})}{N}\]</div>
+      <div class="formula"><div class="cap">Covariância amostral</div>\[\operatorname{Cov}(x,y)=\frac{\sum_i (x_i-\bar{x})(y_i-\bar{y})}{N-1}\]</div>
+    </div>
+    <div class="note"><span class="lbl">Intuição</span>
+      <p>Cada termo \((x_i-\bar{x})(y_i-\bar{y})\) é <strong>positivo</strong> quando x e y estão do mesmo lado das suas médias (ambos acima ou ambos abaixo) e <strong>negativo</strong> quando estão em lados opostos. A covariância é o saldo: se dominam os positivos, as variáveis sobem juntas.</p>
+    </div>
+    <p><strong>Interpretar a covariância é difícil</strong>: perto de 0 indica pouca relação; longe de 0 (negativa para relações inversas) indica relação. Mas "longe" depende das unidades — o valor muda se mudarmos a escala dos dados.</p>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.6.2</span>Correlação: a covariância normalizada</h2>
+    <p>A correlação é <strong>mais fácil de interpretar</strong>: divide a covariância pelos desvios padrão das duas variáveis, o que a deixa sempre entre −1 e 1.</p>
+    <div class="formula">\[\rho_{x,y}=\frac{\operatorname{Cov}(x,y)}{\sigma_x\,\sigma_y}\in[-1,\,1]\]</div>
+    <div class="three">
+      <div class="card"><span class="pill p-bad">ρ = −1</span><p>Correlação inversa perfeita: quando uma sobe, a outra desce, sempre em linha reta.</p></div>
+      <div class="card"><span class="pill p-mid">ρ = 0</span><p>Sem correlação (linear).</p></div>
+      <div class="card"><span class="pill p-good">ρ = 1</span><p>Correlação positiva perfeita.</p></div>
+    </div>
+    <div class="widget" data-widget="correlation"></div>
+    <div class="note extra"><span class="lbl">Complemento · precisão sobre o "cosseno"</span>
+      <p>Os slides dizem que o produto escalar é "o cosseno do ângulo" entre os vetores. Rigorosamente, o produto escalar é \(\lVert a\rVert\lVert b\rVert\cos\theta\); é a <strong>correlação</strong> que é exatamente o cosseno do ângulo entre os vetores de desvios:</p>
+      <div class="formula">\[\rho=\frac{a\cdot b}{\lVert a\rVert\,\lVert b\rVert}=\cos\theta,\qquad a_i=x_i-\bar{x},\ \ b_i=y_i-\bar{y}\]</div>
+      <p>Daí a intuição: vetores alinhados → ρ ≈ 1; perpendiculares → ρ ≈ 0; opostos → ρ ≈ −1. Os limiares "forte/moderada/fraca" do exemplo são indicativos, não vêm dos slides.</p>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.6.3</span>Correlação não implica causalidade!</h2>
+    <p>Só uma <strong>experiência controlada e aleatorizada</strong> permite tirar conclusões sobre causalidade. A correlação serve para decidir <strong>que experiências fazer</strong>.</p>
+    <div class="note warn"><span class="lbl">Exemplo clássico <span class="xtag">complemento</span></span>
+      <p>As vendas de gelados e os afogamentos estão correlacionados. Os gelados não causam afogamentos: ambos aumentam com uma terceira variável, o calor do verão.</p>
+    </div>
+    <div class="note extra"><span class="lbl">Complemento</span>
+      <p>A correlação de Pearson só capta relações <strong>lineares</strong>: duas variáveis podem ter uma relação forte em forma de U e correlação ≈ 0. Vale sempre a pena olhar para o gráfico de dispersão.</p>
+    </div>
+    <pre><code class="language-python">x = np.array([1, 2, 3, 4, 5]); y = np.array([2, 4, 5, 4, 5])
+np.cov(x, y)          # matriz 2x2; fora da diagonal está Cov(x, y)  (divide por N-1)
+np.corrcoef(x, y)     # matriz 2x2; fora da diagonal está r ≈ 0.775
+df.corr()             # pandas: matriz de correlações entre todas as colunas numéricas</code></pre>
+  </section>
+</article>
+
+<!-- ============================ 1.7 AMBIENTE PYTHON ============================ -->
+<article class="page" data-page="ambiente" data-num="1.7" data-title="Ambientes virtuais e setup" data-desc="Conda/Miniconda, venv, WSL, Jupyter e o Hands On da aula.">
+  <header class="ph">
+    <h1>Ambientes virtuais e setup<span class="en">Virtual Environments · Environment Setup · Hands On</span></h1>
+    <p class="lede">Um ambiente virtual é uma instalação isolada de Python e das suas bibliotecas. Permite ter várias versões lado a lado e ativar ou desativar cada uma conforme o projeto.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.7.1</span>Porquê usar ambientes virtuais</h2>
+    <div class="two">
+      <div class="card"><h3>Versões diferentes de uma biblioteca</h3><p>Desenvolveste um programa com scikit-learn 0.17. Sai a 0.18 e queres explorá-la, mas sem partir o código antigo → um ambiente para cada versão.</p></div>
+      <div class="card"><h3>Instalações no sítio certo</h3><p>Tens várias versões de Python no computador (ex.: 2.7 e 3.6) → um ambiente para cada uma, com as bibliotecas instaladas na versão certa.</p></div>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.7.2</span>Conda e Miniconda</h2>
+    <p>O <strong>Conda</strong> tem um gestor de ambientes virtuais incorporado. Como não precisamos de tudo o que o Conda/Anaconda traz, sugere-se o <strong>Miniconda</strong>: um instalador mínimo e gratuito, com apenas o Conda, o Python, as suas dependências e alguns pacotes úteis (como pip e zlib). Pacotes adicionais instalam-se com <code>conda install</code>, a partir do repositório público da Anaconda.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Objetivo</th><th>Comando</th></tr></thead>
+      <tbody>
+        <tr><td>Listar pacotes e versões instalados</td><td><code>conda list</code></td></tr>
+        <tr><td>Listar ambientes</td><td><code>conda info --envs</code></td></tr>
+        <tr><td>Criar o ambiente <em>myenv</em></td><td><code>conda create --name myenv python=3.14 numpy</code></td></tr>
+        <tr><td>Ativar o ambiente</td><td><code>conda activate myenv</code></td></tr>
+        <tr><td>Instalar uma biblioteca (ex.: pandas)</td><td><code>conda install pandas</code></td></tr>
+        <tr><td>Desativar o ambiente</td><td><code>conda deactivate</code></td></tr>
+        <tr><td>Apagar o ambiente</td><td><code>conda env remove --name myenv</code></td></tr>
+      </tbody></table></div>
+    <details class="ans"><summary>A sessão de exemplo dos slides, passo a passo</summary>
+      <div>
+        <p>O ambiente é criado só com numpy; importar pandas falha até o instalarmos <em>dentro</em> do ambiente.</p>
+        <pre><code class="language-bash">conda create --name myenv python=3.14 numpy
+conda activate myenv
+python
+&gt;&gt;&gt; import numpy as np      # ok: numpy foi instalado na criação
+&gt;&gt;&gt; import pandas as pd     # Error: pandas não está neste ambiente
+&gt;&gt;&gt; quit()
+conda install pandas        # agora sim
+conda deactivate
+conda env remove --name myenv</code></pre>
+      </div>
+    </details>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.7.3</span>venv (incorporado no Python)</h2>
+    <p>O Python também tem um gestor de ambientes incorporado (<code>venv</code>). A vantagem é simplificar a gestão de bibliotecas entre vários projetos; a desvantagem é que só inclui os pacotes base do Python — <strong>todas as instalações ficam a cargo do utilizador</strong> (com <code>pip</code>).</p>
+    <div class="tw"><table>
+      <thead><tr><th>Objetivo</th><th>Comando</th></tr></thead>
+      <tbody>
+        <tr><td>Criar</td><td><code>python -m venv &lt;venv_name&gt;</code></td></tr>
+        <tr><td>Ativar · macOS/Linux</td><td><code>. ./&lt;venv_name&gt;/bin/activate</code></td></tr>
+        <tr><td>Ativar · Windows (PowerShell)</td><td><code>.\&lt;venv_name&gt;\Scripts\Activate.ps1</code></td></tr>
+        <tr><td>Ativar · Windows (cmd)</td><td><code>.\&lt;venv_name&gt;\Scripts\activate.bat</code></td></tr>
+        <tr><td>Instalar pacote</td><td><code>pip install &lt;package_name&gt;</code></td></tr>
+        <tr><td>Desativar</td><td><code>deactivate</code></td></tr>
+        <tr><td>Exportar a lista de pacotes</td><td><code>pip freeze &gt; requirements.txt</code></td></tr>
+      </tbody></table></div>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Conda / Miniconda</th><th>venv</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Vem com</strong></td><td>Instalação própria (Miniconda)</td><td>Já incluído no Python</td></tr>
+        <tr><td><strong>Instala pacotes com</strong></td><td><code>conda install</code> (repositório Anaconda)</td><td><code>pip install</code></td></tr>
+        <tr><td><strong>Versão do Python</strong></td><td>Escolhida na criação (<code>python=3.14</code>)</td><td>A do Python que criou o ambiente <span class="xtag">complemento</span></td></tr>
+        <tr><td><strong>Pacotes iniciais</strong></td><td>Conda, Python e alguns úteis</td><td>Só os pacotes base</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.7.4</span>WSL e ferramentas de trabalho</h2>
+    <p>O <strong>Windows Subsystem for Linux (WSL)</strong> corre um ambiente Linux dentro do Windows (ferramentas de linha de comando, utilitários e aplicações) sem máquina virtual nem dual-boot. Instalação: abrir o PowerShell como administrador, correr <code>wsl --install</code> e reiniciar.</p>
+    <ul>
+      <li>Nas aulas usam-se <strong>Jupyter Notebooks / Spyder</strong>, mas podes usar o IDE que preferires (Spyder, PyCharm, VS Code…).</li>
+      <li>A UC usa <strong>Python 3.14 através do Miniconda</strong>.</li>
+      <li>Utilizadores experientes que já têm Python podem instalar o Jupyter com <code>pip install jupyter</code>; a quem está a começar recomenda-se Miniconda ou Anaconda.</li>
+    </ul>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.7.5</span>Hands On (T1–T4)</h2>
+    <ol class="steps-list">
+      <li><div><strong>T1</strong> — Instalar o Miniconda (Python 3.14) para o teu sistema operativo. As bibliotecas de Deep Learning (Theano, TensorFlow, Keras) não são necessárias.</div></li>
+      <li><div><strong>T2</strong> — Criar um ambiente Python 3.14 e instalar: <code>numpy</code>, <code>pandas</code>, <code>matplotlib</code>, <code>seaborn</code>, <code>scikit-learn</code>, <code>jupyterlab</code>.</div></li>
+      <li><div><strong>T3</strong> — Ativar o ambiente e confirmar que as bibliotecas ficaram instaladas.</div></li>
+      <li><div><strong>T4</strong> — Ver a documentação de cada biblioteca e identificar a sua relevância para Machine Learning.</div></li>
+    </ol>
+    <pre data-title="T2 · Terminal"><code class="language-bash">conda create --name daa python=3.14
+conda activate daa
+conda install numpy pandas matplotlib seaborn scikit-learn jupyterlab
+jupyter lab                 # abre o JupyterLab no browser</code></pre>
+    <pre data-title="T3 · Python"><code class="language-python">import numpy, pandas, matplotlib, seaborn, sklearn   # scikit-learn importa-se como sklearn
+for lib in (numpy, pandas, matplotlib, seaborn, sklearn):
+    print(lib.__name__, lib.__version__)</code></pre>
+    <details class="ans"><summary>T4 · Para que serve cada biblioteca em ML <span class="xtag">complemento</span></summary>
+      <div><div class="tw"><table>
+        <thead><tr><th>Biblioteca</th><th>Papel em Machine Learning</th></tr></thead>
+        <tbody>
+          <tr><td class="big">numpy</td><td>Arrays e cálculo numérico vetorizado; base de quase todas as outras.</td></tr>
+          <tr><td class="big">pandas</td><td>Dados tabulares (DataFrame): carregar, limpar, transformar e explorar datasets.</td></tr>
+          <tr><td class="big">matplotlib</td><td>Gráficos de base (histogramas, dispersão, linhas).</td></tr>
+          <tr><td class="big">seaborn</td><td>Gráficos estatísticos sobre o matplotlib (distribuições, correlações, boxplots).</td></tr>
+          <tr><td class="big">scikit-learn</td><td>Modelos de ML, pré-processamento, validação e métricas.</td></tr>
+          <tr><td class="big">jupyterlab</td><td>Ambiente de notebooks para experimentar código e ver resultados passo a passo.</td></tr>
+        </tbody></table></div></div>
+    </details>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo de fórmulas, armadilhas e perguntas para testar.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Conceito</th><th>Fórmula / regra</th><th>Ideia-chave</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Média</strong></td><td>\(\bar{x}=\frac{1}{n}\sum x_i\)</td><td>Sensível a outliers.</td></tr>
+        <tr><td><strong>Mediana</strong></td><td>Valor central dos dados ordenados</td><td>Robusta a outliers.</td></tr>
+        <tr><td><strong>Moda</strong></td><td>Valor mais frequente</td><td>Não relevante para contínuos.</td></tr>
+        <tr><td><strong>Variância</strong></td><td>\(\sigma^2=\frac{1}{N}\sum (x_i-\mu)^2\)</td><td>Média dos quadrados dos desvios.</td></tr>
+        <tr><td><strong>Desvio padrão</strong></td><td>\(\sigma=\sqrt{\sigma^2}\)</td><td>Mesmas unidades dos dados; &gt; 1σ da média = invulgar.</td></tr>
+        <tr><td><strong>Normal</strong></td><td>68% / 95% / 99.7% em ±1σ / ±2σ / ±3σ</td><td>PDF: probabilidade = área.</td></tr>
+        <tr><td><strong>PMF</strong></td><td>P[X = k]</td><td>Para dados discretos.</td></tr>
+        <tr><td><strong>Percentil p</strong></td><td>p% dos valores abaixo</td><td>Q1 = P25, mediana = P50, Q3 = P75.</td></tr>
+        <tr><td><strong>IQR</strong></td><td>\(Q_3-Q_1\); bigodes a \(1.5\cdot\text{IQR}\)</td><td>50% centrais dos dados.</td></tr>
+        <tr><td><strong>Covariância</strong></td><td>\(\frac{1}{N}\sum (x_i-\bar{x})(y_i-\bar{y})\) (ou N − 1)</td><td>Depende das unidades: difícil de interpretar.</td></tr>
+        <tr><td><strong>Correlação</strong></td><td>\(\rho=\frac{\operatorname{Cov}(x,y)}{\sigma_x\sigma_y}\)</td><td>Entre −1 e 1. Não implica causalidade.</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">Σ.2</span>Armadilhas frequentes</h2>
+    <ul>
+      <li>Números a representar categorias não fazem do dado um dado numérico.</li>
+      <li>Com outliers ou assimetria, a média engana: compara-a com a mediana.</li>
+      <li>Somar os desvios à média dá sempre 0 — por isso a variância usa quadrados.</li>
+      <li>N vs. N − 1: população vs. amostra (e <code>np.var</code> ≠ <code>pd.Series.var</code> por omissão).</li>
+      <li>Uma covariância "grande" pode ser só efeito das unidades; compara correlações, não covariâncias.</li>
+      <li>Correlação ≈ 0 não quer dizer "sem relação" — só "sem relação linear".</li>
+    </ul>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.3</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">O número de vezes que um cliente visitou o site num mês é um dado…</p>
+        <div class="opts"><button>Numérico contínuo</button><button data-ok>Numérico discreto</button><button>Ordinal</button><button>Categórico</button></div>
+        <p class="why">É uma contagem de ocorrências de um evento: número inteiro → numérico discreto.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Para os valores 2, 3, 3, 4, 100, qual é a afirmação correta?</p>
+        <div class="opts"><button>Média = mediana = 3</button><button>A mediana (3) é mais afetada pelo 100 do que a média</button><button data-ok>A média (22.4) é puxada pelo 100; a mediana (3) não</button><button>A moda é 100</button></div>
+        <p class="why">Média = 112/5 = 22.4. Ordenando, o valor do meio é 3. A moda também é 3. A mediana é a medida robusta a outliers.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual é a variância (população) de 2, 4, 4, 4, 5, 5, 7, 9?</p>
+        <div class="opts"><button>2</button><button data-ok>4</button><button>5</button><button>32</button></div>
+        <p class="why">μ = 40/8 = 5. Quadrados dos desvios: 9, 1, 1, 1, 0, 0, 4, 16 → soma 32. σ² = 32/8 = 4 (e σ = 2). 32 é a soma, faltava dividir por N.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Numa distribuição normal, que percentagem aproximada dos valores fica a menos de 2σ da média?</p>
+        <div class="opts"><button>50%</button><button>68%</button><button data-ok>95%</button><button>99.7%</button></div>
+        <p class="why">34.1 + 34.1 + 13.6 + 13.6 ≈ 95.4%. 68% é para ±1σ e 99.7% para ±3σ.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">O IQR é…</p>
+        <div class="opts"><button>A diferença entre o máximo e o mínimo</button><button data-ok>Q3 − Q1, a zona que contém os 50% centrais dos dados</button><button>O desvio padrão dividido pela média</button><button>O percentil 50</button></div>
+        <p class="why">Inter-Quartile Range = Q3 − Q1. O percentil 50 é a mediana; máximo − mínimo é a amplitude total.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Mudamos a altura de metros para centímetros. O que acontece à covariância e à correlação entre altura e peso?</p>
+        <div class="opts"><button>Ambas ficam 100× maiores</button><button data-ok>A covariância fica 100× maior; a correlação não muda</button><button>A covariância não muda; a correlação fica 100× maior</button><button>Nenhuma muda</button></div>
+        <p class="why">A covariância depende das unidades. A correlação divide por σ<sub>x</sub>σ<sub>y</sub>, que também cresce 100×, e o fator cancela.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Uma correlação de −0.95 entre duas variáveis significa que…</p>
+        <div class="opts"><button>Não há relação entre elas</button><button>Uma causa a diminuição da outra</button><button data-ok>Há uma relação inversa forte: quando uma sobe, a outra tende a descer</button><button>Os dados estão errados, a correlação não pode ser negativa</button></div>
+        <p class="why">Perto de −1 = relação inversa forte. Mas correlação não implica causalidade: só uma experiência controlada e aleatorizada o pode mostrar.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Criaste um ambiente Conda só com numpy e <code>import pandas</code> dá erro. O que fazes?</p>
+        <div class="opts"><button>Reinstalar o Python</button><button data-ok>Com o ambiente ativo, <code>conda install pandas</code></button><button><code>conda deactivate</code> e importar de novo</button><button><code>conda env remove --name myenv</code></button></div>
+        <p class="why">Cada ambiente tem as suas próprias bibliotecas: é preciso instalar pandas dentro do ambiente ativo.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.4</span>Exercícios de cálculo</h2>
+    <details class="ans"><summary>1. Para 3, 7, 7, 2, 9, 1 calcula média, mediana e moda.</summary>
+      <div><p>Soma = 29, n = 6 → <strong>média ≈ 4.83</strong>. Ordenado: 1, 2, 3, 7, 7, 9 → n par, média dos dois centrais (3 + 7)/2 = <strong>mediana 5</strong>. <strong>Moda = 7</strong> (aparece 2 vezes).</p></div>
+    </details>
+    <details class="ans"><summary>2. Para 10, 12, 14, calcula σ² (população), σ e s² (amostra).</summary>
+      <div><p>μ = 12. Desvios: −2, 0, 2 → quadrados 4, 0, 4 → soma 8. <strong>σ² = 8/3 ≈ 2.67</strong>, <strong>σ ≈ 1.63</strong>. <strong>s² = 8/2 = 4</strong>.</p></div>
+    </details>
+    <details class="ans"><summary>3. Uma variável tem μ = 50 e σ = 5. O valor 63 é invulgar? A quantos sigmas está?</summary>
+      <div><p>(63 − 50)/5 = <strong>2.6σ</strong> acima da média. Está fora de μ ± 1σ = [45, 55], logo é invulgar segundo o critério dos slides. Numa normal, menos de 1% dos valores ficam tão acima da média.</p></div>
+    </details>
+    <details class="ans"><summary>4. Q1 = 20 e Q3 = 30. Quais são os limites dos bigodes? O valor 48 é outlier?</summary>
+      <div><p>IQR = 10. Limites: 20 − 15 = <strong>5</strong> e 30 + 15 = <strong>45</strong>. 48 &gt; 45 → <strong>sim</strong>, fica fora do bigode superior.</p></div>
+    </details>
+    <details class="ans"><summary>5. Cov(x, y) = 6, σx = 2, σy = 4. Qual a correlação? Como a interpretas?</summary>
+      <div><p>ρ = 6 / (2 · 4) = <strong>0.75</strong>: correlação positiva relativamente forte — mas não prova que x cause y.</p></div>
+    </details>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

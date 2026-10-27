@@ -1,0 +1,89 @@
+<!doctype html>
+<!--
+  MODELO DE TEMA — copiar para <uc>/<NN>-<slug>.html e:
+    1. mudar data-uc / data-topic no <body> (têm de coincidir com assets/js/catalog.js)
+    2. pôr o tema com status: 'ready' no catalog.js
+    3. cada <article class="page"> é uma sub-página (data-page = id no URL, data-num, data-title, data-desc)
+  Os componentes disponíveis estão todos exemplificados abaixo; apagar o que não for preciso.
+-->
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Título do tema · UC · meiUM</title>
+<meta name="description" content="Resumo curto do tema.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var t=JSON.parse(localStorage.getItem('meium:theme'));if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="daa" data-topic="02" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<article class="page" data-page="inicio" data-num="2.0" data-title="Visão geral" data-desc="O que este tema cobre.">
+  <header class="ph">
+    <h1>Título em português<span class="en">Título em inglês (como nos slides)</span></h1>
+    <p class="lede">Uma ou duas frases sobre a ideia central do tema.</p>
+  </header>
+  <section class="blk">
+    <h2><span class="sn">2.0</span>Mapa do tema</h2>
+    <div data-map></div><!-- cartões gerados automaticamente a partir das sub-páginas -->
+  </section>
+</article>
+
+<article class="page" data-page="exemplo" data-num="2.1" data-title="Sub-página de exemplo" data-desc="Todos os componentes.">
+  <header class="ph">
+    <h1>Sub-página<span class="en">Slide title</span></h1>
+    <p class="lede">Introdução.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">2.1.1</span>Texto, fórmulas e notas</h2>
+    <p>Fórmula inline \(\bar{x}\) e em bloco:</p>
+    <div class="formula"><div class="cap">Legenda opcional</div>\[\sigma^2=\frac{1}{N}\sum (x_i-\mu)^2\]</div>
+    <div class="note"><span class="lbl">Intuição</span><p>…</p></div>
+    <div class="note warn"><span class="lbl">Armadilha</span><p>…</p></div>
+    <div class="note extra"><span class="lbl">Complemento</span><p>Informação que NÃO vem dos slides.</p></div>
+    <p>Etiqueta inline para complementos: <span class="xtag">complemento</span></p>
+  </section>
+
+  <section class="blk">
+    <div class="three">
+      <div class="card c1"><span class="tag">Cartão</span><p>…</p></div>
+      <div class="card c2"><span class="tag">Cartão</span><p>…</p></div>
+      <div class="card c3"><span class="tag">Cartão</span><p>…</p></div>
+    </div>
+    <div class="tw"><table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>…</td><td>…</td></tr></tbody></table></div>
+    <pre><code class="language-python">import numpy as np  # bloco de código com botão "Copiar"</code></pre>
+    <details class="ans"><summary>Secção expansível</summary><div><p>…</p></div></details>
+    <!-- widgets disponíveis: stats, normal, pmf, boxplot, correlation (ver assets/js/widgets.js) -->
+    <div class="widget" data-widget="stats" data-values="1, 4, 5, 4, 8"></div>
+  </section>
+
+  <section class="blk">
+    <div class="classify" data-options="Opção A,Opção B">
+      <div class="ci" data-answer="Opção A" data-why="Explicação.">Item a classificar</div>
+    </div>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">Pergunta?</p>
+        <div class="opts"><button>Errada</button><button data-ok>Certa</button></div>
+        <p class="why">Explicação mostrada depois de responder.</p>
+      </div>
+    </div>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>
