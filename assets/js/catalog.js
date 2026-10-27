@@ -7,7 +7,11 @@
  *                             2. acrescentar a UC abaixo, com um "hue" (0–360) para a cor de destaque
  */
 window.CATALOG = {
-  site: { name: 'meiUM', tagline: 'Apontamentos do Mestrado em Engenharia Informática · Universidade do Minho' },
+  site: {
+    name: 'meiUM', year: '2026/2027',
+    tagline: 'Apontamentos do Mestrado em Engenharia Informática · Universidade do Minho',
+    tagline_en: 'Notes from the MSc in Informatics Engineering · University of Minho'
+  },
   ucs: [
     {
       id: 'daa',
@@ -17,6 +21,7 @@ window.CATALOG = {
       year: '2026/2027',
       hue: 172,
       desc: 'Fundamentos de ciência de dados e Machine Learning: estatística descritiva, validação de modelos, preparação de dados, regressão, feature engineering, árvores de decisão e ensembles.',
+      desc_en: 'Foundations of data science and Machine Learning: descriptive statistics, model validation, data preparation, regression, feature engineering, decision trees and ensembles.',
       staff: 'Filipa Ferraz, Victor Alves, Dalila Durães, Francisco Marcondes, Guilherme Barbosa',
       topics: [
         { id: '01', file: '01-data-science-concepts.html', title: 'Conceitos de Ciência de Dados', en: 'Introduction to Data Science Concepts', status: 'ready', source: 'DAA_PL_1' },

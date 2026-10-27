@@ -5,6 +5,7 @@
    - <body data-view="topic" data-uc data-topic>  → tema com sub-páginas (<article class="page">)
    data-root aponta para a raiz do site (".", ".." ...), para os links funcionarem
    tanto em file:// como no Vercel.
+   Os textos da interface vêm de i18n.js (PT/EN); o conteúdo está nas páginas.
    ===================================================================== */
 (() => {
   'use strict';
@@ -14,103 +15,169 @@
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   const body = document.body;
+  const html = document.documentElement;
   const ROOT = (body.dataset.root || '.').replace(/\/$/, '');
   const url = p => `${ROOT}/${p}`;
   const CAT = window.CATALOG;
   const uc = CAT.ucs.find(u => u.id === body.dataset.uc);
   const topic = uc && uc.topics.find(t => t.id === body.dataset.topic);
-  if (uc) document.documentElement.style.setProperty('--hue', uc.hue);
+  if (uc) html.style.setProperty('--hue', uc.hue);
 
-  /* ---------- preferência de tema guardada no browser ---------- */
+  /* ---------- preferências guardadas no browser ---------- */
   const store = {
     get(k, d) { try { const v = localStorage.getItem('meium:' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v) { try { localStorage.setItem('meium:' + k, JSON.stringify(v)); } catch { /* sem armazenamento */ } }
   };
 
-  /* ---------- tema claro/escuro ---------- */
+  /* ---------- idioma da interface ---------- */
+  const LANG = store.get('lang', 'pt') === 'en' ? 'en' : 'pt';
+  const D = window.I18N || { pt: {} };
+  const t = (k, ...a) => { const s = (D[LANG] || {})[k] ?? (D.pt || {})[k] ?? k; return typeof s === 'function' ? s(...a) : s; };
+  /* nomes do catálogo: em inglês usa os campos *_en / en quando existem */
+  const tName = x => (LANG === 'en' && x.en) || x.title || x.name;
+  const tDesc = x => (LANG === 'en' && x.desc_en) || x.desc;
+  const tTag = () => (LANG === 'en' && CAT.site.tagline_en) || CAT.site.tagline;
+  const uiLang = el => { if (LANG === 'en') el.lang = 'en'; return el; };
+
+  /* ---------- tema, tamanho do texto e complementos ---------- */
   const THEMES = ['auto', 'light', 'dark'];
-  const THEME_LBL = { auto: '◐ Automático', light: '☀ Claro', dark: '☾ Escuro' };
-  function applyTheme(t) {
-    if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
-    else delete document.documentElement.dataset.theme;
+  const THEME_ICON = { auto: '◐', light: '☀', dark: '☾' };
+  const THEME_LBL = { auto: 'themeAuto', light: 'themeLight', dark: 'themeDark' };
+  const FS = [0.9, 1, 1.1, 1.2, 1.3];
+  function applyTheme(v) {
+    if (v === 'light' || v === 'dark') html.dataset.theme = v;
+    else delete html.dataset.theme;
   }
-  function themeButton() {
-    const b = document.createElement('button');
-    b.className = 'btn sm theme-btn';
-    const paint = () => { b.textContent = THEME_LBL[store.get('theme', 'auto')]; };
-    b.addEventListener('click', () => {
-      const t = THEMES[(THEMES.indexOf(store.get('theme', 'auto')) + 1) % THEMES.length];
-      store.set('theme', t); applyTheme(t); paint();
-      document.dispatchEvent(new CustomEvent('meium:theme'));
-    });
-    paint();
-    return b;
-  }
+  const applyFont = f => html.style.setProperty('--fs', f);
+  const applyExtra = on => html.classList.toggle('hide-extra', !on);
   applyTheme(store.get('theme', 'auto'));
+  applyFont(store.get('fontScale', 1));
+  applyExtra(store.get('showExtra', true));
+
+  /* ferramentas da barra: idioma, tema e ⚙ (tamanho do texto, complementos).
+     "up" abre o painel para cima, "left" alinha-o à esquerda. */
+  function tools(opts = {}) {
+    const w = uiLang(document.createElement('div'));
+    w.className = 'tools' + (opts.up ? ' up' : '') + (opts.left ? ' left' : '');
+    w.innerHTML = `
+      <span class="lang-seg" role="group" aria-label="${t('language')}">
+        <button type="button" data-lang="pt" lang="pt" title="Português">PT</button><button type="button" data-lang="en" lang="en" title="English">EN</button>
+      </span>
+      <button type="button" class="icon-btn" data-a="theme"></button>
+      <span class="more">
+        <button type="button" class="icon-btn" data-a="more" aria-haspopup="dialog" aria-expanded="false" title="${t('moreSettings')}" aria-label="${t('moreSettings')}">
+          <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1L15 3.5h-4l-.4 2.5a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4L6.6 11a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1c.5.4 1.1.7 1.7 1l.4 2.5h4l.4-2.5c.6-.3 1.2-.6 1.7-1l2.4 1 2-3.4-2.2-1.6ZM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z" transform="translate(-1 0)"/></svg>
+        </button>
+        <div class="set-panel" role="dialog" aria-label="${t('moreSettings')}" hidden>
+          <div class="set-row"><span class="set-lbl">${t('textSize')}</span>
+            <span class="seg"><button type="button" class="btn sm" data-fs="-1" aria-label="${t('smaller')}">A−</button><span class="set-val" data-fsv></span><button type="button" class="btn sm" data-fs="1" aria-label="${t('larger')}">A+</button></span></div>
+          <div class="set-row"><label class="set-check"><input type="checkbox" data-extra> ${t('showExtra')}</label>
+            <p class="set-hint">${t('showExtraHint')}</p></div>
+        </div>
+      </span>`;
+    const theme = $('[data-a="theme"]', w), more = $('[data-a="more"]', w), panel = $('.set-panel', w);
+    const paint = () => {
+      $$('[data-lang]', w).forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === LANG));
+      const th = store.get('theme', 'auto');
+      theme.textContent = THEME_ICON[th]; theme.title = t(THEME_LBL[th]); theme.setAttribute('aria-label', t(THEME_LBL[th]));
+      $('[data-fsv]', w).textContent = Math.round(store.get('fontScale', 1) * 100) + '%';
+      $('[data-extra]', w).checked = store.get('showExtra', true);
+    };
+    const open = o => { panel.hidden = !o; more.setAttribute('aria-expanded', o); };
+    more.addEventListener('click', e => { e.stopPropagation(); open(panel.hidden); });
+    document.addEventListener('click', e => { if (!$('.more', w).contains(e.target)) open(false); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') open(false); });
+    theme.addEventListener('click', () => {
+      const v = THEMES[(THEMES.indexOf(store.get('theme', 'auto')) + 1) % THEMES.length];
+      store.set('theme', v); applyTheme(v); document.dispatchEvent(new CustomEvent('meium:prefs'));
+    });
+    w.addEventListener('click', e => {
+      const l = e.target.closest('[data-lang]'), f = e.target.closest('[data-fs]');
+      if (l && l.dataset.lang !== LANG) { store.set('lang', l.dataset.lang); location.reload(); }
+      if (f) {
+        const i = Math.max(0, Math.min(FS.length - 1, FS.indexOf(store.get('fontScale', 1)) + +f.dataset.fs));
+        store.set('fontScale', FS[i]); applyFont(FS[i]); document.dispatchEvent(new CustomEvent('meium:prefs'));
+      }
+    });
+    $('[data-extra]', w).addEventListener('change', e => { store.set('showExtra', e.target.checked); applyExtra(e.target.checked); document.dispatchEvent(new CustomEvent('meium:prefs')); });
+    /* várias barras na mesma página (lateral + topo mobile) ficam sincronizadas */
+    document.addEventListener('meium:prefs', paint);
+    paint();
+    return w;
+  }
+
+  /* a etiqueta "complemento" das páginas acompanha o idioma da interface */
+  function localizeTags() { if (LANG === 'en') $$('.xtag').forEach(x => { x.textContent = t('extraTag'); }); }
 
   /* =====================================================================
      Vistas de índice
      ===================================================================== */
   function siteBar(crumbs) {
-    const bar = document.createElement('header');
+    const bar = uiLang(document.createElement('header'));
     bar.className = 'sitebar';
     bar.innerHTML = `<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
         <a class="logo" href="${url('index.html')}">mei<span>UM</span></a>
-        ${crumbs ? `<nav class="crumbs" aria-label="Localização">${crumbs}</nav>` : ''}</div>`;
-    bar.appendChild(themeButton());
+        ${crumbs ? `<nav class="crumbs" aria-label="Breadcrumb">${crumbs}</nav>` : ''}</div>`;
+    bar.appendChild(tools());
     return bar;
   }
   function siteFoot() {
-    const f = document.createElement('footer');
+    const f = uiLang(document.createElement('footer'));
     f.className = 'sitefoot';
-    f.innerHTML = `<span>${esc(CAT.site.tagline)}</span><span>Apontamentos pessoais baseados nos materiais das UCs.</span>`;
+    f.innerHTML = `<span>${esc(tTag())}</span><span>${t('footNote')}</span>`;
     return f;
   }
 
   function renderHome(root) {
+    uiLang(root);
+    const nTopics = CAT.ucs.reduce((s, u) => s + u.topics.filter(x => x.status === 'ready').length, 0);
     const cards = CAT.ucs.map(u => {
-      const ready = u.topics.filter(t => t.status === 'ready').length;
+      const ready = u.topics.filter(x => x.status === 'ready').length;
       return `<a class="uc-card" style="--h:${u.hue}" href="${url(u.id + '/index.html')}">
         <span class="code-l">${esc(u.code)} · ${esc(u.year)}</span>
-        <b>${esc(u.name)}</b>
-        <p>${esc(u.desc)}</p>
-        <span class="pill p-acc">${ready} de ${u.topics.length} temas disponíveis</span></a>`;
+        <b>${esc(tName(u))}</b>
+        <p>${esc(tDesc(u))}</p>
+        <span class="uc-foot"><span class="pill p-acc">${t('topicsReady', ready, u.topics.length)}</span><span class="uc-go">${t('open')} <span aria-hidden="true">→</span></span></span></a>`;
     }).join('');
     root.innerHTML = `
-      <section class="hero">
-        <p class="eyebrow">Mestrado em Engenharia Informática · UMinho</p>
-        <h1>Apontamentos para estudar, não só para ler.</h1>
-        <p class="lede">Resumos organizados por unidade curricular e por tema, com fórmulas, intuição, exemplos interativos e perguntas de revisão.</p>
+      <section class="hero home-hero">
+        <p class="eyebrow">${t('heroEyebrow')}</p>
+        <h1>${t('heroTitle')}</h1>
+        <p class="lede">${t('heroLede')}</p>
+        <div class="meta"><span class="pill p-acc">${t('schoolYear', esc(CAT.site.year))}</span><span class="pill p-mid">${t('ucCount', CAT.ucs.length, nTopics)}</span></div>
+        <a class="btn scroll-cue" href="#ucs">${t('seeUCs')} <span class="arr" aria-hidden="true">↓</span></a>
       </section>
-      <h2 style="margin-bottom:14px">Unidades curriculares</h2>
+      <h2 id="ucs" style="margin-bottom:14px;scroll-margin-top:16px">${t('ucs')} <span class="muted small" style="font-family:var(--f-mono);font-weight:500">${esc(CAT.site.year)}</span></h2>
       <div class="uc-grid">${cards}
-        <div class="uc-card placeholder"><span class="code-l">Em breve</span><p>Novas UCs serão acrescentadas ao longo do mestrado.</p></div>
+        <div class="uc-card placeholder"><span class="code-l">${t('soon')}</span><p>${t('moreUCsSoon')}</p></div>
       </div>`;
     root.before(siteBar(''));
     root.after(siteFoot());
   }
 
   function renderUC(root) {
-    const rows = uc.topics.map(t => {
-      if (t.status !== 'ready') {
-        return `<div class="topic soon"><span class="tn">${t.id}</span>
-          <div><b>${esc(t.title)}</b><span class="te">${esc(t.en)}</span></div>
-          <div class="tr"><span class="pill p-mid">em preparação</span></div></div>`;
+    uiLang(root);
+    const sub = x => LANG === 'en' ? x.title : x.en;      /* a outra língua, por baixo */
+    const rows = uc.topics.map(x => {
+      if (x.status !== 'ready') {
+        return `<div class="topic soon"><span class="tn">${x.id}</span>
+          <div><b>${esc(tName(x))}</b><span class="te">${esc(sub(x))}</span></div>
+          <div class="tr"><span class="pill p-mid">${t('inPrep')}</span></div></div>`;
       }
-      return `<a class="topic" href="${url(`${uc.id}/${t.file}`)}"><span class="tn">${t.id}</span>
-        <div><b>${esc(t.title)}</b><span class="te">${esc(t.en)}</span></div>
-        <div class="tr"><span class="pill p-acc">abrir →</span></div></a>`;
+      return `<a class="topic" href="${url(`${uc.id}/${x.file}`)}"><span class="tn">${x.id}</span>
+        <div><b>${esc(tName(x))}</b><span class="te">${esc(sub(x))}</span></div>
+        <div class="tr"><span class="pill p-acc">${t('openTopic')}</span></div></a>`;
     }).join('');
     root.innerHTML = `
       <section class="hero">
         <p class="eyebrow">${esc(uc.code)} · ${esc(uc.year)}</p>
-        <h1>${esc(uc.name)}<span class="en">${esc(uc.en)}</span></h1>
-        <p class="lede">${esc(uc.desc)}</p>
-        <div class="meta"><span class="pill p-acc">${uc.topics.length} temas</span>${uc.staff ? `<span class="small muted">Docentes: ${esc(uc.staff)}</span>` : ''}</div>
+        <h1>${esc(tName(uc))}<span class="en">${esc(LANG === 'en' ? uc.name : uc.en)}</span></h1>
+        <p class="lede">${esc(tDesc(uc))}</p>
+        <div class="meta"><span class="pill p-acc">${t('nTopics', uc.topics.length)}</span>${uc.staff ? `<span class="small muted">${t('staff')}: ${esc(uc.staff)}</span>` : ''}</div>
       </section>
-      <h2 style="margin-bottom:14px">Temas</h2>
+      <h2 style="margin-bottom:14px">${t('topics')}</h2>
       <div class="topics">${rows}</div>`;
-    root.before(siteBar(`<a href="${url('index.html')}">Início</a><span>/</span><span>${esc(uc.code)}</span>`));
+    root.before(siteBar(`<a href="${url('index.html')}">${t('home')}</a><span>/</span><span>${esc(uc.code)}</span>`));
     root.after(siteFoot());
   }
 
@@ -122,29 +189,30 @@
     const tIdx = uc.topics.indexOf(topic);
 
     /* --- barra lateral --- */
-    const nav = $('#nav');
-    const subLinks = pages.map(a => `<a class="sublink" href="#${a.dataset.page}" data-p="${a.dataset.page}">
+    const nav = uiLang($('#nav'));
+    const subLinks = pages.map(a => `<a class="sublink" href="#${a.dataset.page}" data-p="${a.dataset.page}" lang="pt">
         <span class="num">${esc(a.dataset.num || '')}</span><span>${esc(a.dataset.title)}</span></a>`).join('');
-    const topicLinks = uc.topics.map(t => {
-      if (t === topic) {
-        return `<span class="tlink cur"><span class="num">${t.id}</span><span>${esc(t.title)}</span></span>
+    const topicLinks = uc.topics.map(x => {
+      if (x === topic) {
+        return `<span class="tlink cur"><span class="num">${x.id}</span><span>${esc(tName(x))}</span></span>
           <div class="subs">${subLinks}</div>`;
       }
-      if (t.status !== 'ready') return `<span class="tlink soon" title="Em preparação"><span class="num">${t.id}</span><span>${esc(t.title)}</span><span class="bo">breve</span></span>`;
-      return `<a class="tlink" href="${url(uc.id + '/' + t.file)}"><span class="num">${t.id}</span><span>${esc(t.title)}</span></a>`;
+      if (x.status !== 'ready') return `<span class="tlink soon" title="${t('inPrep')}"><span class="num">${x.id}</span><span>${esc(tName(x))}</span><span class="bo">${t('soonShort')}</span></span>`;
+      return `<a class="tlink" href="${url(uc.id + '/' + x.file)}"><span class="num">${x.id}</span><span>${esc(tName(x))}</span></a>`;
     }).join('');
     nav.innerHTML = `
-      <a class="home-link" href="${url('index.html')}">← meiUM · todas as UCs</a>
-      <a class="brand" href="${url(uc.id + '/index.html')}"><span class="k">${esc(uc.code)} · ${esc(uc.year)}</span><b>${esc(uc.name)}</b></a>
-      <div class="navgroup"><h6>Temas</h6>${topicLinks}</div>
-      <div class="navfoot"><span>Navegar entre sub-páginas: <kbd>←</kbd> <kbd>→</kbd></span></div>`;
-    $('.navfoot', nav).appendChild(themeButton());
+      <div class="nav-top"><a class="home-link" href="${url('index.html')}">${t('allUCs')}</a></div>
+      <a class="brand" href="${url(uc.id + '/index.html')}"><span class="k">${esc(uc.code)} · ${esc(uc.year)}</span><b>${esc(tName(uc))}</b></a>
+      <div class="navgroup"><h6>${t('topics')}</h6>${topicLinks}</div>
+      <div class="navfoot"><span>${t('keysHint')} <kbd>←</kbd> <kbd>→</kbd></span></div>`;
+    $('.nav-top', nav).appendChild(tools({ left: true }));
 
     /* --- barra superior (mobile) + gaveta --- */
-    const top = document.createElement('div');
+    const top = uiLang(document.createElement('div'));
     top.className = 'topbar';
-    top.innerHTML = `<button class="btn sm" id="menuBtn" aria-label="Abrir índice" aria-expanded="false">☰</button>
-      <div class="tt"><small>${esc(uc.code)} · Tema ${topic.id}</small><b id="topTitle"></b></div>`;
+    top.innerHTML = `<button class="btn sm" id="menuBtn" aria-label="${t('openIndex')}" aria-expanded="false">☰</button>
+      <div class="tt"><small>${esc(uc.code)} · ${t('topicN', topic.id)}</small><b id="topTitle" lang="pt"></b></div>`;
+    top.appendChild(tools());
     $('.app').before(top);
     const scrim = document.createElement('div');
     scrim.className = 'scrim';
@@ -155,23 +223,28 @@
     document.addEventListener('keydown', e => { if (e.key === 'Escape') setDrawer(false); });
 
     /* --- cabeçalho automático e paginação em cada sub-página --- */
-    const prevTopic = uc.topics.slice(0, tIdx).reverse().find(t => t.status === 'ready');
-    const nextTopic = uc.topics.slice(tIdx + 1).find(t => t.status === 'ready');
+    const prevTopic = uc.topics.slice(0, tIdx).reverse().find(x => x.status === 'ready');
+    const nextTopic = uc.topics.slice(tIdx + 1).find(x => x.status === 'ready');
     pages.forEach((a, i) => {
       const ph = $('.ph', a);
       if (ph && !$('.eyebrow', ph)) {
-        ph.insertAdjacentHTML('afterbegin', `<p class="eyebrow">Tema ${topic.id} · ${esc(topic.en)}${a.dataset.num ? ' · ' + esc(a.dataset.num) : ''}</p>`);
+        ph.insertAdjacentHTML('afterbegin', `<p class="eyebrow">${t('topicN', topic.id)} · ${esc(topic.en)}${a.dataset.num ? ' · ' + esc(a.dataset.num) : ''}</p>`);
       }
       const pv = pages[i - 1], nx = pages[i + 1];
-      const L = (href, small, title, cls) => `<a class="${cls}" href="${href}"><small>${small}</small><span>${esc(title)}</span></a>`;
-      let html = '';
-      if (pv) html += L('#' + pv.dataset.page, '← Anterior', pv.dataset.title, 'pv');
-      else if (prevTopic) html += L(url(uc.id + '/' + prevTopic.file), '← Tema anterior', prevTopic.title, 'pv');
-      if (nx) html += L('#' + nx.dataset.page, 'Seguinte →', nx.dataset.title, 'nx');
-      else if (nextTopic) html += L(url(uc.id + '/' + nextTopic.file), 'Próximo tema →', nextTopic.title, 'nx');
-      else html += L(url(uc.id + '/index.html'), 'Fim do tema →', 'Voltar aos temas de ' + uc.code, 'nx');
-      a.insertAdjacentHTML('beforeend', `<nav class="pager" aria-label="Paginação">${html}</nav>`);
+      const L = (href, small, title, cls, tl) => `<a class="${cls}" href="${href}"><small>${small}</small><span${tl ? ` lang="${tl}"` : ''}>${esc(title)}</span></a>`;
+      let h = '';
+      if (pv) h += L('#' + pv.dataset.page, t('prev'), pv.dataset.title, 'pv', 'pt');
+      else if (prevTopic) h += L(url(uc.id + '/' + prevTopic.file), t('prevTopic'), tName(prevTopic), 'pv');
+      if (nx) h += L('#' + nx.dataset.page, t('next'), nx.dataset.title, 'nx', 'pt');
+      else if (nextTopic) h += L(url(uc.id + '/' + nextTopic.file), t('nextTopic'), tName(nextTopic), 'nx');
+      else h += L(url(uc.id + '/index.html'), t('endTopic'), t('backTo', uc.code), 'nx');
+      a.insertAdjacentHTML('beforeend', `<nav class="pager"${LANG === 'en' ? ' lang="en"' : ''} aria-label="${t('pagination')}">${h}</nav>`);
     });
+
+    /* --- conteúdo ainda só em português --- */
+    if (LANG === 'en' && t('onlyPT')) {
+      $('#main').insertAdjacentHTML('afterbegin', `<p class="lang-note" lang="en" role="note">${t('onlyPT')}</p>`);
+    }
 
     /* --- mapa do tema: cartões gerados a partir das sub-páginas --- */
     $$('[data-map]').forEach(m => {
@@ -189,7 +262,7 @@
       pages.forEach(a => { a.hidden = a !== el; });
       $$('.sublink').forEach(l => l.setAttribute('aria-current', l.dataset.p === el.dataset.page ? 'page' : 'false'));
       $('#topTitle').textContent = el.dataset.title;
-      document.title = `${el.dataset.title} · ${topic.title} · ${uc.code}`;
+      document.title = `${el.dataset.title} · ${tName(topic)} · ${uc.code}`;
       if (scroll) window.scrollTo({ top: 0, behavior: 'instant' });
       setDrawer(false);
       document.dispatchEvent(new CustomEvent('meium:page', { detail: el }));
@@ -239,13 +312,13 @@
       const wrap = document.createElement('div');
       wrap.className = 'code';
       const label = pre.dataset.title || { python: 'Python', bash: 'Terminal' }[lang] || lang;
-      wrap.innerHTML = `<div class="cap"><span>${esc(label)}</span><button class="cp" type="button">Copiar</button></div>`;
+      wrap.innerHTML = `<div class="cap"><span>${esc(label)}</span><button class="cp" type="button">${t('copy')}</button></div>`;
       pre.replaceWith(wrap);
       wrap.appendChild(pre);
       $('.cp', wrap).addEventListener('click', async e => {
-        try { await navigator.clipboard.writeText(raw); e.target.textContent = 'Copiado ✓'; }
-        catch { e.target.textContent = 'Indisponível'; }
-        setTimeout(() => { e.target.textContent = 'Copiar'; }, 1400);
+        try { await navigator.clipboard.writeText(raw); e.target.textContent = t('copied'); }
+        catch { e.target.textContent = t('copyFail'); }
+        setTimeout(() => { e.target.textContent = t('copy'); }, 1400);
       });
     });
   }
@@ -269,7 +342,7 @@
       $$('.quiz .qq', s).forEach((p, i) => p.insertAdjacentHTML('afterbegin', `<span class="qn">Q${i + 1}</span>`));
       const bar = document.createElement('div');
       bar.className = 'row';
-      bar.innerHTML = `<span class="quiz-score"></span><button class="btn sm" type="button">↺ Recomeçar</button>`;
+      bar.innerHTML = `<span class="quiz-score"></span><button class="btn sm" type="button">${t('restart')}</button>`;
       s.appendChild(bar);
       $('button', bar).addEventListener('click', () => {
         $$('.quiz', s).forEach(q => { q.classList.remove('answered'); $$('.opt', q).forEach(o => { o.disabled = false; o.classList.remove('ok', 'no'); }); });
@@ -282,7 +355,7 @@
     if (!s) return;
     const qs = $$('.quiz', s), ans = qs.filter(q => q.classList.contains('answered'));
     const ok = ans.filter(q => !$('.opt.no', q)).length;
-    $('.quiz-score', s).textContent = ans.length ? `${ok} certas em ${ans.length} respondidas (de ${qs.length})` : `${qs.length} perguntas`;
+    $('.quiz-score', s).textContent = ans.length ? t('score', ok, ans.length, qs.length) : t('nQuestions', qs.length);
   }
 
   /* --- classificação: <div class="classify" data-options="A,B,C"><div class="ci" data-answer="A" data-why="…">texto</div>…</div> --- */
@@ -291,13 +364,13 @@
       const opts = c.dataset.options.split(',').map(s => s.trim());
       $$('.ci', c).forEach(item => {
         const text = item.innerHTML;
-        item.innerHTML = `<span class="ct">${text}</span><span class="seg">${opts.map(o => `<button type="button" class="btn">${esc(o)}</button>`).join('')}</span>
+        item.innerHTML = `<span class="ct">${text}</span><span class="seg">${opts.map(o => `<button type="button" class="btn" data-o="${esc(o)}">${esc(o)}</button>`).join('')}</span>
           <span class="cw"></span>`;
         $$('.seg .btn', item).forEach(b => b.addEventListener('click', () => {
           if (item.classList.contains('done')) return;
-          const ok = b.textContent === item.dataset.answer;
+          const ok = b.dataset.o === item.dataset.answer;
           b.classList.add(ok ? 'ok' : 'no');
-          if (!ok) $$('.seg .btn', item).find(x => x.textContent === item.dataset.answer).classList.add('ok');
+          if (!ok) $$('.seg .btn', item).find(x => x.dataset.o === item.dataset.answer).classList.add('ok');
           item.classList.add('done');
           $('.cw', item).innerHTML = (ok ? '✓ ' : '✗ ') + (item.dataset.why || '');
         }));
@@ -319,7 +392,7 @@
     const W = window.MEIUM_WIDGETS || {};
     $$('[data-widget]').forEach(el => {
       const fn = W[el.dataset.widget];
-      if (fn) { try { fn(el); } catch (err) { el.textContent = 'Erro ao carregar o exemplo interativo.'; console.error(err); } }
+      if (fn) { try { fn(el); } catch (err) { el.textContent = t('widgetError'); console.error(err); } }
     });
   }
 
@@ -333,6 +406,7 @@
     enhanceClassify();
     mountWidgets();
     renderTopic();
+    localizeTags();
     if (document.readyState === 'complete') renderMath();
     else window.addEventListener('load', renderMath);
   }

@@ -77,7 +77,6 @@ a.tlink:hover,a.sublink:hover{background:var(--card-2);color:var(--ink)}
 .sublink[aria-current="page"]{background:var(--accent-soft);color:var(--ink);font-weight:700}
 .sublink[aria-current="page"] .num{color:var(--accent)}
 .navfoot{margin-top:auto;display:flex;flex-direction:column;gap:10px;font-size:13px;color:var(--muted);line-height:1.45}
-.theme-btn{align-self:flex-start}
 
 .topbar{display:none}
 .scrim{display:none}
@@ -311,9 +310,53 @@ a.topic:hover{border-color:var(--accent)}
 .topic.soon .tn{color:var(--muted)}
 .sitefoot{margin-top:48px;padding-top:16px;border-top:1px solid var(--rule);font-size:13.5px;color:var(--muted);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 
+/* ---------- ferramentas da barra: idioma, tema, ⚙ ---------- */
+.tools{display:flex;align-items:center;gap:6px;flex:none}
+.lang-seg{display:inline-flex;border:1px solid var(--rule);border-radius:6px;overflow:hidden;background:var(--card)}
+.lang-seg button{font-family:var(--f-mono);font-size:12px;font-weight:600;letter-spacing:.04em;border:0;background:none;color:var(--muted);padding:0 9px;min-height:30px;cursor:pointer}
+.lang-seg button+button{border-left:1px solid var(--rule)}
+.lang-seg button:hover{color:var(--ink)}
+.lang-seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--ink)}
+.icon-btn{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:6px;border:1px solid transparent;background:none;color:var(--ink-2);cursor:pointer;font-size:16px;line-height:1;padding:0}
+.icon-btn:hover,.icon-btn[aria-expanded="true"]{border-color:var(--rule);background:var(--card-2);color:var(--ink)}
+.more{position:relative;display:inline-flex}
+.set-panel{position:absolute;right:0;top:calc(100% + 8px);z-index:40;width:min(300px,calc(100vw - 32px));background:var(--card);border:1px solid var(--rule);border-radius:10px;
+  box-shadow:0 12px 32px rgba(0,0,0,.18);padding:14px;display:flex;flex-direction:column;gap:14px;font-family:var(--f-body);font-size:14.5px;color:var(--ink);line-height:1.45}
+.tools.left .set-panel{right:auto;left:0}
+.tools.up .set-panel{top:auto;bottom:calc(100% + 8px)}
+.nav-top{display:flex;flex-direction:column;gap:10px}
+.lang-note{max-width:980px;margin:0 auto 20px;padding:10px 14px;border:1px dashed var(--rule);border-radius:8px;font-family:var(--f-display);font-size:14px;color:var(--ink-2);background:var(--card)}
+.topbar .tools{margin-left:auto}
+.set-row{display:flex;flex-direction:column;gap:6px}
+.set-lbl{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.set-val{font-family:var(--f-mono);font-size:13px;min-width:48px;text-align:center;align-self:center}
+.set-hint{font-size:13px;color:var(--muted);max-width:none}
+.set-check{display:flex;gap:8px;align-items:center;font-family:var(--f-display);font-weight:600;font-size:14px;cursor:pointer}
+.set-check input{accent-color:var(--accent);width:16px;height:16px}
+
+/* tamanho do texto (definições): escala o conteúdo, não a barra lateral */
+.page,.simple>main{zoom:var(--fs,1)}
+
+/* esconder conteúdo complementar (definições) */
+.hide-extra :is(.note.extra,.note:has(.xtag),section.blk:has(>h2 .xtag),details:has(>summary .xtag),.formula:has(.xtag),p:has(>.xtag),li:has(>.xtag)){display:none!important}
+.hide-extra .xtag{display:none!important}
+
+/* página inicial */
+.home-hero{padding:32px 0 26px;margin-bottom:22px;gap:12px}
+.home-hero h1{font-size:clamp(30px,4.4vw,46px)}
+.home-hero .lede{font-size:18.5px}
+.scroll-cue{align-self:flex-start;margin-top:4px;border-color:var(--accent);color:var(--accent)}
+.scroll-cue .arr{display:inline-block;animation:cue 1.6s ease-in-out 3}
+@keyframes cue{0%,100%{transform:none}50%{transform:translateY(3px)}}
+.uc-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:auto;padding-top:6px}
+.uc-go{font-family:var(--f-display);font-weight:700;font-size:15px;color:oklch(.55 .13 var(--h));display:inline-flex;gap:6px;align-items:center}
+.uc-go span{transition:transform .15s}
+.uc-card:hover .uc-go span{transform:translateX(4px)}
+
 /* ---------- responsivo ---------- */
 @media (max-width:900px){
   .app{grid-template-columns:minmax(0,1fr)}
+  .nav .tools{display:none}
   .topbar{display:flex;position:sticky;top:0;z-index:15;align-items:center;gap:10px;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--rule)}
   .topbar .tt{min-width:0;display:flex;flex-direction:column;line-height:1.2}
   .topbar .tt small{font-family:var(--f-mono);font-size:10.5px;color:var(--accent);letter-spacing:.08em;text-transform:uppercase}

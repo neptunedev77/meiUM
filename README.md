@@ -13,7 +13,8 @@ daa/
 assets/
   css/style.css                estilos (tema claro/escuro, layout, componentes)
   js/catalog.js                ← registo de UCs e temas: a única fonte da navegação
-  js/app.js                    navegação, paginação, quizzes, blocos de código
+  js/app.js                    navegação, paginação, quizzes, blocos de código, definições
+  js/i18n.js                   textos da interface em PT e EN (o conteúdo dos temas não passa por aqui)
   js/widgets.js                exemplos interativos reutilizáveis (gráficos SVG)
   img/favicon.svg
 templates/topic.html           modelo com todos os componentes
