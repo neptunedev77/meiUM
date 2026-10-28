@@ -71,12 +71,14 @@
 
   /* ferramentas da barra: idioma, tema e ⚙ (tamanho do texto, complementos).
      "up" abre o painel para cima, "left" alinha-o à esquerda. */
+  const KEY_K = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? '⌘ K' : 'Ctrl K';
   function tools(opts = {}) {
     const w = uiLang(document.createElement('div'));
     w.className = 'tools' + (opts.up ? ' up' : '') + (opts.left ? ' left' : '');
     w.innerHTML = `
-      <button type="button" class="icon-btn" data-a="search" title="${t('search')} (Ctrl+K)" aria-label="${t('search')}">
-        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <button type="button" class="search-field" data-a="search" title="${t('search')} (${KEY_K})" aria-label="${t('search')}" aria-keyshortcuts="Control+K Meta+K">
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        <span class="sf-ph">${t('search')}…</span><kbd>${KEY_K}</kbd>
       </button>
       <span class="lang-seg" role="group" aria-label="${t('language')}">
         <button type="button" data-lang="pt" lang="pt" title="Português">PT</button><button type="button" data-lang="en" lang="en" title="English">EN</button>

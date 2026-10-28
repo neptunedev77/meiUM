@@ -366,6 +366,22 @@ h2{scroll-margin-top:72px;border-radius:4px}
 .lang-seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--ink)}
 .icon-btn{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:6px;border:1px solid transparent;background:none;color:var(--ink-2);cursor:pointer;font-size:16px;line-height:1;padding:0}
 .icon-btn:hover,.icon-btn[aria-expanded="true"]{border-color:var(--rule);background:var(--card-2);color:var(--ink)}
+/* pesquisa: parece um campo, abre a janela de pesquisa */
+.search-field{display:inline-flex;align-items:center;gap:8px;width:220px;height:32px;padding:0 6px 0 10px;border:1px solid var(--rule);border-radius:6px;
+  background:var(--card);color:var(--muted);font-family:var(--f-display);font-size:13.5px;cursor:pointer;text-align:left}
+.search-field{transition:background-color .15s ease,color .15s ease}
+.search-field:hover{background:var(--card-2);color:var(--ink-2)}
+.search-field:hover kbd{color:var(--ink-2)}
+.search-field svg{flex:none}
+.search-field .sf-ph{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search-field kbd{flex:none;font-family:var(--f-mono);font-size:11px;line-height:1;padding:4px 6px;border:1px solid var(--rule);border-radius:4px;background:var(--card-2);color:var(--muted)}
+.nav-top .tools{flex-wrap:wrap}
+.nav-top .search-field{flex:1 1 100%;width:auto;order:-1}
+@media (max-width:900px){.topbar .search-field{width:188px}}
+@media (max-width:600px){
+  .search-field{width:auto}.search-field kbd{display:none}
+  .topbar .search-field{width:32px;padding:0;justify-content:center;border-color:transparent;background:none}
+  .topbar .search-field .sf-ph{display:none}}
 .more{position:relative;display:inline-flex}
 .set-panel{position:absolute;right:0;top:calc(100% + 8px);z-index:40;width:min(300px,calc(100vw - 32px));background:var(--card);border:1px solid var(--rule);border-radius:10px;
   box-shadow:0 12px 32px rgba(0,0,0,.18);padding:14px;display:flex;flex-direction:column;gap:14px;font-family:var(--f-body);font-size:14.5px;color:var(--ink);line-height:1.45}
