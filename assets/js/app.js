@@ -54,6 +54,21 @@
   applyFont(store.get('fontScale', 1));
   applyExtra(store.get('showExtra', true));
 
+  /* ---------- modo offline: service worker (sw.js, na raiz) ---------- */
+  let OFFLINE = 'no';                    /* no | prep | ready */
+  const offlineChanged = () => document.dispatchEvent(new CustomEvent('meium:prefs'));
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    OFFLINE = navigator.serviceWorker.controller ? 'ready' : 'prep';
+    navigator.serviceWorker.register(url('sw.js')).then(reg => {
+      const watch = w => w && w.addEventListener('statechange', () => { if (w.state === 'activated') { OFFLINE = 'ready'; offlineChanged(); } });
+      if (reg.active && !reg.installing && !reg.waiting) { OFFLINE = 'ready'; offlineChanged(); }
+      watch(reg.installing || reg.waiting);
+      reg.addEventListener('updatefound', () => watch(reg.installing));
+    }).catch(() => { OFFLINE = 'no'; offlineChanged(); });
+    window.addEventListener('online', offlineChanged);
+    window.addEventListener('offline', offlineChanged);
+  }
+
   /* ferramentas da barra: idioma, tema e ⚙ (tamanho do texto, complementos).
      "up" abre o painel para cima, "left" alinha-o à esquerda. */
   function tools(opts = {}) {
@@ -76,6 +91,7 @@
             <span class="seg"><button type="button" class="btn sm" data-fs="-1" aria-label="${t('smaller')}">A−</button><span class="set-val" data-fsv></span><button type="button" class="btn sm" data-fs="1" aria-label="${t('larger')}">A+</button></span></div>
           <div class="set-row"><label class="set-check"><input type="checkbox" data-extra> ${t('showExtra')}</label>
             <p class="set-hint">${t('showExtraHint')}</p></div>
+          <div class="set-row"><span class="set-lbl">${t('offline')}</span><p class="set-hint" data-offline></p></div>
         </div>
       </span>`;
     const theme = $('[data-a="theme"]', w), more = $('[data-a="more"]', w), panel = $('.set-panel', w);
@@ -85,6 +101,9 @@
       theme.textContent = THEME_ICON[th]; theme.title = t(THEME_LBL[th]); theme.setAttribute('aria-label', t(THEME_LBL[th]));
       $('[data-fsv]', w).textContent = Math.round(store.get('fontScale', 1) * 100) + '%';
       $('[data-extra]', w).checked = store.get('showExtra', true);
+      const off = $('[data-offline]', w);
+      off.innerHTML = (navigator.onLine === false ? `<b>${t('offlineNow')}</b> ` : '') + t({ no: 'offlineNo', prep: 'offlinePrep', ready: 'offlineReady' }[OFFLINE]);
+      off.classList.toggle('ok', OFFLINE === 'ready');
     };
     const open = o => { panel.hidden = !o; more.setAttribute('aria-expanded', o); };
     more.addEventListener('click', e => { e.stopPropagation(); open(panel.hidden); });

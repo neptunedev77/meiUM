@@ -27,6 +27,7 @@ More courses are added as the master's progresses.
 ## Features
 
 - **Global search** — <kbd>Ctrl</kbd>+<kbd>K</kbd> or <kbd>/</kbd> searches titles, sections and text across every course (accent-insensitive) and jumps straight to the matching section. The index is built in the browser from the published pages, so it never goes stale and needs no build step.
+- **Works offline** — a service worker stores the whole site on first visit, so every topic, formula and the search keep working without a connection. It can be installed as an app (PWA) on desktop and mobile.
 - **Self-contained notes** — each topic stands on its own, with examples that can be worked through by hand and code that runs on datasets bundled with scikit-learn, so readers do not need the original slides.
 - **Interactive widgets** — more than 20 SVG-based visualisations: confusion matrices, ROC curves, the LASSO path, decision-tree pruning, k-fold cross-validation, bootstrap sampling, distributed architectures with simulated node failures, Ansible idempotency, VM overcommit, and more.
 - **Review built in** — every topic ends with a cheat sheet, common pitfalls, multiple-choice questions with explanations and worked exercises.
@@ -43,8 +44,9 @@ More courses are added as the master's progresses.
 | Pages | Static HTML, one file per topic; each `<article class="page">` is a section routed by URL hash |
 | Styling | A single CSS file with design tokens, light/dark themes and a per-course accent colour |
 | Behaviour | Vanilla JavaScript (no dependencies) |
-| Maths | [KaTeX](https://katex.org/) via CDN |
-| Fonts | Archivo, Source Serif 4 and JetBrains Mono (Google Fonts) |
+| Maths | [KaTeX](https://katex.org/), self-hosted |
+| Fonts | Archivo, Source Serif 4 and JetBrains Mono, self-hosted as WOFF2 (SIL Open Font License) |
+| Offline | Service worker (`sw.js`) and web app manifest; no third-party requests at runtime |
 | Hosting | [Vercel](https://vercel.com/), deployed on every push to `main` |
 
 ## Project structure
@@ -58,12 +60,17 @@ ascn/                      Cloud Computing Applications and Services
 esr/                       Network Services Engineering
 assets/
   css/style.css            Styles, themes and components
+  css/fonts.css            @font-face rules for the self-hosted fonts
+  fonts/                   WOFF2 font files and their licences
+  vendor/katex/            KaTeX (JS, CSS, fonts)
   js/catalog.js            Course and topic registry — the single source of navigation
   js/app.js                Navigation, routing, pagination, quizzes, code blocks, settings
   js/i18n.js               Interface strings in Portuguese and English
   js/widgets.js            Reusable interactive widgets
-  img/favicon.svg
+  img/                     Favicon and app icons
 templates/topic.html       Starter file showing every available component
+sw.js                      Service worker (offline cache)
+manifest.webmanifest       App manifest (installable PWA)
 vercel.json
 ```
 
@@ -84,6 +91,7 @@ Then visit <http://localhost:5173>.
 1. Copy `templates/topic.html` to `<course>/NN-slug.html`.
 2. Set `data-uc` and `data-topic` on the `<body>` element.
 3. Register the topic in `assets/js/catalog.js` with `status: 'ready'` (the `file` field must match the file name).
+4. Bump `VERSION` in `sw.js` so returning visitors download the new topic for offline use.
 
 The sidebar, pagination, topic map and links between topics are generated automatically.
 

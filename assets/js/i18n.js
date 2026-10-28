@@ -60,7 +60,13 @@ window.I18N = {
     searchLoading: 'A preparar o índice de pesquisa…',
     searchEmpty: q => `Sem resultados para "${q}". Experimenta outras palavras ou o termo em inglês.`,
     searchFile: 'A pesquisa precisa que o site seja servido por HTTP (ex.: <code>python -m http.server</code>); não funciona ao abrir os ficheiros diretamente.',
-    searchFail: 'Não foi possível carregar o índice de pesquisa. Verifica a ligação e tenta de novo.'
+    searchFail: 'Não foi possível carregar o índice de pesquisa. Verifica a ligação e tenta de novo.',
+    // offline
+    offline: 'Modo offline',
+    offlineReady: '✓ Disponível offline: o site inteiro está guardado neste dispositivo.',
+    offlinePrep: 'A guardar o site para poder ser usado sem ligação…',
+    offlineNo: 'Indisponível ao abrir os ficheiros diretamente (precisa de HTTP).',
+    offlineNow: 'Sem ligação — estás a ver a versão guardada.'
   },
   en: {
     langName: 'English',
@@ -112,6 +118,11 @@ window.I18N = {
     searchLoading: 'Preparing the search index…',
     searchEmpty: q => `No results for "${q}". Try other words, or the Portuguese term.`,
     searchFile: 'Search needs the site to be served over HTTP (e.g. <code>python -m http.server</code>); it does not work when opening the files directly.',
-    searchFail: 'Could not load the search index. Check your connection and try again.'
+    searchFail: 'Could not load the search index. Check your connection and try again.',
+    offline: 'Offline mode',
+    offlineReady: '✓ Available offline: the whole site is stored on this device.',
+    offlinePrep: 'Saving the site so it can be used without a connection…',
+    offlineNo: 'Unavailable when opening the files directly (needs HTTP).',
+    offlineNow: 'No connection — you are viewing the saved version.'
   }
 };
