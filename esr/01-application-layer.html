@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Camada de Aplicação: Princípios · ESR · meiUM</title>
+<meta name="description" content="ESR · Tema 1: aplicações de rede, princípio extremo-a-extremo, arquiteturas cliente-servidor e P2P, processos e sockets, endereçamento, protocolos de aplicação, requisitos de transporte, TCP, UDP e TLS.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var d=document.documentElement,g=function(k){return JSON.parse(localStorage.getItem('meium:'+k))},t=g('theme'),f=g('fontScale');if(t==='light'||t==='dark')d.dataset.theme=t;if(f)d.style.setProperty('--fs',f);if(g('showExtra')===false)d.classList.add('hide-extra')}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="esr" data-topic="01" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 1.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="1.0" data-title="Visão geral" data-desc="Aplicações de rede e o princípio extremo-a-extremo.">
+  <header class="ph">
+    <h1>Camada de Aplicação: Princípios<span class="en">Application Layer · Principles of network applications</span></h1>
+    <p class="lede">A camada de aplicação é onde vivem os serviços que usamos: Web, email, streaming, jogos, videochamadas. Este tema trata dos conceitos comuns a todas estas aplicações — como se organizam, como os processos comunicam e o que precisam da rede.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.0.1</span>Uma variedade enorme de aplicações</h2>
+    <p>Email, Web, mensagens, acesso remoto, partilha de ficheiros P2P, jogos multijogador, streaming de vídeo, voz sobre IP, videoconferência em tempo real, redes sociais, pesquisa… A Internet suporta todas, com <strong>características e requisitos de qualidade muito diferentes</strong>.</p>
+
+    <h2><span class="sn">1.0.2</span>Criar uma aplicação de rede</h2>
+    <ul>
+      <li>Escrever programas que <strong>correm em sistemas terminais</strong> (diferentes) e comunicam pela rede — ex.: o software do servidor web comunica com o browser.</li>
+      <li><strong>Não é preciso escrever software para os equipamentos do núcleo da rede</strong> (routers, switches): esses não correm aplicações de utilizador.</li>
+      <li>Ter as aplicações nos sistemas terminais permite desenvolvê-las e espalhá-las <strong>depressa</strong>.</li>
+    </ul>
+    <div class="note"><span class="lbl">Princípio extremo-a-extremo (end-to-end)</span>
+      <p>A inteligência das aplicações fica nas <strong>extremidades</strong> da rede (os sistemas terminais); o núcleo limita-se a encaminhar pacotes. É por isso que se pode lançar uma aplicação nova sem pedir autorização a ninguém nem alterar um único router. <span class="xtag">complemento</span></p>
+    </div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <p class="src">Baseado nas aulas de ESR (Application Layer) e no livro de Kurose e Ross, <em>Computer Networking: A Top-Down Approach</em>. Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 1.1 ARQUITETURAS ============================ -->
+<article class="page" data-page="arquiteturas" data-num="1.1" data-title="Cliente-servidor e P2P" data-desc="As duas arquiteturas de aplicações.">
+  <header class="ph">
+    <h1>Arquiteturas de aplicações<span class="en">Client-server · Peer-to-peer</span></h1>
+    <p class="lede">Há duas formas principais de estruturar uma aplicação: <strong>cliente-servidor</strong> e <strong>peer-to-peer</strong> (P2P).</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="two">
+      <div class="card c1"><span class="tag">Cliente-servidor</span>
+        <p><strong>Servidor</strong>:</p>
+        <ul><li>host sempre ligado;</li><li>endereço IP permanente;</li><li>data centers para escalar.</li></ul>
+        <p><strong>Clientes</strong>:</p>
+        <ul><li>comunicam com o servidor;</li><li>podem estar ligados de forma intermitente;</li><li>podem ter IP dinâmico;</li><li><strong>não comunicam diretamente uns com os outros</strong>.</li></ul></div>
+      <div class="card c2"><span class="tag">Peer-to-peer (P2P)</span>
+        <ul>
+          <li><strong>Sem servidor sempre ligado</strong> (no P2P puro).</li>
+          <li>Sistemas terminais arbitrários comunicam diretamente.</li>
+          <li>Os peers pedem serviço a outros peers e, em troca, prestam serviço a outros peers.</li>
+          <li><strong>Autoescalabilidade</strong>: cada peer novo traz nova procura, mas também nova capacidade de serviço.</li>
+          <li>Os peers ligam-se de forma intermitente e mudam de IP → <strong>gestão complexa</strong>.</li>
+        </ul></div>
+    </div>
+    <p>O tema 2 aprofunda o P2P, incluindo uma comparação quantitativa entre as duas arquiteturas.</p>
+  </section>
+</article>
+
+<!-- ============================ 1.2 PROCESSOS E SOCKETS ============================ -->
+<article class="page" data-page="processos" data-num="1.2" data-title="Processos, sockets e portas" data-desc="Quem comunica e como se identifica.">
+  <header class="ph">
+    <h1>Processos, sockets e endereçamento<span class="en">Processes communicating · Sockets · Addressing</span></h1>
+    <p class="lede">Na rede não comunicam computadores: comunicam <strong>processos</strong>.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">1.2.1</span>Processos</h2>
+    <ul>
+      <li><strong>Processo</strong>: um programa a correr num host.</li>
+      <li>No mesmo host, dois processos comunicam por mecanismos de comunicação entre processos (definidos pelo SO).</li>
+      <li>Em hosts diferentes, comunicam <strong>trocando mensagens</strong>.</li>
+      <li><strong>Processo cliente</strong>: o que inicia a comunicação. <strong>Processo servidor</strong>: o que espera ser contactado.</li>
+      <li>Mesmo em P2P há processos clientes e processos servidores — um peer faz os dois papéis.</li>
+    </ul>
+
+    <h2><span class="sn">1.2.2</span>Sockets</h2>
+    <p>O processo envia e recebe mensagens através do seu <strong>socket</strong>, que funciona como uma <strong>porta</strong>: o processo empurra a mensagem porta fora e confia na infraestrutura de transporte do outro lado para a entregar ao socket do processo destino.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Camada</th><th>Controlada por</th></tr></thead>
+      <tbody>
+        <tr><td>Aplicação (processo) — acima do socket</td><td>Quem desenvolve a aplicação</td></tr>
+        <tr><td>Transporte, rede, ligação, física — abaixo do socket</td><td>O sistema operativo</td></tr>
+      </tbody></table></div>
+    <p>Os sockets usam um protocolo de transporte: <strong>TCP</strong> (stream), <strong>UDP</strong> (datagram) ou até sockets <strong>raw</strong>, que dão acesso direto a protocolos de mais baixo nível (como o ICMP).</p>
+
+    <h2><span class="sn">1.2.3</span>Endereçar processos</h2>
+    <p>Para receber mensagens, um processo precisa de um <strong>identificador</strong>. O endereço IP do host (32 bits em IPv4) chega? <strong>Não</strong>: podem correr muitos processos no mesmo host.</p>
+    <div class="formula"><div class="cap">Identificador de um processo</div>\[\text{endereço IP} + \text{número de porta}\]</div>
+    <div class="two">
+      <div class="card"><span class="tag">Portas bem conhecidas</span><ul><li>Servidor HTTP: <strong>80</strong></li><li>Servidor de email (SMTP): <strong>25</strong></li></ul></div>
+      <div class="card"><span class="tag">Exemplo</span><p>Mensagem HTTP para o servidor web de <code>gaia.cs.umass.edu</code>: IP <code>128.119.245.12</code>, porta <code>80</code>.</p></div>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 1.3 PROTOCOLOS ============================ -->
+<article class="page" data-page="protocolos" data-num="1.3" data-title="Protocolos de aplicação" data-desc="O que um protocolo define e temas recorrentes.">
+  <header class="ph">
+    <h1>O que define um protocolo de aplicação<span class="en">App-layer protocol</span></h1>
+    <p class="lede">Para dois processos se entenderem, têm de seguir as mesmas regras.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="tw"><table>
+      <thead><tr><th>Um protocolo define…</th><th>Exemplo</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Tipos de mensagens</strong> trocadas</td><td>pedido, resposta</td></tr>
+        <tr><td><strong>Sintaxe</strong>: que campos e como se delimitam</td><td>cabeçalhos separados por linhas</td></tr>
+        <tr><td><strong>Semântica</strong>: o significado da informação em cada campo</td><td>um código de estado diz se o pedido correu bem</td></tr>
+        <tr><td><strong>Regras</strong>: quando e como os processos enviam e respondem</td><td>o cliente pede, o servidor responde</td></tr>
+      </tbody></table></div>
+    <div class="two">
+      <div class="card c1"><span class="tag">Protocolos abertos</span><p>Definidos em <strong>RFCs</strong>: permitem a interoperabilidade entre implementações diferentes. Ex.: HTTP, SMTP.</p></div>
+      <div class="card c2"><span class="tag">Protocolos proprietários</span><p>Definidos e controlados por uma empresa. Ex.: Skype, Zoom.</p></div>
+    </div>
+
+    <h2><span class="sn">1.3.1</span>Temas que se repetem em todos os protocolos</h2>
+    <ul>
+      <li>Troca típica de <strong>pedido/resposta</strong>: o cliente pede informação ou um serviço; o servidor responde com dados e um código de estado.</li>
+      <li><strong>Formato das mensagens</strong>: cabeçalhos (campos que descrevem os dados) + dados (o payload que se comunica).</li>
+      <li>Mensagens de <strong>controlo vs. dados</strong>: na mesma ligação (<em>in-band</em>) ou numa ligação separada (<em>out-of-band</em>).</li>
+      <li><strong>Centralizado vs. descentralizado</strong>.</li>
+      <li><strong>Sem estado vs. com estado</strong> (stateless vs. stateful).</li>
+      <li>Transferência de mensagens <strong>fiável vs. não fiável</strong>.</li>
+      <li>A <strong>complexidade fica na periferia da rede</strong>.</li>
+    </ul>
+  </section>
+</article>
+
+<!-- ============================ 1.4 TRANSPORTE ============================ -->
+<article class="page" data-page="transporte" data-num="1.4" data-title="Requisitos e serviços de transporte" data-desc="O que cada aplicação precisa; TCP, UDP e TLS.">
+  <header class="ph">
+    <h1>Que serviço de transporte precisa uma aplicação?<span class="en">Transport service requirements</span></h1>
+    <p class="lede">Aplicações diferentes precisam de coisas diferentes da rede. Quatro dimensões resumem essas necessidades.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="two">
+      <div class="card"><span class="tag">Integridade dos dados</span><p>Algumas aplicações (transferência de ficheiros, transações web) exigem transferência <strong>100% fiável</strong>; outras (áudio) toleram alguma perda.</p></div>
+      <div class="card"><span class="tag">Débito (throughput)</span><p>Algumas (multimédia) precisam de um <strong>débito mínimo</strong> para serem eficazes; outras — as <strong>elásticas</strong> — usam o que houver.</p></div>
+      <div class="card"><span class="tag">Temporização</span><p>Algumas (telefonia na Internet, jogos interativos) precisam de <strong>atraso baixo</strong> para serem eficazes.</p></div>
+      <div class="card"><span class="tag">Segurança</span><p>Cifra, integridade dos dados, …</p></div>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>Aplicação</th><th>Perda de dados</th><th>Débito</th><th>Sensível ao tempo</th></tr></thead>
+      <tbody>
+        <tr><td>Transferência de ficheiros</td><td>sem perda</td><td>elástico</td><td>não</td></tr>
+        <tr><td>Email</td><td>sem perda</td><td>elástico</td><td>não</td></tr>
+        <tr><td>Documentos web</td><td>sem perda</td><td>elástico</td><td>não</td></tr>
+        <tr><td>Áudio/vídeo em tempo real</td><td>tolerante</td><td>áudio: kbps–1 Mbps; vídeo: 10 kbps–5 Mbps</td><td>sim, dezenas de ms</td></tr>
+        <tr><td>Áudio/vídeo armazenado (streaming)</td><td>tolerante</td><td>igual ao anterior</td><td>sim, alguns segundos</td></tr>
+        <tr><td>Jogos interativos</td><td>tolerante</td><td>a partir de alguns kbps</td><td>sim, dezenas de ms</td></tr>
+        <tr><td>Mensagens</td><td>sem perda</td><td>elástico</td><td>sim e não</td></tr>
+      </tbody></table></div>
+
+    <h2><span class="sn">1.4.1</span>TCP vs. UDP</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Serviço</th><th>TCP</th><th>UDP</th></tr></thead>
+      <tbody>
+        <tr><td>Transporte fiável entre processos</td><td>✓</td><td>✗</td></tr>
+        <tr><td>Controlo de fluxo (o emissor não afoga o recetor)</td><td>✓</td><td>✗</td></tr>
+        <tr><td>Controlo de congestão (abranda quando a rede está sobrecarregada)</td><td>✓</td><td>✗</td></tr>
+        <tr><td>Orientado à conexão (é preciso estabelecer a ligação)</td><td>✓</td><td>✗</td></tr>
+        <tr><td>Temporização, débito mínimo garantido, segurança</td><td>✗</td><td>✗</td></tr>
+      </tbody></table></div>
+    <details class="ans"><summary>Então porque é que existe o UDP?</summary>
+      <div><p>Precisamente porque não faz nada disto: <strong>sem estabelecimento de ligação</strong> (menos atraso), <strong>sem controlo de congestão</strong> (a aplicação envia ao ritmo que quiser) e cabeçalhos mais pequenos. Para voz, vídeo em tempo real ou jogos, chegar a tempo vale mais do que chegar tudo; e protocolos como o QUIC constroem a sua própria fiabilidade por cima do UDP. <span class="xtag">complemento</span></p></div></details>
+
+    <h2><span class="sn">1.4.2</span>Que aplicação usa que protocolo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Aplicação</th><th>Protocolo de aplicação</th><th>Transporte</th></tr></thead>
+      <tbody>
+        <tr><td>Email</td><td>SMTP (RFC 5321)</td><td>TCP</td></tr>
+        <tr><td>Terminal remoto</td><td>Telnet (RFC 854)</td><td>TCP</td></tr>
+        <tr><td>Web</td><td>HTTP/1.1</td><td>TCP</td></tr>
+        <tr><td>Web</td><td>HTTP/3 (RFC 9114)</td><td>QUIC sobre UDP</td></tr>
+        <tr><td>Transferência de ficheiros</td><td>FTP (RFC 959)</td><td>TCP</td></tr>
+        <tr><td>Streaming multimédia</td><td>HTTP/1.1, DASH</td><td>TCP</td></tr>
+        <tr><td>Telefonia na Internet</td><td>SIP (RFC 3261), RTP (RFC 3550) ou proprietário</td><td>UDP (ou TCP)</td></tr>
+      </tbody></table></div>
+
+    <h2><span class="sn">1.4.3</span>Segurança: TLS</h2>
+    <ul>
+      <li>Sockets TCP e UDP "simples" <strong>não cifram</strong>: uma password enviada para o socket atravessa a Internet em claro.</li>
+      <li>O <strong>TLS</strong> (Transport Layer Security) fornece ligações TCP <strong>cifradas</strong>, <strong>integridade dos dados</strong> e <strong>autenticação dos extremos</strong>.</li>
+      <li>O TLS é implementado na <strong>camada de aplicação</strong>: as aplicações usam bibliotecas TLS, que por sua vez usam TCP. O texto que a aplicação escreve no "socket" TLS atravessa a Internet cifrado.</li>
+    </ul>
+    <p>Classifica, para cada aplicação, o transporte mais adequado:</p>
+    <div class="classify" data-options="TCP,UDP">
+      <div class="ci" data-answer="TCP" data-why="Um ficheiro tem de chegar inteiro e sem erros.">Descarregar um ficheiro.</div>
+      <div class="ci" data-answer="UDP" data-why="Chegar a tempo importa mais do que chegar tudo; retransmitir um pacote antigo não ajuda.">Chamada de voz em tempo real.</div>
+      <div class="ci" data-answer="TCP" data-why="O email não pode perder dados (SMTP usa TCP).">Enviar um email.</div>
+      <div class="ci" data-answer="UDP" data-why="Atualizações de posição frequentes e sensíveis ao atraso; uma perdida é logo substituída pela seguinte.">Posição dos jogadores num jogo multijogador.</div>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo e perguntas para testar.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Conceito</th><th>Ideia-chave</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Princípio extremo-a-extremo</strong></td><td>Aplicações nos sistemas terminais; o núcleo só encaminha.</td></tr>
+        <tr><td><strong>Cliente-servidor</strong></td><td>Servidor sempre ligado, IP fixo; clientes não falam entre si.</td></tr>
+        <tr><td><strong>P2P</strong></td><td>Peers são clientes e servidores; autoescaláveis; gestão complexa.</td></tr>
+        <tr><td><strong>Socket</strong></td><td>A "porta" entre o processo e o transporte.</td></tr>
+        <tr><td><strong>Identificar um processo</strong></td><td>IP + porta (HTTP 80, SMTP 25).</td></tr>
+        <tr><td><strong>Protocolo</strong></td><td>Tipos de mensagens, sintaxe, semântica, regras. Aberto (RFC) ou proprietário.</td></tr>
+        <tr><td><strong>Requisitos</strong></td><td>Integridade, débito, temporização, segurança.</td></tr>
+        <tr><td><strong>TCP / UDP</strong></td><td>Fiável, fluxo, congestão, conexão / nada disso, mas rápido e simples.</td></tr>
+        <tr><td><strong>TLS</strong></td><td>Cifra, integridade e autenticação sobre TCP, na camada de aplicação.</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.2</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">Porque é que o endereço IP não basta para identificar um processo?</p>
+        <div class="opts"><button>Porque o IP muda sempre</button><button data-ok>Porque podem correr muitos processos no mesmo host; é preciso também a porta</button><button>Porque os processos não têm IP</button></div>
+        <p class="why">IP + porta identifica o processo dentro do host.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual destas afirmações sobre cliente-servidor é verdadeira?</p>
+        <div class="opts"><button>Os clientes comunicam diretamente entre si</button><button data-ok>O servidor está sempre ligado e tem um endereço IP permanente</button><button>Cada cliente traz capacidade de serviço nova</button></div>
+        <p class="why">A autoescalabilidade é característica do P2P; em cliente-servidor os clientes só falam com o servidor.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Uma aplicação "elástica" é uma aplicação que…</p>
+        <div class="opts"><button>Tolera perdas</button><button data-ok>Usa o débito que houver disponível, sem exigir um mínimo</button><button>Precisa de atraso baixo</button></div>
+        <p class="why">Ex.: email, transferência de ficheiros, Web.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Que serviço o TCP <strong>não</strong> fornece?</p>
+        <div class="opts"><button>Controlo de congestão</button><button>Transporte fiável</button><button data-ok>Débito mínimo garantido</button></div>
+        <p class="why">Nem TCP nem UDP garantem temporização, débito mínimo ou segurança.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Onde é implementado o TLS?</p>
+        <div class="opts"><button>Nos routers</button><button data-ok>Na camada de aplicação, através de bibliotecas que usam TCP</button><button>Dentro do protocolo IP</button></div>
+        <p class="why">A aplicação usa uma biblioteca TLS, que cifra os dados antes de os passar ao TCP.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Em que protocolo de transporte assenta o HTTP/3?</p>
+        <div class="opts"><button>TCP</button><button data-ok>QUIC, sobre UDP</button><button>SCTP</button></div>
+        <p class="why">As versões anteriores do HTTP usam TCP; o HTTP/3 usa QUIC, que corre sobre UDP.</p>
+      </div>
+    </div>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/i18n.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

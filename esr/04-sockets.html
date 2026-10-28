@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Programação com Sockets · ESR · meiUM</title>
+<meta name="description" content="ESR · Tema 4: sockets UDP e TCP, interação cliente-servidor em cada um, e exemplos completos em Python de clientes e servidores.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var d=document.documentElement,g=function(k){return JSON.parse(localStorage.getItem('meium:'+k))},t=g('theme'),f=g('fontScale');if(t==='light'||t==='dark')d.dataset.theme=t;if(f)d.style.setProperty('--fs',f);if(g('showExtra')===false)d.classList.add('hide-extra')}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="esr" data-topic="04" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 4.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="4.0" data-title="Visão geral" data-desc="O socket e a aplicação de exemplo.">
+  <header class="ph">
+    <h1>Programação com Sockets<span class="en">Socket programming with UDP and TCP</span></h1>
+    <p class="lede">O objetivo: construir aplicações cliente-servidor que comunicam através de <strong>sockets</strong> — a porta entre o processo da aplicação e o protocolo de transporte extremo-a-extremo.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">4.0.1</span>Dois tipos de socket, dois serviços</h2>
+    <div class="two">
+      <div class="card c1"><span class="tag">UDP · SOCK_DGRAM</span><p>Datagramas <strong>não fiáveis</strong>.</p></div>
+      <div class="card c2"><span class="tag">TCP · SOCK_STREAM</span><p>Stream de bytes <strong>fiável e ordenado</strong>.</p></div>
+    </div>
+    <h2><span class="sn">4.0.2</span>A aplicação de exemplo</h2>
+    <ol class="steps-list">
+      <li><div>O cliente lê uma linha de texto do teclado e envia-a ao servidor.</div></li>
+      <li><div>O servidor recebe os dados e converte os caracteres para <strong>maiúsculas</strong>.</div></li>
+      <li><div>O servidor envia os dados modificados ao cliente.</div></li>
+      <li><div>O cliente recebe-os e mostra a linha no ecrã.</div></li>
+    </ol>
+    <p>A mesma aplicação vai ser escrita duas vezes — com UDP e com TCP — para se ver a diferença.</p>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <p class="src">Baseado nas aulas de ESR (Application Layer — socket programming) e no livro de Kurose e Ross. O código está em Python 3. Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 4.1 UDP ============================ -->
+<article class="page" data-page="udp" data-num="4.1" data-title="Sockets UDP" data-desc="Sem ligação: cada datagrama leva o destino.">
+  <header class="ph">
+    <h1>Sockets UDP<span class="en">Socket programming with UDP</span></h1>
+    <p class="lede">Com UDP não há "ligação" entre cliente e servidor.</p>
+  </header>
+
+  <section class="blk prose">
+    <ul>
+      <li><strong>Sem handshake</strong> antes de enviar dados.</li>
+      <li>O emissor junta <strong>explicitamente</strong> o endereço IP e a porta de destino a cada pacote.</li>
+      <li>O recetor extrai do pacote recebido o IP e a porta do emissor (para lhe poder responder).</li>
+      <li>Os dados transmitidos podem <strong>perder-se</strong> ou chegar <strong>fora de ordem</strong>.</li>
+    </ul>
+    <p>Do ponto de vista da aplicação, o UDP fornece transferência não fiável de grupos de bytes ("datagramas") entre cliente e servidor.</p>
+
+    <h2><span class="sn">4.1.1</span>A interação</h2>
+    <div class="two">
+      <div class="card c1"><span class="tag">Servidor</span>
+        <ol><li>Cria o socket e associa-o à porta x (<code>bind</code>).</li><li>Lê um datagrama do socket.</li><li>Escreve a resposta no socket, indicando o endereço e a porta do cliente.</li><li>Volta a 2.</li></ol></div>
+      <div class="card c2"><span class="tag">Cliente</span>
+        <ol><li>Cria o socket.</li><li>Cria um datagrama com o IP do servidor e a porta x e envia-o.</li><li>Lê a resposta do socket.</li><li>Fecha o socket.</li></ol></div>
+    </div>
+
+    <h2><span class="sn">4.1.2</span>O código</h2>
+    <div class="two">
+      <pre data-title="UDPClient.py"><code class="language-python">from socket import *
+
+serverName = 'hostname'
+serverPort = 12000
+clientSocket = socket(AF_INET, SOCK_DGRAM)    # socket UDP
+
+message = input('Input lowercase sentence: ')
+clientSocket.sendto(message.encode(), (serverName, serverPort))
+
+modifiedMessage, serverAddress = clientSocket.recvfrom(2048)
+print(modifiedMessage.decode())
+clientSocket.close()</code></pre>
+      <pre data-title="UDPServer.py"><code class="language-python">from socket import *
+
+serverPort = 12000
+serverSocket = socket(AF_INET, SOCK_DGRAM)
+serverSocket.bind(('', serverPort))            # porta 12000
+print('The server is ready to receive')
+
+while True:
+    message, clientAddress = serverSocket.recvfrom(2048)
+    modifiedMessage = message.decode().upper()
+    serverSocket.sendto(modifiedMessage.encode(), clientAddress)</code></pre>
+    </div>
+    <ul>
+      <li><code>sendto(dados, (host, porta))</code>: cada envio leva o destino.</li>
+      <li><code>recvfrom(2048)</code>: devolve os dados (até 2048 bytes) <strong>e</strong> o endereço de quem os enviou.</li>
+      <li>Um só socket no servidor atende todos os clientes.</li>
+      <li><code>encode()</code>/<code>decode()</code>: os sockets transportam bytes, não texto.</li>
+    </ul>
+  </section>
+</article>
+
+<!-- ============================ 4.2 TCP ============================ -->
+<article class="page" data-page="tcp" data-num="4.2" data-title="Sockets TCP" data-desc="Socket de boas-vindas, accept e um socket por cliente.">
+  <header class="ph">
+    <h1>Sockets TCP<span class="en">Socket programming with TCP</span></h1>
+    <p class="lede">Com TCP, o cliente tem de <strong>contactar</strong> o servidor primeiro e estabelecer uma ligação.</p>
+  </header>
+
+  <section class="blk prose">
+    <ul>
+      <li>O processo servidor já tem de estar a correr e ter criado um socket — a "porta" — que dá as <strong>boas-vindas</strong> aos clientes (<em>welcoming socket</em>).</li>
+      <li>O cliente contacta o servidor criando um socket TCP e indicando o IP e a porta do processo servidor. Ao criar o socket, o TCP do cliente <strong>estabelece a ligação</strong> com o TCP do servidor.</li>
+      <li>Quando é contactado, o servidor TCP <strong>cria um socket novo</strong> para comunicar com aquele cliente em particular. Assim pode falar com vários clientes; as portas de origem distinguem-nos.</li>
+    </ul>
+    <p>Do ponto de vista da aplicação, o TCP fornece uma transferência <strong>fiável e ordenada</strong> de um <strong>stream de bytes</strong> — um "tubo" — entre cliente e servidor.</p>
+
+    <h2><span class="sn">4.2.1</span>A interação</h2>
+    <div class="two">
+      <div class="card c1"><span class="tag">Servidor</span>
+        <ol><li>Cria o socket de boas-vindas na porta x.</li><li>Espera por um pedido de ligação: <code>accept()</code> devolve um socket novo, <code>connectionSocket</code>.</li><li>Lê o pedido do <code>connectionSocket</code>.</li><li>Escreve a resposta no <code>connectionSocket</code>.</li><li>Fecha o <code>connectionSocket</code> (o de boas-vindas continua aberto).</li></ol></div>
+      <div class="card c2"><span class="tag">Cliente</span>
+        <ol><li>Cria o socket e liga-se ao host e à porta x (estabelecimento da ligação TCP).</li><li>Envia o pedido.</li><li>Lê a resposta.</li><li>Fecha o socket.</li></ol></div>
+    </div>
+
+    <h2><span class="sn">4.2.2</span>O código</h2>
+    <div class="two">
+      <pre data-title="TCPClient.py"><code class="language-python">from socket import *
+
+serverName = 'servername'
+serverPort = 12000
+clientSocket = socket(AF_INET, SOCK_STREAM)    # socket TCP
+clientSocket.connect((serverName, serverPort)) # estabelece a ligação
+
+sentence = input('Input lowercase sentence: ')
+clientSocket.send(sentence.encode())           # sem indicar o destino
+
+modifiedSentence = clientSocket.recv(1024)
+print('From Server:', modifiedSentence.decode())
+clientSocket.close()</code></pre>
+      <pre data-title="TCPServer.py"><code class="language-python">from socket import *
+
+serverPort = 12000
+serverSocket = socket(AF_INET, SOCK_STREAM)
+serverSocket.bind(('', serverPort))
+serverSocket.listen(1)                         # socket de boas-vindas
+print('The server is ready to receive')
+
+while True:
+    connectionSocket, addr = serverSocket.accept()   # socket novo por cliente
+    sentence = connectionSocket.recv(1024).decode()
+    capitalizedSentence = sentence.upper()
+    connectionSocket.send(capitalizedSentence.encode())
+    connectionSocket.close()                   # fecha só a ligação a este cliente</code></pre>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 4.3 COMPARAÇÃO ============================ -->
+<article class="page" data-page="comparacao" data-num="4.3" data-title="UDP vs. TCP no código" data-desc="As diferenças lado a lado.">
+  <header class="ph">
+    <h1>UDP vs. TCP no código<span class="en">Comparison</span></h1>
+    <p class="lede">As diferenças entre os dois programas refletem diretamente as diferenças entre os dois serviços.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="tw"><table>
+      <thead><tr><th></th><th>UDP</th><th>TCP</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Tipo de socket</strong></td><td><code>SOCK_DGRAM</code></td><td><code>SOCK_STREAM</code></td></tr>
+        <tr><td><strong>Ligação</strong></td><td>Nenhuma</td><td><code>connect()</code> no cliente; <code>listen()</code> + <code>accept()</code> no servidor</td></tr>
+        <tr><td><strong>Enviar</strong></td><td><code>sendto(dados, endereço)</code> — destino em cada envio</td><td><code>send(dados)</code> — o destino é o da ligação</td></tr>
+        <tr><td><strong>Receber</strong></td><td><code>recvfrom()</code> devolve dados <strong>e</strong> endereço</td><td><code>recv()</code> devolve só os dados</td></tr>
+        <tr><td><strong>Sockets no servidor</strong></td><td>Um só, para todos os clientes</td><td>Um de boas-vindas + um por ligação</td></tr>
+        <tr><td><strong>Garantias</strong></td><td>Podem perder-se ou trocar de ordem</td><td>Fiável e ordenado</td></tr>
+        <tr><td><strong>Unidade</strong></td><td>Datagramas (mensagens com fronteiras)</td><td>Stream de bytes (sem fronteiras)</td></tr>
+      </tbody></table></div>
+    <div class="note warn"><span class="lbl">Armadilha do stream de bytes</span>
+      <p>No TCP não há fronteiras entre mensagens: dois <code>send()</code> seguidos podem chegar num só <code>recv()</code>, e uma mensagem grande pode chegar partida em vários. Em aplicações reais é preciso delimitar as mensagens (ex.: terminá-las com <code>\n</code> ou indicar o tamanho no início). <span class="xtag">complemento</span></p>
+    </div>
+    <div class="note extra"><span class="lbl">Complemento · servir vários clientes ao mesmo tempo</span>
+      <p>O servidor TCP de exemplo atende um cliente de cada vez: enquanto trata de um, os outros esperam no <code>accept()</code>. Na prática usa-se uma thread (ou processo) por ligação, ou I/O assíncrono.</p>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo e perguntas para testar.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Chamada</th><th>Para quê</th></tr></thead>
+      <tbody>
+        <tr><td><code>socket(AF_INET, SOCK_DGRAM / SOCK_STREAM)</code></td><td>Criar um socket UDP / TCP sobre IPv4</td></tr>
+        <tr><td><code>bind(('', porta))</code></td><td>Associar o socket do servidor a uma porta</td></tr>
+        <tr><td><code>listen(n)</code></td><td>(TCP) Pôr o socket de boas-vindas à escuta</td></tr>
+        <tr><td><code>accept()</code></td><td>(TCP) Esperar uma ligação; devolve um socket novo e o endereço do cliente</td></tr>
+        <tr><td><code>connect((host, porta))</code></td><td>(TCP) Estabelecer a ligação ao servidor</td></tr>
+        <tr><td><code>sendto</code> / <code>recvfrom</code></td><td>(UDP) Enviar com destino / receber com origem</td></tr>
+        <tr><td><code>send</code> / <code>recv</code></td><td>(TCP) Enviar / receber pela ligação</td></tr>
+        <tr><td><code>close()</code></td><td>Fechar o socket</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.2</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">Num cliente UDP, porque é que se usa <code>sendto</code> e não <code>send</code>?</p>
+        <div class="opts"><button>Porque é mais rápido</button><button data-ok>Porque não há ligação: cada datagrama tem de levar o endereço de destino</button><button>Porque o UDP não suporta texto</button></div>
+        <p class="why">Sem ligação estabelecida, o socket não sabe para onde enviar.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">O que devolve <code>accept()</code> num servidor TCP?</p>
+        <div class="opts"><button>Os dados enviados pelo cliente</button><button data-ok>Um socket novo dedicado àquele cliente e o seu endereço</button><button>O socket de boas-vindas</button></div>
+        <p class="why">O socket de boas-vindas continua a aceitar ligações; cada cliente tem o seu connectionSocket.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Quantos sockets usa o servidor UDP do exemplo para atender 10 clientes?</p>
+        <div class="opts"><button data-ok>1</button><button>10</button><button>11</button></div>
+        <p class="why">Em UDP um só socket recebe de todos; o recvfrom diz de quem veio cada datagrama.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">E o servidor TCP, para 10 clientes ligados ao mesmo tempo?</p>
+        <div class="opts"><button>1</button><button>10</button><button data-ok>11</button></div>
+        <p class="why">Um socket de boas-vindas + um por ligação.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Que tipo de socket dá acesso direto a protocolos como o ICMP?</p>
+        <div class="opts"><button>Stream</button><button>Datagram</button><button data-ok>Raw</button></div>
+        <p class="why">Os sockets raw dão acesso a camadas mais baixas, sem o serviço de transporte.</p>
+      </div>
+    </div>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/i18n.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

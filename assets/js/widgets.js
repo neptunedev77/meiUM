@@ -982,4 +982,186 @@
     rg.addEventListener('input', draw);
     draw();
   };
+
+  /* =====================================================================
+     p2pdist — tempo mínimo para distribuir um ficheiro: cliente-servidor vs. P2P
+     unidades: F/u = 1 hora; u_s = k·u; d_min ≥ u_s (não limita)
+     ===================================================================== */
+  W.p2pdist = el => {
+    el.innerHTML = head(el, 'Distribuir um ficheiro a N peers', 'Cada peer faz upload a uma taxa u, e enviar o ficheiro uma vez a essa taxa demora 1 hora (F/u = 1 h). O servidor faz upload k vezes mais depressa. A taxa de download dos peers não é o gargalo.') + `
+      <div class="row">
+        <label class="f grow"><span>N (peers) = <b data-nv></b></span><input type="range" min="1" max="40" step="1" value="30" data-i="n"></label>
+        <label class="f grow"><span>upload do servidor u<sub>s</sub> = <b data-kv></b>·u</span><input type="range" min="1" max="20" step="1" value="10" data-i="k"></label>
+      </div>
+      <svg class="w-svg" viewBox="0 0 640 260" role="img" aria-label="Tempo de distribuição em função de N"></svg>
+      <div class="legend"><span><i style="background:var(--s2)"></i>cliente-servidor</span><span><i style="background:var(--accent)"></i>P2P</span></div>
+      <dl class="kpis"></dl><p class="w-out"></p>`;
+    const svg = el.querySelector('svg'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out');
+    const I = k => el.querySelector(`[data-i="${k}"]`);
+    const cs = (n, k) => n / k, p2p = (n, k) => Math.max(1 / k, n / (k + n));
+    function draw() {
+      const n = +I('n').value, k = +I('k').value;
+      el.querySelector('[data-nv]').textContent = n; el.querySelector('[data-kv]').textContent = k;
+      const ymax = Math.max(cs(40, k), 1.2) * 1.05;
+      const X = scale(0, 40, 50, 620), Y = scale(0, ymax, 228, 14), yt = niceTicks(0, ymax, 5);
+      const line = (f, c) => `<path d="M${Array.from({ length: 81 }, (_, i) => { const x = Math.max(0.5, i / 2); return `${X(x).toFixed(1)},${Y(f(x, k)).toFixed(1)}`; }).join(' L')}" style="fill:none;stroke:${c};stroke-width:2.5"/>`;
+      svg.innerHTML = yt.map(v => `<line class="ax" x1="50" x2="620" y1="${Y(v)}" y2="${Y(v)}" style="opacity:.5"/><text x="44" y="${Y(v) + 4}" text-anchor="end">${fmt(v, 1)} h</text>`).join('') +
+        [0, 5, 10, 15, 20, 25, 30, 35, 40].map(v => `<text x="${X(v)}" y="246" text-anchor="middle">${v}</text>`).join('') +
+        `<text x="335" y="259" text-anchor="middle">N</text>` + line(cs, 'var(--s2)') + line(p2p, 'var(--accent)') +
+        `<line x1="${X(n)}" x2="${X(n)}" y1="14" y2="228" style="stroke:var(--ink);stroke-dasharray:3 4;opacity:.6"/>` +
+        `<circle cx="${X(n)}" cy="${Y(cs(n, k))}" r="5" style="fill:var(--s2)"/><circle cx="${X(n)}" cy="${Y(p2p(n, k))}" r="5" style="fill:var(--accent)"/>`;
+      kp.innerHTML = kpi('cliente-servidor', fmt(cs(n, k), 2) + ' h', 1) + kpi('P2P', fmt(p2p(n, k), 2) + ' h', 1) + kpi('ganho', fmt(cs(n, k) / p2p(n, k), 1) + '×');
+      out.innerHTML = `Cliente-servidor: o servidor envia N cópias, N·F/u<sub>s</sub> = ${n}/${k} = <b>${fmt(cs(n, k), 2)} h</b> — cresce linearmente com N. P2P: max{F/u<sub>s</sub>, N·F/(u<sub>s</sub> + N·u)} = <b>${fmt(p2p(n, k), 2)} h</b> — nunca passa de 1 h, porque cada peer novo traz também capacidade de upload.`;
+    }
+    ['n', 'k'].forEach(k => I(k).addEventListener('input', draw));
+    draw();
+  };
+
+  /* =====================================================================
+     dash — streaming com taxa fixa vs. adaptativa (DASH)
+     ===================================================================== */
+  W.dash = el => {
+    const RATES = [0.5, 1, 2.5, 5, 8], CH = 2, TOTAL = 60, BUF = 20;
+    const TRACES = {
+      var: [[0, 6], [20, 2.5], [40, 1], [55, 4], [75, 8], [100, 3], [130, 3]],
+      flat: [[0, 6], [130, 6]]
+    };
+    let mode = 'dash', trace = 'var';
+    el.innerHTML = head(el, 'DASH: escolher a qualidade chunk a chunk', 'O vídeo está dividido em chunks de 2 s, codificados a 0.5, 1, 2.5, 5 e 8 Mbps. A largura de banda muda com o tempo. Compara uma taxa fixa com a adaptação do DASH.') + `
+      <div class="row"><span class="seg">${[['dash', 'Adaptativa (DASH)'], ['f5', 'Fixa 5 Mbps'], ['f1', 'Fixa 1 Mbps']].map(([k, l], i) => `<button type="button" class="btn sm${i ? '' : ' on'}" data-m="${k}">${l}</button>`).join('')}</span>
+        <span class="seg">${[['var', 'Rede variável'], ['flat', 'Rede estável']].map(([k, l], i) => `<button type="button" class="btn sm${i ? '' : ' on'}" data-t="${k}">${l}</button>`).join('')}</span></div>
+      <svg class="w-svg" viewBox="0 0 640 300" role="img" aria-label="Largura de banda, qualidade escolhida e buffer"></svg>
+      <div class="legend"><span><i style="background:var(--s1)"></i>largura de banda</span><span><i style="background:var(--accent)"></i>qualidade pedida</span><span><i style="background:var(--s3)"></i>buffer (s)</span><span><i class="dot" style="background:var(--bad)"></i>paragem</span></div>
+      <dl class="kpis"></dl><p class="w-out"></p>`;
+    const svg = el.querySelector('svg'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out');
+    const bwAt = t => { const tr = TRACES[trace]; let v = tr[0][1]; tr.forEach(([s, b]) => { if (t >= s) v = b; }); return v; };
+    function simulate() {
+      let t = 0, buf = 0, stall = 0, stalls = 0, last = null, prev = null, switches = 0; const log = [];
+      for (let i = 0; i < TOTAL; i++) {
+        let r = mode === 'f5' ? 5 : mode === 'f1' ? 1 : (last === null ? RATES[0] : RATES.filter(x => x <= 0.8 * last).pop() || RATES[0]);
+        if (prev !== null && r !== prev) switches++;
+        const bw = bwAt(t), dl = r * CH / bw;
+        if (i > 0) { if (buf < dl) { stall += dl - buf; stalls++; log.push({ t: t + buf, s: dl - buf, buf: 0 }); buf = 0; } else buf -= dl; }
+        log.push({ t, r, bw, buf });
+        t += dl; buf += CH; last = bw; prev = r;
+        log.push({ t, buf });
+        if (buf > BUF) { t += buf - BUF; buf = BUF; log.push({ t, buf }); }
+      }
+      return { log, stall, stalls, switches, t, avg: mean(log.filter(x => x.r).map(x => x.r)) };
+    }
+    function draw() {
+      el.querySelectorAll('[data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === mode));
+      el.querySelectorAll('[data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === trace));
+      const s = simulate(), T = Math.max(130, s.t);
+      const X = scale(0, T, 50, 620), Y = scale(0, 9, 150, 12), YB = scale(0, BUF, 278, 186);
+      const bwPath = [], tr = TRACES[trace];
+      tr.forEach(([st, b], i) => { const en = i < tr.length - 1 ? tr[i + 1][0] : T; bwPath.push(`${X(st)},${Y(b)}`, `${X(Math.min(en, T))},${Y(b)}`); });
+      const req = s.log.filter(x => x.r);
+      const rPath = req.map((x, i) => `${X(x.t)},${Y(x.r)} ${X(i < req.length - 1 ? req[i + 1].t : s.t)},${Y(x.r)}`).join(' ');
+      const bPath = s.log.map(x => `${X(x.t).toFixed(1)},${YB(x.buf).toFixed(1)}`).join(' L');
+      svg.innerHTML = [0, 2.5, 5, 8].map(v => `<line class="ax" x1="50" x2="620" y1="${Y(v)}" y2="${Y(v)}" style="opacity:.45"/><text x="44" y="${Y(v) + 4}" text-anchor="end">${v}</text>`).join('') +
+        `<text x="10" y="80" transform="rotate(-90 10 80)" text-anchor="middle">Mbps</text>` +
+        [0, 10, 20].map(v => `<line class="ax" x1="50" x2="620" y1="${YB(v)}" y2="${YB(v)}" style="opacity:.45"/><text x="44" y="${YB(v) + 4}" text-anchor="end">${v}</text>`).join('') +
+        `<text x="10" y="232" transform="rotate(-90 10 232)" text-anchor="middle">buffer (s)</text>` +
+        [0, 30, 60, 90, 120].map(v => `<text x="${X(v)}" y="296" text-anchor="middle">${v} s</text>`).join('') +
+        `<polyline points="${bwPath.join(' ')}" style="fill:none;stroke:var(--s1);stroke-width:2;stroke-dasharray:6 4"/>` +
+        `<polyline points="${rPath}" style="fill:none;stroke:var(--accent);stroke-width:2.5"/>` +
+        `<path d="M${bPath}" style="fill:none;stroke:var(--s3);stroke-width:2"/>` +
+        s.log.filter(x => x.s).map(x => `<rect x="${X(x.t)}" y="186" width="${Math.max(3, X(x.t + x.s) - X(x.t))}" height="92" style="fill:var(--bad);opacity:.35"/>`).join('');
+      kp.innerHTML = kpi('qualidade média', fmt(s.avg, 2) + ' Mbps', 1) + kpi('paragens', s.stalls, 1) + kpi('tempo parado', fmt(s.stall, 1) + ' s') + kpi('mudanças de qualidade', s.switches);
+      out.innerHTML = mode === 'dash' ? 'O cliente mede o débito de cada chunk e pede o seguinte à maior taxa que cabe (com margem). A qualidade acompanha a rede e o buffer raramente esvazia.'
+        : s.stalls ? `Com a taxa fixa, quando a rede desce abaixo de ${mode === 'f5' ? 5 : 1} Mbps os chunks demoram mais a chegar do que a tocar: o buffer esvazia e o vídeo <b>para</b>.`
+        : `A taxa fixa nunca para nesta rede — mas ${mode === 'f1' ? 'desperdiça largura de banda: a qualidade fica baixa mesmo quando havia rede para mais' : 'só porque a rede é sempre suficiente'}.`;
+    }
+    el.addEventListener('click', e => {
+      const m = e.target.closest('[data-m]'), t = e.target.closest('[data-t]');
+      if (m) { mode = m.dataset.m; draw(); } if (t) { trace = t.dataset.t; draw(); }
+    });
+    draw();
+  };
+
+  /* =====================================================================
+     mcast — cópias por ligação: unicast vs. multicast
+     ===================================================================== */
+  W.mcast = el => {
+    const N = { S: [30, 150, 'h'], R1: [100, 150], R2: [190, 70], R3: [320, 70], R4: [400, 150], R5: [190, 230], R6: [320, 230], R7: [470, 220], R8: [580, 220], R9: [500, 85], R10: [605, 40],
+      G1: [190, 290, 'h'], G2: [470, 20, 'h'], G3: [610, 285, 'h'], G4: [620, 110, 'h'] };
+    const E = [['S', 'R1'], ['R1', 'R2'], ['R1', 'R5'], ['R2', 'R3'], ['R5', 'R6'], ['R3', 'R4'], ['R6', 'R4'], ['R4', 'R9'], ['R4', 'R7'], ['R7', 'R8'], ['R9', 'R10'], ['R5', 'G1'], ['R9', 'G2'], ['R8', 'G3'], ['R10', 'G4']];
+    const adj = {}; E.forEach(([a, b]) => { (adj[a] = adj[a] || []).push(b); (adj[b] = adj[b] || []).push(a); });
+    const par = { S: null }, q = ['S'];
+    while (q.length) { const x = q.shift(); (adj[x] || []).forEach(y => { if (!(y in par)) { par[y] = x; q.push(y); } }); }
+    const path = g => { const p = []; let x = g; while (par[x]) { p.push([par[x], x]); x = par[x]; } return p; };
+    const key = (a, b) => [a, b].sort().join('-');
+    let mode = 'multi', on = new Set(['G1', 'G2', 'G3']);
+    el.innerHTML = head(el, 'Unicast vs. multicast: quantas cópias?', 'A fonte S envia o mesmo fluxo a vários recetores. Ativa ou desativa recetores e compara o número de cópias que atravessa cada ligação.') + `
+      <div class="row"><span class="seg"><button type="button" class="btn sm" data-m="uni">Vários unicast</button><button type="button" class="btn sm on" data-m="multi">Multicast</button></span>
+        <span class="seg">${['G1', 'G2', 'G3', 'G4'].map(g => `<button type="button" class="btn sm" data-g="${g}">${g}</button>`).join('')}</span></div>
+      <svg class="w-svg" viewBox="0 0 640 305" role="img" aria-label="Rede com fonte, routers e recetores"></svg>
+      <dl class="kpis"></dl><p class="w-out"></p>`;
+    const svg = el.querySelector('svg'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out');
+    function draw() {
+      el.querySelectorAll('[data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === mode));
+      el.querySelectorAll('[data-g]').forEach(b => b.classList.toggle('on', on.has(b.dataset.g)));
+      const cnt = {};
+      [...on].forEach(g => path(g).forEach(([a, b]) => { const k = key(a, b); cnt[k] = mode === 'uni' ? (cnt[k] || 0) + 1 : 1; }));
+      const total = Object.values(cnt).reduce((s, v) => s + v, 0), src = cnt[key('S', 'R1')] || 0;
+      const dup = mode === 'multi' ? Object.keys(N).filter(r => r.startsWith('R') && (adj[r] || []).filter(y => par[y] === r && cnt[key(r, y)]).length > 1) : [];
+      svg.innerHTML = E.map(([a, b]) => { const c = cnt[key(a, b)] || 0, p = N[a], q2 = N[b], mx = (p[0] + q2[0]) / 2, my = (p[1] + q2[1]) / 2;
+        return `<line x1="${p[0]}" y1="${p[1]}" x2="${q2[0]}" y2="${q2[1]}" style="stroke:${c ? 'var(--accent)' : 'var(--rule)'};stroke-width:${c ? 1.5 + c * 1.6 : 1.5}"/>` +
+          (c ? `<circle cx="${mx}" cy="${my}" r="10" style="fill:var(--card);stroke:var(--accent)"/><text x="${mx}" y="${my + 4}" text-anchor="middle" class="lab" style="font-size:11px">${c}</text>` : ''); }).join('') +
+        Object.entries(N).map(([id, [x, y, h]]) => h
+          ? `<rect x="${x - 17}" y="${y - 12}" width="34" height="24" rx="4" style="fill:${id === 'S' ? 'var(--s2)' : on.has(id) ? 'var(--good-bg)' : 'var(--card-2)'};stroke:${id === 'S' ? 'var(--s2)' : on.has(id) ? 'var(--good)' : 'var(--rule)'}"/><text x="${x}" y="${y + 4}" text-anchor="middle" class="lab" style="${id === 'S' ? 'fill:#fff' : ''}">${id}</text>`
+          : `<circle cx="${x}" cy="${y}" r="16" style="fill:${dup.includes(id) ? 'var(--warn-bg)' : 'var(--accent-soft)'};stroke:${dup.includes(id) ? 'var(--warn)' : 'var(--accent)'}"/><text x="${x}" y="${y + 4}" text-anchor="middle" class="lab" style="font-size:10.5px">${id}</text>`).join('');
+      kp.innerHTML = kpi('recetores', on.size) + kpi('cópias na ligação da fonte', src, 1) + kpi('transmissões no total', total, 1) + (mode === 'multi' ? kpi('routers que duplicam', dup.length) : '');
+      out.innerHTML = mode === 'uni'
+        ? `A fonte tem de conhecer os ${on.size} recetores e enviar <b>${on.size} cópias iguais</b>; as ligações partilhadas pelos caminhos levam várias cópias do mesmo pacote.`
+        : `A fonte envia <b>uma só cópia</b> para o endereço do grupo. Os routers a laranja duplicam o pacote onde a árvore se ramifica, e cada ligação leva no máximo uma cópia. G4 só recebe se aderir ao grupo.`;
+    }
+    el.addEventListener('click', e => {
+      const m = e.target.closest('[data-m]'), g = e.target.closest('[data-g]');
+      if (m) mode = m.dataset.m; if (g) { const id = g.dataset.g; on.has(id) ? on.delete(id) : on.add(id); }
+      if (m || g) draw();
+    });
+    draw();
+  };
+
+  /* =====================================================================
+     digit — tamanho de imagem, áudio e vídeo digitalizados
+     ===================================================================== */
+  W.digit = el => {
+    el.innerHTML = head(el, 'Quantos bits?', 'Escolhe o tipo de media e os parâmetros da digitalização.') + `
+      <div class="seg"><button type="button" class="btn sm on" data-m="img">Imagem</button><button type="button" class="btn sm" data-m="aud">Áudio</button><button type="button" class="btn sm" data-m="vid">Vídeo</button></div>
+      <div class="row" data-ctl></div><dl class="kpis"></dl><p class="w-out"></p>`;
+    const ctl = el.querySelector('[data-ctl]'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out');
+    const sel = (k, l, opts, v) => `<label class="f grow">${l}<select data-k="${k}">${opts.map(([val, txt]) => `<option value="${val}"${val == v ? ' selected' : ''}>${txt}</option>`).join('')}</select></label>`;
+    const num = (k, l, v, min, max) => `<label class="f grow">${l}<input type="number" data-k="${k}" value="${v}" min="${min}" max="${max}"></label>`;
+    const RES = [['640x480', '640 × 480'], ['1280x720', '1280 × 720 (HD)'], ['1920x1080', '1920 × 1080 (Full HD)'], ['3840x2160', '3840 × 2160 (4K)'], ['7680x4320', '7680 × 4320 (8K)']];
+    const size = b => b >= 8e9 ? fmt(b / 8e9, 2) + ' GB' : b >= 8e6 ? fmt(b / 8e6, 2) + ' MB' : fmt(b / 8e3, 1) + ' kB';
+    let m = 'img';
+    const CTL = {
+      img: sel('res', 'Resolução', RES, '1920x1080') + sel('bpp', 'Bits por pixel', [[1, '1 (preto e branco)'], [4, '4 (16 cores)'], [8, '8 (256 cores)'], [24, '24 (true color, RGB 8+8+8)']], 24),
+      aud: sel('sr', 'Amostras por segundo', [[8000, '8 kHz (telefone)'], [44100, '44.1 kHz (CD)'], [48000, '48 kHz']], 44100) + sel('bits', 'Bits por amostra', [[8, '8'], [16, '16'], [24, '24']], 16) + sel('ch', 'Canais', [[1, 'mono'], [2, 'estéreo']], 2) + num('dur', 'Duração (s)', 180, 1, 7200),
+      vid: sel('res', 'Resolução', RES, '1920x1080') + sel('fps', 'Imagens por segundo', [[24, '24'], [30, '30'], [60, '60']], 24) + sel('bpp', 'Bits por pixel', [[24, '24']], 24)
+    };
+    function render() { ctl.innerHTML = CTL[m]; el.querySelectorAll('[data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === m)); draw(); }
+    function draw() {
+      const v = k => { const e = el.querySelector(`[data-k="${k}"]`); return e ? e.value : null; };
+      if (m === 'img') {
+        const [w, h] = v('res').split('x').map(Number), bits = w * h * +v('bpp');
+        kp.innerHTML = kpi('pixels', fmt(w * h / 1e6, 2) + ' MP') + kpi('cores possíveis', (2 ** +v('bpp')).toLocaleString('pt-PT')) + kpi('tamanho sem compressão', size(bits), 1);
+        out.innerHTML = `${w} × ${h} pixels × ${v('bpp')} bits = ${fmt(bits / 1e6, 1)} Mbit. Mais pixels ou mais bits por pixel = mais qualidade, mas ficheiro maior.`;
+      } else if (m === 'aud') {
+        const rate = +v('sr') * +v('bits') * +v('ch'), bits = rate * +v('dur');
+        kp.innerHTML = kpi('débito', fmt(rate / 1e3, 1) + ' kbps', 1) + kpi('tamanho sem compressão', size(bits), 1) + kpi('níveis por amostra', (2 ** +v('bits')).toLocaleString('pt-PT'));
+        out.innerHTML = `${(+v('sr')).toLocaleString('pt-PT')} amostras/s × ${v('bits')} bits × ${v('ch')} canal(is) = ${fmt(rate / 1e3, 1)} kbps — é o débito de um WAV. Um MP3 comprime para cerca de 128–320 kbps.`;
+      } else {
+        const [w, h] = v('res').split('x').map(Number), rate = w * h * 24 * +v('fps');
+        kp.innerHTML = kpi('débito sem compressão', fmt(rate / 1e6, 0) + ' Mbps', 1) + kpi('1 minuto sem compressão', size(rate * 60)) + kpi('fator para caber em 5 Mbps', fmt(rate / 5e6, 0) + '×', 1);
+        out.innerHTML = `Sem compressão, o vídeo é inviável na Internet. A codificação espacial (dentro de cada imagem) e temporal (só as diferenças entre imagens) reduz o débito para alguns Mbps (MPEG-4: 64 kbps a 12 Mbps).`;
+      }
+    }
+    el.addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (b) { m = b.dataset.m; render(); } });
+    el.addEventListener('input', draw); el.addEventListener('change', draw);
+    render();
+  };
 })();

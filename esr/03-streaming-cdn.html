@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Multimédia, Streaming e CDNs · ESR · meiUM</title>
+<meta name="description" content="ESR · Tema 3: digitalização de texto, imagem e áudio, codificação de vídeo (espacial, temporal, CBR, VBR), streaming DASH, redes de distribuição de conteúdos (CDN), redirecionamento por DNS e o caso da Netflix.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var d=document.documentElement,g=function(k){return JSON.parse(localStorage.getItem('meium:'+k))},t=g('theme'),f=g('fontScale');if(t==='light'||t==='dark')d.dataset.theme=t;if(f)d.style.setProperty('--fs',f);if(g('showExtra')===false)d.classList.add('hide-extra')}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="esr" data-topic="03" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 3.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="3.0" data-title="Visão geral" data-desc="Porque é que o vídeo é o grande desafio da Internet.">
+  <header class="ph">
+    <h1>Multimédia, Streaming e CDNs<span class="en">Video streaming and content distribution networks</span></h1>
+    <p class="lede">O vídeo é o maior consumidor de largura de banda da Internet. Netflix, YouTube e Amazon Prime representavam mais de 80% do tráfego total em 2021, com cerca de 2 mil milhões de utilizadores no YouTube e 210 milhões de subscritores na Netflix.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.0.1</span>Os dois desafios</h2>
+    <div class="two">
+      <div class="card c1"><span class="tag">Escala</span><p>Como chegar a ~2 mil milhões de utilizadores? Um único "mega-servidor" de vídeo não funciona (3.4 explica porquê).</p></div>
+      <div class="card c2"><span class="tag">Heterogeneidade</span><p>Utilizadores diferentes têm capacidades diferentes: rede fixa vs. móvel, muita vs. pouca largura de banda.</p></div>
+    </div>
+    <p><strong>A solução</strong>: uma infraestrutura <strong>distribuída, ao nível da aplicação</strong> — streaming adaptativo (DASH) e redes de distribuição de conteúdos (CDN). Antes disso, como é que imagens, som e vídeo se transformam em bits.</p>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <p class="src">Baseado nas aulas de ESR (Application Layer — video streaming and CDNs, digitization) e no livro de Kurose e Ross. Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 3.1 DIGITALIZAÇÃO ============================ -->
+<article class="page" data-page="digitalizacao" data-num="3.1" data-title="Digitalização" data-desc="Texto, imagem e áudio em bits.">
+  <header class="ph">
+    <h1>Digitalização<span class="en">Digitization</span></h1>
+    <p class="lede">Digitalizar é <strong>codificar</strong> informação em dígitos — nos computadores, em 0 e 1. Com n bits representam-se \(2^n\) valores diferentes.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.1.1</span>Texto</h2>
+    <p>Cada letra (maiúscula ou minúscula), símbolo e algarismo recebe um código binário. Com 1 bit distinguem-se 2 letras (A = 0, B = 1); com 2 bits, 4 (A = 00, B = 01, C = 10, D = 11); com <strong>8 bits, 2<sup>8</sup> = 256 caracteres</strong>. O exemplo clássico é o <strong>ASCII</strong> (American Standard Code for Information Interchange), proposto em 1961.</p>
+
+    <h2><span class="sn">3.1.2</span>Imagem</h2>
+    <ul>
+      <li>Uma imagem é uma <strong>matriz</strong> de n linhas e m colunas de quadrados — os <strong>pixels</strong>. Quanto mais pequenos os quadrados, maior a resolução.</li>
+      <li>Cada pixel tem uma cor, representada por um código: preto = 0000, branco = 1111, as outras são intermédias. Mais bits, mais cores: 2<sup>4</sup> = 16, 2<sup>8</sup> = 256, 2<sup>24</sup> = 16 777 216 (<em>true color</em>).</li>
+      <li><strong>RGB</strong>: cada cor é uma mistura de vermelho, verde e azul, com 8 bits (0 a 255) por componente. Usado em monitores.</li>
+      <li><strong>CMYK</strong>: ciano, magenta, amarelo e preto. Usado em impressão.</li>
+      <li>1 megapixel (MP) = 1 000 000 pixels. 1920 × 1080 ≈ 2 MP; 7680 × 4320 ≈ 33 MP.</li>
+    </ul>
+
+    <h2><span class="sn">3.1.3</span>Áudio</h2>
+    <ul>
+      <li>O som analógico é uma curva contínua no tempo. Digitaliza-se <strong>amostrando</strong>: a intervalos regulares mede-se o nível e converte-se num número de bits.</li>
+      <li>Mais amostras por segundo → mais fiel ao som original. Mais bits por amostra → mais níveis distinguíveis. Ambos aumentam o tamanho.</li>
+      <li>Taxa de amostragem típica: <strong>44.1 kHz</strong> (44 100 amostras por segundo).</li>
+      <li><strong>WAV</strong>: 44.1 kHz, 16 bits por amostra, sem compressão. <strong>MP3</strong> (MPEG-1 Layer 3): comprimido, usado em streaming.</li>
+    </ul>
+    <div class="widget" data-widget="digit"></div>
+  </section>
+</article>
+
+<!-- ============================ 3.2 VÍDEO ============================ -->
+<article class="page" data-page="video" data-num="3.2" data-title="Codificação de vídeo" data-desc="Redundância espacial e temporal; CBR e VBR.">
+  <header class="ph">
+    <h1>Codificação de vídeo<span class="en">Multimedia: video</span></h1>
+    <p class="lede">Um vídeo é uma <strong>sequência de imagens</strong> mostradas a uma taxa constante (ex.: 24 imagens por segundo). Sem compressão seria demasiado grande, por isso a codificação aproveita a <strong>redundância</strong> dentro e entre imagens.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="two">
+      <div class="card c1"><span class="tag">Codificação espacial</span><p>Dentro de uma imagem. Em vez de enviar N valores da mesma cor (tudo roxo), envia-se só dois valores: a cor e o número de repetições.</p></div>
+      <div class="card c2"><span class="tag">Codificação temporal</span><p>Entre imagens. Em vez de enviar a imagem i+1 completa, enviam-se só as <strong>diferenças</strong> em relação à imagem i.</p></div>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>Tipo</th><th>Débito de codificação</th></tr></thead>
+      <tbody>
+        <tr><td><strong>CBR</strong> (constant bit rate)</td><td>Fixo</td></tr>
+        <tr><td><strong>VBR</strong> (variable bit rate)</td><td>Varia consoante a codificação espacial e temporal conseguida (cenas paradas pedem menos bits do que cenas de ação)</td></tr>
+      </tbody></table></div>
+    <div class="tw"><table>
+      <thead><tr><th>Norma</th><th>Uso típico</th><th class="num">Débito</th></tr></thead>
+      <tbody>
+        <tr><td>MPEG-1</td><td>CD-ROM</td><td class="num">1.5 Mbps</td></tr>
+        <tr><td>MPEG-2</td><td>DVD</td><td class="num">3–6 Mbps</td></tr>
+        <tr><td>MPEG-4</td><td>Internet</td><td class="num">64 kbps–12 Mbps</td></tr>
+      </tbody></table></div>
+    <p class="small muted">Para comparação: Full HD a 24 imagens/s sem compressão são cerca de 1 194 Mbps (experimenta o modo "Vídeo" na calculadora de 3.1).</p>
+
+    <h2><span class="sn">3.2.1</span>Streaming de vídeo armazenado</h2>
+    <p>No cenário mais simples, um servidor de vídeo envia um vídeo guardado a um cliente pela Internet. Os desafios:</p>
+    <ul>
+      <li>A largura de banda servidor → cliente <strong>varia com o tempo</strong>, consoante a congestão (em casa, na rede de acesso, no núcleo, no servidor).</li>
+      <li><strong>Perdas e atrasos</strong> devidos à congestão atrasam a reprodução ou baixam a qualidade.</li>
+    </ul>
+  </section>
+</article>
+
+<!-- ============================ 3.3 DASH ============================ -->
+<article class="page" data-page="dash" data-num="3.3" data-title="DASH" data-desc="Streaming adaptativo sobre HTTP.">
+  <header class="ph">
+    <h1>DASH<span class="en">Dynamic, Adaptive Streaming over HTTP</span></h1>
+    <p class="lede">Em vez de enviar o vídeo a uma qualidade fixa, o servidor oferece-o em várias qualidades, e o cliente vai escolhendo a cada momento a que a rede aguenta.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="two">
+      <div class="card c1"><span class="tag">Servidor</span>
+        <ul>
+          <li>Divide o ficheiro de vídeo em <strong>chunks</strong>.</li>
+          <li>Guarda cada chunk <strong>codificado a vários débitos</strong>.</li>
+          <li>Um ficheiro <strong>manifest</strong> dá os URLs dos diferentes chunks.</li>
+        </ul></div>
+      <div class="card c2"><span class="tag">Cliente</span>
+        <ul>
+          <li>Mede periodicamente a largura de banda servidor → cliente.</li>
+          <li>Consulta o manifest e pede <strong>um chunk de cada vez</strong>.</li>
+          <li>Escolhe o <strong>débito máximo sustentável</strong> com a largura de banda atual.</li>
+          <li>Pode mudar de débito ao longo do vídeo.</li>
+        </ul></div>
+    </div>
+    <div class="note"><span class="lbl">A inteligência está no cliente</span>
+      <p>É o cliente que decide <strong>quando</strong> pedir um chunk (para o buffer não esvaziar nem transbordar), <strong>a que débito</strong> (mais qualidade quando há mais largura de banda) e <strong>onde</strong> (a um servidor "perto" ou com mais largura de banda disponível).</p>
+    </div>
+    <div class="widget" data-widget="dash"></div>
+  </section>
+</article>
+
+<!-- ============================ 3.4 CDN ============================ -->
+<article class="page" data-page="cdn" data-num="3.4" data-title="Redes de distribuição de conteúdos" data-desc="Enter deep, bring home, DNS e Netflix.">
+  <header class="ph">
+    <h1>Redes de distribuição de conteúdos<span class="en">Content Distribution Networks (CDNs)</span></h1>
+    <p class="lede">Como fazer streaming de conteúdo, escolhido entre milhões de vídeos, para centenas de milhares de utilizadores em simultâneo?</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">3.4.1</span>Opção 1: um único "mega-servidor"</h2>
+    <ul>
+      <li><strong>Ponto único de falha</strong>.</li>
+      <li><strong>Ponto de congestão</strong> da rede.</li>
+      <li>Caminho <strong>longo</strong> até clientes distantes.</li>
+      <li><strong>Muitas cópias</strong> do mesmo vídeo a sair pela mesma ligação.</li>
+    </ul>
+    <p>Simplesmente, <strong>não escala</strong>.</p>
+
+    <h2><span class="sn">3.4.2</span>Opção 2: uma CDN</h2>
+    <p>Guardar e servir <strong>várias cópias</strong> dos vídeos em <strong>vários locais geograficamente distribuídos</strong>.</p>
+    <div class="two">
+      <div class="card c1"><span class="tag">Enter deep</span><p>Pôr servidores da CDN <strong>dentro de muitas redes de acesso</strong>, perto dos utilizadores (idealmente a um salto). Usado pela Akamai: ~325 000 servidores em mais de 135 países, 100 Tbps (2021).</p></div>
+      <div class="card c2"><span class="tag">Bring home</span><p>Um número menor (dezenas) de clusters maiores em <strong>POPs perto</strong> (mas não dentro) das redes de acesso. Usado pela Limelight (hoje Edgio).</p></div>
+    </div>
+    <p>A CDN guarda cópias do conteúdo nos seus nós (ex.: a Netflix guarda cópias de <em>Mad Men</em>). Quando um subscritor pede o conteúdo, é encaminhado para uma cópia próxima; se o caminho estiver congestionado, pode escolher outra.</p>
+    <div class="note"><span class="lbl">"Over the top" (OTT)</span>
+      <p>As CDNs funcionam por cima da Internet, usando-a como serviço de comunicação host a host. Os desafios: de que nó da CDN obter o conteúdo? Como reagir à congestão? Que conteúdo pôr em que nó, e a que débito?</p>
+    </div>
+
+    <h2><span class="sn">3.4.3</span>Como se chega ao nó certo: DNS</h2>
+    <p>O Bob quer ver um vídeo da <code>netcinema.com</code>, guardado na CDN <code>KingCDN.com</code>:</p>
+    <ol class="steps-list">
+      <li><div>O Bob obtém o URL do vídeo, <code>http://netcinema.com/6Y7B23V</code>, na página da netcinema.</div></li>
+      <li><div>O DNS local do Bob tenta resolver esse nome.</div></li>
+      <li><div>O DNS autoritativo da netcinema responde com outro nome, <code>http://KingCDN.com/NetC6y&amp;B23V</code>.</div></li>
+      <li><div>O DNS local resolve esse nome através do DNS autoritativo da KingCDN…</div></li>
+      <li><div>… que devolve o endereço IP de um servidor da KingCDN com o vídeo — escolhido pela própria CDN.</div></li>
+      <li><div>O Bob pede o vídeo a esse servidor, que o envia por HTTP.</div></li>
+    </ol>
+    <div class="note extra"><span class="lbl">Complemento · porque DNS</span>
+      <p>O DNS é o primeiro contacto do cliente e acontece antes de qualquer ligação. Ao responder com o IP de um servidor "perto" do DNS local do cliente, a CDN escolhe o nó sem que o browser ou a aplicação tenham de saber nada.</p>
+    </div>
+
+    <h2><span class="sn">3.4.4</span>Estudo de caso: Netflix</h2>
+    <ol class="steps-list">
+      <li><div>A Netflix carrega várias versões de cada vídeo (débitos diferentes) para os servidores da CDN. O registo, a faturação e o catálogo correm na cloud da Amazon.</div></li>
+      <li><div>O Bob gere a conta e navega no catálogo.</div></li>
+      <li><div>Quando escolhe um vídeo, recebe o <strong>ficheiro manifest</strong>.</div></li>
+      <li><div>O cliente faz <strong>streaming DASH</strong> a partir dos servidores da CDN.</div></li>
+    </ol>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo, exercícios e perguntas.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Conceito</th><th>Ideia-chave</th></tr></thead>
+      <tbody>
+        <tr><td><strong>n bits</strong></td><td>\(2^n\) valores: 8 bits → 256 caracteres/cores; 24 bits → 16.7 milhões de cores.</td></tr>
+        <tr><td><strong>Áudio</strong></td><td>Amostras/s × bits/amostra × canais. CD: 44.1 kHz, 16 bits.</td></tr>
+        <tr><td><strong>Codificação espacial / temporal</strong></td><td>Redundância dentro de uma imagem / entre imagens.</td></tr>
+        <tr><td><strong>CBR / VBR</strong></td><td>Débito fixo / débito que varia com a cena.</td></tr>
+        <tr><td><strong>DASH</strong></td><td>Chunks em vários débitos + manifest; o cliente escolhe quando, quanto e onde.</td></tr>
+        <tr><td><strong>CDN</strong></td><td>Cópias em muitos locais; enter deep (Akamai) vs. bring home (Limelight).</td></tr>
+        <tr><td><strong>Redirecionamento</strong></td><td>Via DNS: o DNS autoritativo da CDN escolhe o servidor.</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.2</span>Exercícios</h2>
+    <details class="ans"><summary>1. Quanto ocupa um minuto de áudio WAV estéreo a 44.1 kHz e 16 bits?</summary>
+      <div><p>44 100 × 16 × 2 = 1 411 200 bit/s ≈ 1.41 Mbps. Em 60 s: 84 672 000 bits ≈ <strong>10.6 MB</strong>.</p></div></details>
+    <details class="ans"><summary>2. Uma imagem 1920 × 1080 a 24 bits por pixel, sem compressão?</summary>
+      <div><p>1920 × 1080 × 24 = 49 766 400 bits ≈ <strong>6.2 MB</strong>.</p></div></details>
+    <details class="ans"><summary>3. Num cliente DASH, a largura de banda medida é 3.5 Mbps e há versões a 1, 2.5 e 5 Mbps. Que versão pede?</summary>
+      <div><p><strong>2.5 Mbps</strong>: a mais alta que cabe na largura de banda. Pedir 5 Mbps faria cada chunk demorar mais a chegar do que a tocar, e o buffer esvaziaria.</p></div></details>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.3</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">Enviar só as diferenças entre uma imagem e a anterior é codificação…</p>
+        <div class="opts"><button>Espacial</button><button data-ok>Temporal</button><button>CBR</button></div>
+        <p class="why">Temporal: aproveita a redundância entre imagens consecutivas.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">No DASH, quem decide o débito de cada chunk?</p>
+        <div class="opts"><button>O servidor</button><button data-ok>O cliente</button><button>O DNS</button></div>
+        <p class="why">A inteligência está no cliente: quando, a que débito e onde pedir.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">O que contém o manifest DASH?</p>
+        <div class="opts"><button>O vídeo completo</button><button data-ok>Os URLs dos chunks nas várias qualidades</button><button>As credenciais do utilizador</button></div>
+        <p class="why">O cliente consulta-o para saber onde pedir cada chunk em cada débito.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual é a diferença entre "enter deep" e "bring home"?</p>
+        <div class="opts"><button data-ok>Enter deep põe muitos servidores dentro das redes de acesso; bring home usa menos clusters maiores perto delas</button><button>Enter deep usa P2P; bring home usa cliente-servidor</button><button>São a mesma coisa</button></div>
+        <p class="why">Akamai (enter deep) vs. Limelight (bring home).</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Porque é que um único mega-servidor não serve para streaming global?</p>
+        <div class="opts"><button>Porque não suporta HTTP</button><button data-ok>Ponto único de falha e de congestão, caminhos longos e muitas cópias iguais na mesma ligação</button><button>Porque é demasiado barato</button></div>
+        <p class="why">Simplesmente não escala.</p>
+      </div>
+    </div>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/i18n.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

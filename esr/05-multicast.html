@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Multicast · ESR · meiUM</title>
+<meta name="description" content="ESR · Tema 5: comunicação em grupo em redes TCP/IP, IGMP e MLD, ASM vs. SSM, protocolos opt-in e opt-out, árvores por fonte e partilhadas, RPF, PIM Sparse Mode e PIM Dense Mode.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var d=document.documentElement,g=function(k){return JSON.parse(localStorage.getItem('meium:'+k))},t=g('theme'),f=g('fontScale');if(t==='light'||t==='dark')d.dataset.theme=t;if(f)d.style.setProperty('--fs',f);if(g('showExtra')===false)d.classList.add('hide-extra')}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="esr" data-topic="05" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 5.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="5.0" data-title="Visão geral" data-desc="Porquê multicast em vez de vários unicast.">
+  <header class="ph">
+    <h1>Multicast<span class="en">Introduction to group communications in TCP/IP networks</span></h1>
+    <p class="lede">Muitas aplicações servem não um utilizador, mas um <strong>grupo</strong>: transmissões de vídeo, videoconferências, distribuição de atualizações. Podem precisar de comunicação ponto-a-ponto, ponto-a-multiponto ou multiponto-a-multiponto.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.0.1</span>Porque não vários unicast?</h2>
+    <p>Os pacotes IP são normalmente enviados de uma fonte para um destino. Para chegar a vários, a fonte podia enviar um unicast a cada um — mas isso obriga a:</p>
+    <ul>
+      <li>a fonte manter a <strong>lista completa</strong> de destinatários;</li>
+      <li>enviar <strong>várias cópias idênticas</strong> dos mesmos dados.</li>
+    </ul>
+    <p>É uma solução cara em processamento e em transmissão. Daí o <strong>multicast</strong>.</p>
+
+    <h2><span class="sn">5.0.2</span>A ideia</h2>
+    <ul>
+      <li>Enviar <strong>uma única cópia</strong> dos dados para um grupo de destinatários, identificado por um <strong>endereço multicast</strong> — uma abstração: a fonte não precisa de saber quem está no grupo.</li>
+      <li>Os nós da rede (routers, se for ao nível da rede) encaminham os pacotes e <strong>duplicam-nos</strong> só quando é preciso, onde os caminhos se separam.</li>
+    </ul>
+    <div class="widget" data-widget="mcast"></div>
+    <div class="note extra"><span class="lbl">Complemento · endereços multicast</span>
+      <p>Em IPv4 os endereços multicast são os da antiga classe D, <code>224.0.0.0/4</code> (224.0.0.0 a 239.255.255.255); em IPv6 começam por <code>ff00::/8</code>. Os conceitos do tema aplicam-se também a multicast ao nível da aplicação.</p>
+    </div>
+
+    <h2><span class="sn">5.0.3</span>As duas peças</h2>
+    <div class="two">
+      <div class="card c1"><span class="tag">Entre hosts e router</span><p>Os hosts usam <strong>protocolos de descoberta de membros</strong> (IGMP em IPv4, MLD em IPv6) para dizer ao router local que querem receber dados de um grupo.</p></div>
+      <div class="card c2"><span class="tag">Entre routers</span><p>Os routers usam <strong>protocolos de encaminhamento multicast</strong> para construir uma <strong>árvore de distribuição</strong>: o tráfego chega a todos os membros do grupo com o mínimo de cópias.</p></div>
+    </div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <p class="src">Baseado nas aulas de ESR (Multicast) e em J. Hardwick, <em>IP Multicast Explained</em>. Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 5.1 IGMP ============================ -->
+<article class="page" data-page="igmp" data-num="5.1" data-title="IGMP e MLD" data-desc="Como os hosts aderem e saem de grupos.">
+  <header class="ph">
+    <h1>Descoberta de membros: IGMP e MLD<span class="en">Multicast Group Membership Discovery Protocols</span></h1>
+    <p class="lede">Os hosts usam estes protocolos para dizer aos routers da sua LAN o endereço do grupo multicast a que querem aderir: <strong>IGMP</strong> (Internet Group Management Protocol) em IPv4 e <strong>MLD</strong> (Multicast Listener Discovery) em IPv6.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.1.1</span>Funcionamento básico do IGMP</h2>
+    <ol class="steps-list">
+      <li><div>Um host que quer aderir a um grupo envia um <strong>IGMP Report</strong> não solicitado para esse grupo.</div></li>
+      <li><div>Um router local apanha o Report e usa um <strong>protocolo de encaminhamento multicast</strong> para se juntar ao grupo.</div></li>
+      <li><div>Periodicamente, um router <strong>querier</strong> envia <strong>IGMP Query</strong> em broadcast, para saber a que grupos estão subscritos os hosts locais.</div></li>
+      <li><div>Os hosts respondem com IGMP Reports a indicar os grupos de que são membros.</div></li>
+      <li><div>Se o router deixar de receber Reports de um grupo durante algum tempo, assume que já não há membros na LAN e <strong>sai do grupo</strong>.</div></li>
+    </ol>
+
+    <h2><span class="sn">5.1.2</span>Evitar respostas em avalanche</h2>
+    <p>Para que muitos hosts não respondam ao mesmo tempo, cada host arranca um <strong>temporizador aleatório</strong> por cada grupo de que é membro. Quando o temporizador acaba, envia o Report — mas se entretanto ouvir um Report de outro host para o mesmo grupo, <strong>cancela</strong> o seu. Ao router basta saber que há pelo menos um membro.</p>
+
+    <h2><span class="sn">5.1.3</span>As versões</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Versão</th><th>O que acrescenta</th></tr></thead>
+      <tbody>
+        <tr><td><strong>IGMPv1</strong></td><td>Query e Report. A escolha do router querier depende do protocolo de encaminhamento multicast.</td></tr>
+        <tr><td><strong>IGMPv2</strong></td><td>Um processo de <strong>eleição do querier</strong>; a mensagem <strong>Leave Group</strong>, que permite sair logo em vez de esperar que o router dê pela falta de Reports (menor latência de saída).</td></tr>
+        <tr><td><strong>IGMPv3</strong></td><td><strong>Filtragem por fonte</strong>: o Report pode incluir ou excluir uma lista de fontes para cada grupo; o router junta os requisitos dos vários hosts.</td></tr>
+      </tbody></table></div>
+    <p class="small muted">A filtragem por fonte do IGMPv3 é o que torna possível o SSM (5.2).</p>
+  </section>
+</article>
+
+<!-- ============================ 5.2 ÁRVORES ============================ -->
+<article class="page" data-page="arvores" data-num="5.2" data-title="Alternativas de desenho" data-desc="ASM/SSM, opt-in/opt-out, árvores por fonte e partilhadas, RPF.">
+  <header class="ph">
+    <h1>Alternativas de desenho<span class="en">Design alternatives</span></h1>
+    <p class="lede">Três decisões definem um protocolo de multicast: <strong>de que fontes</strong> se recebe, <strong>como</strong> se constrói a árvore e <strong>que tipo</strong> de árvore se usa.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.2.1</span>De que fontes: ASM vs. SSM</h2>
+    <div class="two">
+      <div class="card c1"><span class="tag">ASM · Any Source Multicast</span><p>O host indica só o <strong>grupo</strong> e recebe dados enviados para ele por <strong>qualquer fonte</strong>.</p></div>
+      <div class="card c2"><span class="tag">SSM · Source-Specific Multicast</span><p>O host indica o <strong>grupo e a fonte</strong>: só recebe dados daquela fonte.</p></div>
+    </div>
+
+    <h2><span class="sn">5.2.2</span>Como construir a árvore: opt-in vs. opt-out</h2>
+    <div class="two">
+      <div class="card c1"><span class="tag">Opt-in</span><p>Os nós indicam os grupos que lhes interessam; a árvore constrói-se a partir dos <strong>joins</strong> dos clientes. Ex.: PIM-SM.</p></div>
+      <div class="card c2"><span class="tag">Opt-out (flood and prune)</span><p>Assume-se que todos os nós querem os dados; depois, os que não têm clientes interessados <strong>cortam-se</strong> (prune) da árvore. Ex.: PIM-DM.</p></div>
+    </div>
+
+    <h2><span class="sn">5.2.3</span>Que tipo de árvore</h2>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Árvores por fonte (source-based)</th><th>Árvores partilhadas (shared)</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Quantas</strong></td><td>Uma por cada fonte que envia para o grupo</td><td>Uma só para todas as fontes do grupo</td></tr>
+        <tr><td><strong>Raiz</strong></td><td>O router adjacente à fonte</td><td>Um nó escolhido: o <strong>Rendezvous Point (RP)</strong>, pré-configurado ou eleito</td></tr>
+        <tr><td><strong>Mensagem de adesão</strong></td><td><strong>(S, G)</strong>: o router indica a fonte e o grupo</td><td><strong>(*, G)</strong>: só o grupo, sem fonte</td></tr>
+        <tr><td><strong>Vantagem</strong></td><td>Caminhos de dados <strong>eficientes</strong></td><td>Melhor com <strong>muitas fontes</strong></td></tr>
+        <tr><td><strong>Desvantagem</strong></td><td>Problemas de escala com muitas fontes</td><td>Caminhos menos eficientes; é preciso escolher o RP e levar os dados das fontes até ele</td></tr>
+        <tr><td><strong>SSM</strong></td><td>Exigido pelo SSM</td><td>—</td></tr>
+      </tbody></table></div>
+    <div class="note"><span class="lbl">Levar os dados da fonte ao RP</span>
+      <p>Numa árvore partilhada unidirecional (como no PIM-SM), o router da fonte <strong>encapsula</strong> cada pacote, envia-o ao RP em <strong>unicast</strong>, e o RP desencapsula-o e distribui-o pela árvore.</p>
+    </div>
+
+    <h2><span class="sn">5.2.4</span>Descobrir o router a montante: RPF</h2>
+    <p>Os protocolos precisam de saber qual é a interface a montante (em direção à fonte ou ao RP). Usam o algoritmo <strong>Reverse Path Forwarding (RPF)</strong>. Essa interface serve:</p>
+    <ul>
+      <li>como interface de <strong>saída</strong> para as mensagens de controlo (join, leave, prune…);</li>
+      <li>como a única interface de <strong>entrada</strong> aceite para os dados multicast: se um pacote chegar por outra interface, é <strong>descartado</strong> — evita duplicados e ciclos.</li>
+    </ul>
+    <p>O PIM faz as consultas RPF numa <strong>Multicast Routing Information Base (MRIB)</strong>, parecida com uma tabela de encaminhamento unicast.</p>
+  </section>
+</article>
+
+<!-- ============================ 5.3 PIM ============================ -->
+<article class="page" data-page="pim" data-num="5.3" data-title="PIM-SM e PIM-DM" data-desc="Sparse mode (opt-in) e dense mode (flood and prune).">
+  <header class="ph">
+    <h1>Protocol Independent Multicast<span class="en">PIM Sparse Mode · PIM Dense Mode</span></h1>
+    <p class="lede">O PIM é o protocolo de encaminhamento multicast mais usado. "Independente do protocolo" porque não depende do protocolo de encaminhamento unicast da rede: usa a informação que já existe (a MRIB). Tem dois modos principais.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">5.3.1</span>PIM Sparse Mode (PIM-SM)</h2>
+    <p>Protocolo <strong>opt-in</strong>: só encaminha o tráfego multicast depois de um router a jusante o <strong>pedir</strong>. É o mais usado em ambientes "esparsos", onde poucas partes da rede querem cada grupo.</p>
+    <ol class="steps-list">
+      <li><div>Os hosts indicam interesse com <strong>IGMP</strong> ou <strong>MLD</strong>.</div></li>
+      <li><div>Um dos routers da LAN é eleito <strong>Designated Router (DR)</strong>: é ele que se junta ao grupo e encaminha o tráfego.</div></li>
+      <li><div>Os routers enviam <strong>PIM (*, G) Join</strong> em direção ao RP, criando estado de encaminhamento pelo caminho: a <strong>Rendezvous Point Tree (RPT)</strong>.</div></li>
+      <li><div>Os dados de uma fonte chegam ao RP <strong>encapsulados em unicast</strong>, e daí descem pela árvore partilhada.</div></li>
+    </ol>
+    <ul>
+      <li>Por omissão usa <strong>árvores partilhadas</strong> com raiz no RP, mas também suporta <strong>árvores por fonte</strong>: para evitar o encapsulamento, para otimizar o caminho dos dados e para o SSM.</li>
+      <li>É um protocolo de <strong>soft state</strong>: o estado expira algum tempo depois das mensagens de controlo, por isso os joins são <strong>reenviados periodicamente</strong> para o manter.</li>
+    </ul>
+    <div class="two">
+      <div class="card c1"><span class="tag">Vantagens</span><ul><li>Independente do protocolo unicast da rede.</li><li>Escala bem.</li><li>Suporta SSM e ASM.</li><li>Árvores partilhadas (sem estado por fonte) e por fonte (caminhos mais eficientes).</li></ul></div>
+      <div class="card c2"><span class="tag">Desvantagens</span><ul><li>As árvores partilhadas exigem encapsulamento/desencapsulamento entre a fonte e o RP.</li><li>É preciso um mecanismo para levar os dados da fonte ao RP.</li></ul></div>
+    </div>
+
+    <h2><span class="sn">5.3.2</span>PIM Dense Mode (PIM-DM)</h2>
+    <p>Protocolo <strong>opt-out</strong> (flood and prune), só com <strong>árvores por fonte</strong>. Assume que a maior parte das redes do domínio quer receber os dados, por isso encaminha para todas as interfaces até que um router a jusante peça para parar. Usado em domínios pequenos e redes com poucos recursos.</p>
+    <ol class="steps-list">
+      <li><div><strong>Inundação</strong>: os dados são enviados para toda a rede — mas cada router verifica se o pacote chegou pela interface mais próxima da fonte (RPF); se não, descarta-o.</div></li>
+      <li><div><strong>Prune</strong>: um router que não precisa dos dados envia uma mensagem <strong>PIM (S, G) Prune</strong> a montante, e o router a montante deixa de lhe enviar.</div></li>
+      <li><div>O estado de prune <strong>expira</strong>: os dados voltam a chegar às zonas cortadas, que voltam a fazer prune — ou aceitam, se agora houver interesse.</div></li>
+      <li><div><strong>Graft</strong>: se aparecer um recetor numa zona cortada, o router local envia um <strong>PIM (S, G) Graft</strong> a montante para voltar a entrar na árvore. O graft é confirmado com um <strong>acknowledgment explícito</strong> — o único caso no PIM.</div></li>
+    </ol>
+    <div class="two">
+      <div class="card c1"><span class="tag">Vantagens</span><ul><li>Eficiente quando os recetores estão densamente distribuídos.</li><li>Evita a complexidade de configurar um RP.</li></ul></div>
+      <div class="card c2"><span class="tag">Desvantagens</span><ul><li>Todos os routers guardam estado por fonte, para todas as fontes do domínio.</li><li>Não escala em domínios onde a maioria não quer os dados.</li></ul></div>
+    </div>
+
+    <h2><span class="sn">5.3.3</span>Resumo dos protocolos de encaminhamento multicast</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Protocolo</th><th>Opt-in / opt-out</th><th>Suporta SSM</th><th>Tipo de árvore</th><th>Router a montante via</th></tr></thead>
+      <tbody>
+        <tr><td><strong>PIM-SM</strong></td><td>Opt-in</td><td>Sim</td><td>Partilhada ou por fonte</td><td>MRIB</td></tr>
+        <tr><td><strong>PIM-DM</strong></td><td>Opt-out</td><td>Sim</td><td>Por fonte</td><td>MRIB</td></tr>
+        <tr><td><strong>BIDIR-PIM</strong></td><td>Opt-in</td><td>Não</td><td>Partilhada</td><td>MRIB</td></tr>
+        <tr><td><strong>DVMRP</strong></td><td>Opt-out</td><td>Sim</td><td>Por fonte</td><td>Mecanismo de vetor de distâncias</td></tr>
+        <tr><td><strong>MOSPF</strong></td><td>Opt-in</td><td>Não</td><td>Por fonte</td><td>Mecanismo de estado das ligações</td></tr>
+      </tbody></table></div>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo e perguntas para testar.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Conceito</th><th>Ideia-chave</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Multicast</strong></td><td>Uma cópia para um endereço de grupo; os routers duplicam onde a árvore se ramifica.</td></tr>
+        <tr><td><strong>IGMP / MLD</strong></td><td>Host ↔ router: aderir (Report), verificar (Query); v2 Leave e eleição; v3 filtragem por fonte.</td></tr>
+        <tr><td><strong>ASM / SSM</strong></td><td>Qualquer fonte / grupo + fonte específica.</td></tr>
+        <tr><td><strong>Opt-in / opt-out</strong></td><td>Árvore construída por joins / inundar e cortar (prune).</td></tr>
+        <tr><td><strong>(S, G) / (*, G)</strong></td><td>Árvore por fonte / árvore partilhada com raiz no RP.</td></tr>
+        <tr><td><strong>RPF</strong></td><td>Só se aceitam dados pela interface a caminho da fonte/RP; consulta à MRIB.</td></tr>
+        <tr><td><strong>PIM-SM</strong></td><td>Opt-in, RP, DR, (*,G) Join → RPT, encapsulamento fonte→RP, soft state.</td></tr>
+        <tr><td><strong>PIM-DM</strong></td><td>Opt-out, flood + (S,G) Prune, prune expira, Graft com ack.</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.2</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">Que protocolo usa um host IPv4 para aderir a um grupo multicast?</p>
+        <div class="opts"><button>PIM</button><button data-ok>IGMP</button><button>MLD</button></div>
+        <p class="why">IGMP em IPv4, MLD em IPv6. O PIM é entre routers.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Que versão do IGMP introduz a mensagem Leave Group?</p>
+        <div class="opts"><button>IGMPv1</button><button data-ok>IGMPv2</button><button>IGMPv3</button></div>
+        <p class="why">O IGMPv2 traz o Leave e a eleição do querier; o v3 traz a filtragem por fonte.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Um router envia um Join (*, G). Que árvore está a usar?</p>
+        <div class="opts"><button>Árvore por fonte</button><button data-ok>Árvore partilhada, com raiz no RP</button><button>Nenhuma: é um prune</button></div>
+        <p class="why">(*, G) = qualquer fonte do grupo G, pela árvore partilhada. (S, G) indica uma fonte concreta.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Um router recebe um pacote multicast por uma interface que não é a que leva à fonte. O que faz?</p>
+        <div class="opts"><button>Reencaminha-o para todas as interfaces</button><button data-ok>Descarta-o (falha a verificação RPF)</button><button>Envia-o de volta à fonte</button></div>
+        <p class="why">O RPF evita duplicados e ciclos.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual é o único caso no PIM em que há acknowledgment explícito?</p>
+        <div class="opts"><button>Join no PIM-SM</button><button>Prune no PIM-DM</button><button data-ok>Graft no PIM-DM</button></div>
+        <p class="why">O Graft (voltar a entrar numa zona cortada) é confirmado explicitamente.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Num domínio grande onde poucos routers têm recetores, qual escolhes?</p>
+        <div class="opts"><button data-ok>PIM-SM</button><button>PIM-DM</button></div>
+        <p class="why">O PIM-DM inundaria todo o domínio e obrigaria todos os routers a guardar estado por fonte.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Porque é que o SSM exige árvores por fonte?</p>
+        <div class="opts"><button>Porque não usa IGMP</button><button data-ok>Porque o recetor pede uma fonte específica: a árvore tem de ter raiz nessa fonte, (S, G)</button><button>Porque não tem RP disponível</button></div>
+        <p class="why">Numa árvore partilhada não se distingue a fonte; no SSM a adesão já indica a fonte.</p>
+      </div>
+    </div>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/i18n.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

@@ -49,6 +49,23 @@ window.CATALOG = {
         { id: '04', file: '04-cloud-computing.html', title: 'Computação em Nuvem', en: 'Cloud Computing', status: 'ready', source: '4 - Cloud Computing' },
         { id: '05', file: '05-virtualization-vms.html', title: 'Virtualização: Máquinas Virtuais', en: 'Virtualization (Part I): VMs', status: 'ready', source: '5 - Virtualization Part 1' }
       ]
+    },
+    {
+      id: 'esr',
+      code: 'ESR',
+      name: 'Engenharia de Serviços em Rede',
+      en: 'Network Services Engineering',
+      year: '2026/2027',
+      hue: 25,
+      desc: 'Como funcionam os serviços na Internet: a camada de aplicação, arquiteturas cliente-servidor e P2P, streaming de vídeo e CDNs, programação com sockets e comunicação em grupo com multicast IP.',
+      desc_en: 'How Internet services work: the application layer, client-server and P2P architectures, video streaming and CDNs, socket programming and group communication with IP multicast.',
+      topics: [
+        { id: '01', file: '01-application-layer.html', title: 'Camada de Aplicação: Princípios', en: 'Application Layer: Principles', status: 'ready', source: '1-ESR-Chapter_2' },
+        { id: '02', file: '02-p2p.html', title: 'Aplicações P2P e BitTorrent', en: 'P2P Applications', status: 'ready', source: '1-ESR-Chapter_2' },
+        { id: '03', file: '03-streaming-cdn.html', title: 'Multimédia, Streaming e CDNs', en: 'Video Streaming and CDNs', status: 'ready', source: '1-ESR-Chapter_2' },
+        { id: '04', file: '04-sockets.html', title: 'Programação com Sockets', en: 'Socket Programming', status: 'ready', source: '1-ESR-Chapter_2' },
+        { id: '05', file: '05-multicast.html', title: 'Multicast', en: 'IP Multicast', status: 'ready', source: '2-ESR-Multicast' }
+      ]
     }
   ]
 };
