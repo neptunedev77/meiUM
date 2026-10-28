@@ -436,6 +436,60 @@ h2{scroll-margin-top:72px;border-radius:4px}
   .topic{grid-template-columns:40px minmax(0,1fr)}
   .topic .tr{grid-column:2;align-items:flex-start}
 }
+/* ---------- modo exame ---------- */
+.ex-cta{display:flex;align-items:center;gap:16px;padding:16px 18px;margin-bottom:28px;background:var(--card);border:1px solid var(--rule);border-left:4px solid var(--accent);border-radius:10px;text-decoration:none;color:var(--ink);transition:border-color .15s}
+.ex-cta:hover{border-color:var(--accent)}
+.ex-cta > span:nth-child(2){flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ex-cta b{font-family:var(--f-display);font-size:18px}
+.ex-cta .uc-go{font-family:var(--f-display);font-weight:600;font-size:14px;color:var(--accent);white-space:nowrap}
+.ex-ico{display:grid;place-items:center;width:40px;height:40px;flex:none;border-radius:8px;background:var(--accent-soft);color:var(--accent);font-size:20px}
+.ex-from-quiz{margin-left:auto;align-self:center}
+.exam .row{align-items:center}
+.ex-setup{display:flex;flex-direction:column;gap:26px}
+.ex-field{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.ex-size button{font-size:13px;padding:0 14px;min-height:34px}
+.ex-topics{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:8px;width:100%}
+.ex-topic{display:grid;grid-template-columns:auto 30px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;background:var(--card);border:1px solid var(--rule);border-radius:8px;cursor:pointer}
+.ex-topic:has(input:checked){border-color:var(--accent)}
+.ex-topic input{accent-color:var(--accent);width:16px;height:16px;margin:0}
+.ex-topic .tn{font-family:var(--f-mono);font-weight:600;color:var(--accent)}
+.ex-topic .tt{font-family:var(--f-display);font-size:15px;line-height:1.25}
+.ex-go{gap:14px}
+.ex-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:28px 0 4px}
+.ex-prog{font-family:var(--f-mono);font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.ex-time{margin-left:auto;font-family:var(--f-mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ex-bar{flex:1 1 100%;display:flex;gap:3px}
+.ex-bar button{flex:1;height:8px;padding:0;border:0;border-radius:3px;background:var(--rule);cursor:pointer}
+.ex-bar button.done{background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.ex-bar button.cur{background:var(--accent)}
+.ex-q{margin:18px 0}
+.ex-from{font-family:var(--f-mono);font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.opt.sel{border-color:var(--accent);background:var(--accent-soft)}
+.opt.sel::before{color:var(--accent)}
+.ex-nav{justify-content:space-between}
+.ex-result{padding:40px 0 30px;display:flex;flex-direction:column;gap:10px;border-bottom:2px solid var(--ink);margin-bottom:28px}
+.ex-score{display:flex;align-items:baseline;gap:10px;font-family:var(--f-display)}
+.ex-score b{font-size:76px;line-height:1;font-stretch:110%;font-weight:800}
+.ex-score span{font-size:28px;color:var(--muted)}
+.ex-result.good .ex-score b{color:var(--good)} .ex-result.mid .ex-score b{color:var(--warn)} .ex-result.bad .ex-score b{color:var(--bad)}
+.ex-result .row{margin-top:8px}
+.ex-topics-res{display:flex;flex-direction:column;gap:8px;margin:14px 0 34px}
+.ex-tr{display:grid;grid-template-columns:30px minmax(0,1fr) minmax(90px,32%) 44px;gap:12px;align-items:center}
+.ex-tr .tn{font-family:var(--f-mono);font-weight:600;color:var(--accent)}
+.ex-tr .tt{font-family:var(--f-display);font-size:15px}
+.ex-meter{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--accent) var(--p),var(--rule) var(--p))}
+.ex-tn{font-family:var(--f-mono);font-size:13px;text-align:right;color:var(--ink-2)}
+.ex-rev-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.ex-review{display:flex;flex-direction:column;gap:12px}
+.only-wrong .ex-item.is-ok{display:none}
+.ex-link{align-self:flex-start;font-family:var(--f-display);font-weight:600}
+@media (max-width:600px){
+  .ex-cta .uc-go{display:none}
+  .ex-tr{grid-template-columns:30px minmax(0,1fr) 44px}
+  .ex-meter{grid-column:1 / -1;grid-row:2}
+  .ex-score b{font-size:60px}
+  .ex-go .muted{display:none}}
+
 @media print{
   .nav,.topbar,.pager,.widget .row{display:none!important}
   .app{display:block} .page[hidden]{display:flex!important}

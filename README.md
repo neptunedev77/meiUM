@@ -31,6 +31,7 @@ More courses are added as the master's progresses.
 - **Shareable links** — every page has Open Graph and Twitter Card tags with a preview image, a canonical URL on meium.space, and is listed in `sitemap.xml`. Unknown addresses get a friendly 404 page with search and links to every course.
 - **Self-contained notes** — each topic stands on its own, with examples that can be worked through by hand and code that runs on datasets bundled with scikit-learn, so readers do not need the original slides.
 - **Interactive widgets** — more than 20 SVG-based visualisations: confusion matrices, ROC curves, the LASSO path, decision-tree pruning, k-fold cross-validation, bootstrap sampling, distributed architectures with simulated node failures, Ansible idempotency, VM overcommit, and more.
+- **Exam mode** — a per-course quiz that draws random questions from every topic (with shuffled options), marks them only at the end and shows a score out of 20, a per-topic breakdown and the corrected answers with links back to each section. Wrong answers can be retried on their own. Questions are read straight from the topic pages, so new quizzes join the pool automatically.
 - **Review built in** — every topic ends with a cheat sheet, common pitfalls, multiple-choice questions with explanations and worked exercises.
 - **Clear sourcing** — material that goes beyond what was taught in class is tagged as *supplementary*, and can be hidden with one toggle.
 - **Formulas** rendered with KaTeX; **code** with syntax highlighting and a copy button.
@@ -55,6 +56,7 @@ More courses are added as the master's progresses.
 ```
 index.html                 Home page (course list, generated from the catalogue)
 404.html                   Not-found page (served by Vercel for any unknown path)
+exam.html                  Exam mode (exam.html?uc=daa)
 daa/                       Data and Machine Learning
   index.html               Course page (topic list)
   01-…html … 07-…html      One file per topic

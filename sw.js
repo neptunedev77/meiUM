@@ -16,7 +16,7 @@ const CACHE = 'meium-' + VERSION;
 self.window = self;                 /* o catalog.js escreve em window.CATALOG */
 importScripts('assets/js/catalog.js');
 
-const PAGES = ['./', 'index.html', '404.html'];
+const PAGES = ['./', 'index.html', '404.html', 'exam.html'];
 self.CATALOG.ucs.forEach(uc => {
   PAGES.push(`${uc.id}/index.html`);
   uc.topics.filter(t => t.status === 'ready').forEach(t => PAGES.push(`${uc.id}/${t.file}`));

@@ -19,7 +19,7 @@
   const ROOT = (body.dataset.root || '.').replace(/\/$/, '');
   const url = p => `${ROOT}/${p}`;
   const CAT = window.CATALOG;
-  const uc = CAT.ucs.find(u => u.id === body.dataset.uc);
+  const uc = CAT.ucs.find(u => u.id === (body.dataset.uc || new URLSearchParams(location.search).get('uc')));
   const topic = uc && uc.topics.find(t => t.id === body.dataset.topic);
   if (uc) html.style.setProperty('--hue', uc.hue);
 
@@ -343,10 +343,210 @@
         <p class="lede">${esc(tDesc(uc))}</p>
         <div class="meta"><span class="pill p-acc">${t('nTopics', uc.topics.length)}</span>${uc.staff ? `<span class="small muted">${t('staff')}: ${esc(uc.staff)}</span>` : ''}</div>
       </section>
+      ${uc.topics.some(x => x.status === 'ready') ? `<a class="ex-cta" href="${url('exam.html?uc=' + uc.id)}">
+        <span class="ex-ico" aria-hidden="true">✎</span><span><b>${t('examCta')}</b><span class="small muted">${t('examCtaSub')}</span></span>
+        <span class="uc-go">${t('open')} <span aria-hidden="true">→</span></span></a>` : ''}
       <h2 style="margin-bottom:14px">${t('topics')}</h2>
       <div class="topics">${rows}</div>`;
     root.before(siteBar(`<a href="${url('index.html')}">${t('home')}</a><span>/</span><span>${esc(uc.code)}</span>`));
     root.after(siteFoot());
+  }
+
+  /* =====================================================================
+     Modo exame (exam.html?uc=daa): perguntas aleatórias de todos os temas
+     de uma UC, tiradas dos quizzes (.quiz) das próprias páginas. As respostas
+     só são corrigidas no fim. Nada fica guardado.
+     ===================================================================== */
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+  function parseQuizzes(html, x) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const out = [];
+    $$('article.page', doc).forEach(a => {
+      const hs = $$('h2', a);
+      $$('.quiz', a).forEach(q => {
+        /* secção = último h2 antes da pergunta (para o link "rever no tema") */
+        let sec = -1;
+        hs.forEach((h, i) => { if (h.compareDocumentPosition(q) & Node.DOCUMENT_POSITION_FOLLOWING) sec = i; });
+        $$('.qn', q).forEach(e => e.remove());
+        out.push({
+          tid: x.id, topic: x,
+          href: `${uc.id}/${x.file}#${a.dataset.page}${sec >= 0 ? '/' + sec : ''}`,
+          q: $('.qq', q).innerHTML.trim(),
+          opts: $$('.opts > button', q).map(b => ({ h: b.innerHTML.trim(), ok: b.hasAttribute('data-ok') })),
+          why: ($('.why', q) || { innerHTML: '' }).innerHTML.trim()
+        });
+      });
+    });
+    return out.filter(q => q.opts.some(o => o.ok));
+  }
+
+  function renderExam(root) {
+    uiLang(root);
+    root.classList.add('exam');
+    root.before(siteBar(`<a href="${url('index.html')}">${t('home')}</a><span>/</span><a href="${url(uc.id + '/index.html')}">${esc(uc.code)}</a><span>/</span><span>${t('exam')}</span>`));
+    root.after(siteFoot());
+    document.title = `${t('exam')} · ${uc.code} · meiUM`;
+    const ready = uc.topics.filter(x => x.status === 'ready');
+    let POOL = null, S = null;              /* S: { qs, ans, i, t0, t1 } */
+    let size = 20, picked = new Set(ready.map(x => x.id));
+    const top = () => window.scrollTo({ top: 0, behavior: 'instant' });
+
+    root.innerHTML = `<p class="muted">${t('examLoading')}</p>`;
+    Promise.all(ready.map(x => fetch(url(`${uc.id}/${x.file}`))
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(h => parseQuizzes(h, x))))
+      .then(r => { POOL = r.flat(); setup(); })
+      .catch(() => { root.innerHTML = `<p class="muted">${location.protocol === 'file:' ? t('searchFile') : t('examFail')}</p>`; });
+
+    /* --- 1. configuração --- */
+    function setup() {
+      const count = id => POOL.filter(q => q.tid === id).length;
+      root.innerHTML = `
+        <section class="hero">
+          <p class="eyebrow">${esc(uc.code)} · ${esc(uc.year)}</p>
+          <h1>${t('exam')}<span class="en">${esc(tName(uc))}</span></h1>
+          <p class="lede">${t('examLede', POOL.length, ready.length)}</p>
+        </section>
+        <div class="ex-setup">
+          <div class="ex-field"><span class="set-lbl">${t('examCount')}</span><span class="lang-seg ex-size" role="group" data-size></span></div>
+          <div class="ex-field"><span class="set-lbl">${t('topics')}</span>
+            <div class="ex-topics">${ready.map(x => `<label class="ex-topic"><input type="checkbox" value="${x.id}" ${picked.has(x.id) ? 'checked' : ''}>
+              <span class="tn">${x.id}</span><span class="tt">${esc(tName(x))}</span><span class="muted small">${count(x.id)}</span></label>`).join('')}</div>
+            <div class="row"><button class="btn sm" type="button" data-all>${t('examAll')}</button><button class="btn sm" type="button" data-none>${t('examNone')}</button></div></div>
+          <div class="row ex-go"><button class="btn primary" type="button" data-start></button><span class="small muted">${t('examHint')}</span></div>
+        </div>`;
+      const avail = () => POOL.filter(q => picked.has(q.tid)).length;
+      const paint = () => {
+        const n = avail();
+        $('[data-size]', root).innerHTML = [10, 20, 30].filter(k => k < n).concat(n ? [n] : []).map(k =>
+          `<button type="button" data-k="${k}" aria-pressed="${Math.min(size, n) === k}">${k === n ? t('examAllN', n) : k}</button>`).join('');
+        $$('[data-k]', root).forEach(b => b.addEventListener('click', () => { size = +b.dataset.k; paint(); }));
+        const go = $('[data-start]', root);
+        go.disabled = !n;
+        go.textContent = t('examStart', Math.min(size, n));
+      };
+      $$('.ex-topic input', root).forEach(c => c.addEventListener('change', () => { c.checked ? picked.add(c.value) : picked.delete(c.value); paint(); }));
+      $('[data-all]', root).addEventListener('click', () => { picked = new Set(ready.map(x => x.id)); $$('.ex-topic input', root).forEach(c => { c.checked = true; }); paint(); });
+      $('[data-none]', root).addEventListener('click', () => { picked.clear(); $$('.ex-topic input', root).forEach(c => { c.checked = false; }); paint(); });
+      $('[data-start]', root).addEventListener('click', () => {
+        const pool = POOL.filter(q => picked.has(q.tid));
+        start(shuffle(pool).slice(0, Math.min(size, pool.length)));
+      });
+      paint();
+      top();
+    }
+
+    /* --- 2. exame: uma pergunta de cada vez --- */
+    function start(qs) {
+      S = { qs: qs.map(q => ({ ...q, opts: shuffle(q.opts) })), ans: qs.map(() => null), i: 0, t0: Date.now(), t1: 0 };
+      question();
+      top();
+    }
+    const clock = ms => { const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+    let tick = null;
+    function question() {
+      const q = S.qs[S.i], n = S.qs.length, last = S.i === n - 1;
+      const left = S.ans.filter(a => a === null).length;
+      root.innerHTML = `
+        <div class="ex-head">
+          <span class="ex-prog">${t('examQ', S.i + 1, n)}</span>
+          <span class="ex-time" data-time>${clock(Date.now() - S.t0)}</span>
+          <button class="btn sm" type="button" data-finish>${t('examFinish')}</button>
+          <div class="ex-bar">${S.qs.map((_, k) => `<button type="button" data-go="${k}" aria-label="${t('examQ', k + 1, S.qs.length)}" class="${k === S.i ? 'cur' : ''} ${S.ans[k] !== null ? 'done' : ''}"></button>`).join('')}</div>
+        </div>
+        <div class="quiz ex-q">
+          <span class="ex-from">${t('topicN', +q.tid)} · ${esc(tName(q.topic))}</span>
+          <p class="qq">${q.q}</p>
+          <div class="opts">${q.opts.map((o, k) => `<button type="button" class="opt${S.ans[S.i] === k ? ' sel' : ''}" data-l="${'ABCDEFG'[k]}" data-o="${k}" aria-pressed="${S.ans[S.i] === k}">${o.h}</button>`).join('')}</div>
+        </div>
+        <div class="row ex-nav">
+          <button class="btn" type="button" data-prev ${S.i ? '' : 'disabled'}>${t('prev')}</button>
+          <span class="small muted">${left ? t('examLeft', left) : ''}</span>
+          <button class="btn ${last ? 'primary' : ''}" type="button" data-next>${last ? t('examSee') : t('next')}</button>
+        </div>`;
+      $$('[data-o]', root).forEach(b => b.addEventListener('click', () => pick(+b.dataset.o)));
+      $('[data-prev]', root).addEventListener('click', () => move(-1));
+      $('[data-next]', root).addEventListener('click', () => (last ? finish() : move(1)));
+      $('[data-finish]', root).addEventListener('click', finish);
+      $$('[data-go]', root).forEach(b => b.addEventListener('click', () => { S.i = +b.dataset.go; question(); }));
+      renderMath(root);
+      clearInterval(tick);
+      tick = setInterval(() => { const el = $('[data-time]', root); if (el) el.textContent = clock(Date.now() - S.t0); else clearInterval(tick); }, 1000);
+    }
+    function pick(k) {
+      S.ans[S.i] = k;
+      $$('[data-o]', root).forEach(b => { const on = +b.dataset.o === k; b.classList.toggle('sel', on); b.setAttribute('aria-pressed', on); });
+      $$('.ex-bar button', root)[S.i].classList.add('done');
+      const left = S.ans.filter(a => a === null).length;
+      $('.ex-nav .muted', root).textContent = left ? t('examLeft', left) : '';
+    }
+    function move(d) {
+      const i = S.i + d;
+      if (i < 0 || i >= S.qs.length) return;
+      S.i = i; question();
+    }
+
+    /* --- 3. resultado --- */
+    function finish() {
+      clearInterval(tick);
+      S.t1 = Date.now();
+      const res = S.qs.map((q, k) => ({ q, a: S.ans[k], ok: S.ans[k] !== null && q.opts[S.ans[k]].ok }));
+      const ok = res.filter(r => r.ok).length, n = res.length;
+      const grade = (20 * ok / n).toLocaleString(LANG === 'en' ? 'en-GB' : 'pt-PT', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      const pct = Math.round(100 * ok / n);
+      const by = ready.map(x => { const r = res.filter(r => r.q.tid === x.id); return { x, n: r.length, ok: r.filter(r => r.ok).length }; }).filter(b => b.n);
+      const wrong = res.filter(r => !r.ok);
+      const cls = pct >= 75 ? 'good' : pct >= 50 ? 'mid' : 'bad';
+      root.innerHTML = `
+        <section class="ex-result ${cls}">
+          <p class="eyebrow">${t('examResult')}</p>
+          <div class="ex-score"><b>${ok}</b><span>/ ${n}</span></div>
+          <p class="lede">${t('examGrade', grade, pct)} · ${t('examTime', clock(S.t1 - S.t0))}</p>
+          <p>${t(pct >= 75 ? 'examMsgGood' : pct >= 50 ? 'examMsgMid' : 'examMsgBad')}</p>
+          <div class="row">${wrong.length ? `<button class="btn primary" type="button" data-retry>${t('examRetry', wrong.length)}</button>` : ''}
+            <button class="btn" type="button" data-new>${t('examNew')}</button></div>
+        </section>
+        <h2>${t('examByTopic')}</h2>
+        <div class="ex-topics-res">${by.map(b => `<div class="ex-tr"><span class="tn">${b.x.id}</span><span class="tt">${esc(tName(b.x))}</span>
+          <span class="ex-meter" style="--p:${100 * b.ok / b.n}%"></span><span class="ex-tn">${b.ok}/${b.n}</span></div>`).join('')}</div>
+        <div class="ex-rev-head"><h2>${t('examReview')}</h2>
+          ${wrong.length && wrong.length < n ? `<label class="set-check"><input type="checkbox" data-only checked> ${t('examOnlyWrong')}</label>` : ''}</div>
+        <div class="ex-review">${res.map((r, k) => `
+          <div class="quiz answered ex-item ${r.ok ? 'is-ok' : 'is-no'}">
+            <span class="ex-from"><span class="pill ${r.ok ? 'p-good' : r.a === null ? 'p-mid' : 'p-bad'}">${r.ok ? '✓' : r.a === null ? t('examBlank') : '✗'}</span>
+              Q${k + 1} · ${t('topicN', +r.q.tid)} · ${esc(tName(r.q.topic))}</span>
+            <p class="qq">${r.q.q}</p>
+            <div class="opts">${r.q.opts.map((o, j) => `<button type="button" class="opt ${o.ok ? 'ok' : j === r.a ? 'no' : ''}" data-l="${'ABCDEFG'[j]}" disabled>${o.h}</button>`).join('')}</div>
+            ${r.q.why ? `<p class="why">${r.q.why}</p>` : ''}
+            <a class="ex-link small" href="${url(r.q.href)}">${t('examGoTo')}</a>
+          </div>`).join('')}</div>`;
+      const only = $('[data-only]', root);
+      const filt = () => root.classList.toggle('only-wrong', !!(only && only.checked));
+      if (only) only.addEventListener('change', filt);
+      filt();
+      const retry = $('[data-retry]', root);
+      if (retry) retry.addEventListener('click', () => start(shuffle(wrong.map(r => r.q))));
+      $('[data-new]', root).addEventListener('click', setup);
+      renderMath(root);
+      S.done = true;
+      top();
+    }
+
+    /* teclado: 1–9 ou A–G escolhe, Enter/→ avança, ← recua */
+    document.addEventListener('keydown', e => {
+      if (!S || S.done || !$('.ex-q', root) || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (e.target.closest && e.target.closest('input,textarea,select,[contenteditable]')) return;
+      if (document.body.classList.contains('sm-open')) return;
+      const k = e.key.toLowerCase(), n = S.qs[S.i].opts.length;
+      let o = /^[1-9]$/.test(k) ? +k - 1 : 'abcdefg'.indexOf(k);
+      if (o >= 0 && o < n && k.length === 1) { e.preventDefault(); pick(o); return; }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); move(-1); }
+      if (e.key === 'ArrowRight' || e.key === 'Enter') {
+        if (e.key === 'Enter' && e.target.closest && e.target.closest('a, button:not([data-o])')) return;   /* Enter noutro botão faz o próprio click */
+        e.preventDefault(); S.i === S.qs.length - 1 ? finish() : move(1);
+      }
+    });
   }
 
   /* página 404 (404.html na raiz; o Vercel serve-a para qualquer caminho, daí data-root="/") */
@@ -546,7 +746,7 @@
       $$('.quiz .qq', s).forEach((p, i) => p.insertAdjacentHTML('afterbegin', `<span class="qn">Q${i + 1}</span>`));
       const bar = document.createElement('div');
       bar.className = 'row';
-      bar.innerHTML = `<span class="quiz-score"></span><button class="btn sm" type="button">${t('restart')}</button>`;
+      bar.innerHTML = `<span class="quiz-score"></span><button class="btn sm" type="button">${t('restart')}</button>${uc ? `<a class="small ex-from-quiz" href="${url('exam.html?uc=' + uc.id)}">${t('examFromQuiz')}</a>` : ''}`;
       s.appendChild(bar);
       $('button', bar).addEventListener('click', () => {
         $$('.quiz', s).forEach(q => { q.classList.remove('answered'); $$('.opt', q).forEach(o => { o.disabled = false; o.classList.remove('ok', 'no'); }); });
@@ -583,9 +783,9 @@
   }
 
   /* --- fórmulas: KaTeX com \( … \) e \[ … \] --- */
-  function renderMath() {
+  function renderMath(el = document.body) {
     if (typeof window.renderMathInElement !== 'function') return;
-    window.renderMathInElement(document.body, {
+    window.renderMathInElement(el, {
       delimiters: [{ left: '\\[', right: '\\]', display: true }, { left: '\\(', right: '\\)', display: false }],
       throwOnError: false
     });
@@ -605,6 +805,7 @@
   if (view === 'home') renderHome($('#main'));
   else if (view === 'uc' && uc) renderUC($('#main'));
   else if (view === '404') renderNotFound($('#main'));
+  else if (view === 'exam') uc ? renderExam($('#main')) : location.replace(url('index.html'));
   if (view === 'topic' && uc && topic) {
     enhanceCode();
     enhanceQuizzes();
@@ -613,6 +814,6 @@
     renderTopic();
     localizeTags();
     if (document.readyState === 'complete') renderMath();
-    else window.addEventListener('load', renderMath);
+    else window.addEventListener('load', () => renderMath());
   }
 })();
