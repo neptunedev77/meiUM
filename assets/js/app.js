@@ -347,6 +347,27 @@
     root.after(siteFoot());
   }
 
+  /* página 404 (404.html na raiz; o Vercel serve-a para qualquer caminho, daí data-root="/") */
+  function renderNotFound(root) {
+    uiLang(root);
+    const cards = CAT.ucs.map(u => `<a class="uc-card" style="--h:${u.hue}" href="${url(u.id + '/index.html')}">
+        <span class="code-l">${esc(u.code)}</span><b>${esc(tName(u))}</b>
+        <span class="uc-foot"><span class="uc-go">${t('open')} <span aria-hidden="true">→</span></span></span></a>`).join('');
+    root.innerHTML = `
+      <section class="hero">
+        <p class="eyebrow">${t('nfEyebrow')}</p>
+        <h1>${t('nfTitle')}</h1>
+        <p class="lede">${t('nfLede')}</p>
+        <div class="meta"><a class="btn primary" href="${url('index.html')}">${t('nfHome')}</a>
+          <button class="btn" type="button" data-nf-search>${t('nfSearch')} <kbd>Ctrl K</kbd></button></div>
+      </section>
+      <h2 style="margin-bottom:14px">${t('ucs')}</h2>
+      <div class="uc-grid">${cards}</div>`;
+    $('[data-nf-search]', root).addEventListener('click', () => openSearch());
+    root.before(siteBar(''));
+    root.after(siteFoot());
+  }
+
   /* =====================================================================
      Vista de tema
      ===================================================================== */
@@ -581,6 +602,7 @@
   const view = body.dataset.view;
   if (view === 'home') renderHome($('#main'));
   else if (view === 'uc' && uc) renderUC($('#main'));
+  else if (view === '404') renderNotFound($('#main'));
   if (view === 'topic' && uc && topic) {
     enhanceCode();
     enhanceQuizzes();

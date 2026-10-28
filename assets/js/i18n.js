@@ -66,7 +66,13 @@ window.I18N = {
     offlineReady: '✓ Disponível offline: o site inteiro está guardado neste dispositivo.',
     offlinePrep: 'A guardar o site para poder ser usado sem ligação…',
     offlineNo: 'Indisponível ao abrir os ficheiros diretamente (precisa de HTTP).',
-    offlineNow: 'Sem ligação — estás a ver a versão guardada.'
+    offlineNow: 'Sem ligação — estás a ver a versão guardada.',
+    // página 404
+    nfEyebrow: 'Erro 404',
+    nfTitle: 'Esta página não existe.',
+    nfLede: 'O endereço pode estar mal escrito, ou o tema mudou de sítio. Procura-o na pesquisa ou começa por uma das unidades curriculares.',
+    nfHome: '← Página inicial',
+    nfSearch: 'Pesquisar'
   },
   en: {
     langName: 'English',
@@ -123,6 +129,11 @@ window.I18N = {
     offlineReady: '✓ Available offline: the whole site is stored on this device.',
     offlinePrep: 'Saving the site so it can be used without a connection…',
     offlineNo: 'Unavailable when opening the files directly (needs HTTP).',
-    offlineNow: 'No connection — you are viewing the saved version.'
+    offlineNow: 'No connection — you are viewing the saved version.',
+    nfEyebrow: 'Error 404',
+    nfTitle: 'This page does not exist.',
+    nfLede: 'The address may be mistyped, or the topic may have moved. Look it up with search, or start from one of the courses.',
+    nfHome: '← Home',
+    nfSearch: 'Search'
   }
 };

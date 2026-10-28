@@ -5,17 +5,18 @@
    - Páginas, CSS e JS: primeiro a rede (para ver sempre a versão mais
      recente); se a rede falhar ou demorar mais de 4 s, a cópia guardada.
    - Fontes, KaTeX e imagens: primeiro a cache (quase nunca mudam).
+   - Sem ligação, um endereço que não esteja guardado mostra a 404.html.
    Ao acrescentar um tema ao catalog.js, o browser deteta a mudança
    (o catálogo é importado aqui) e volta a guardar o site.
    Para forçar uma atualização completa, muda VERSION.
    ===================================================================== */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = 'meium-' + VERSION;
 
 self.window = self;                 /* o catalog.js escreve em window.CATALOG */
 importScripts('assets/js/catalog.js');
 
-const PAGES = ['./', 'index.html'];
+const PAGES = ['./', 'index.html', '404.html'];
 self.CATALOG.ucs.forEach(uc => {
   PAGES.push(`${uc.id}/index.html`);
   uc.topics.filter(t => t.status === 'ready').forEach(t => PAGES.push(`${uc.id}/${t.file}`));
@@ -78,8 +79,13 @@ const STATIC = /\.(woff2|png|svg|ico)$|\/vendor\//;
 function networkFirst(req) {
   return new Promise(resolve => {
     let done = false;
-    const fromCache = () => caches.match(req, { ignoreSearch: true })
-      .then(r => r || (req.mode === 'navigate' ? caches.match('index.html') : undefined));
+    /* páginas: /daa/ está guardada como /daa/index.html; o que não existir mostra a 404 */
+    const fromCache = () => caches.match(req, { ignoreSearch: true }).then(r => {
+      if (r || req.mode !== 'navigate') return r;
+      const path = new URL(req.url).pathname;
+      return (path.endsWith('/') ? caches.match(path + 'index.html') : Promise.resolve())
+        .then(r2 => r2 || caches.match('404.html'));
+    });
     const timer = setTimeout(() => fromCache().then(r => { if (r && !done) { done = true; resolve(r); } }), 4000);
     fetch(req).then(res => {
       if (res.ok && res.type === 'basic') { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }

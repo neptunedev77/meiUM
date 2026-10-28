@@ -28,6 +28,7 @@ More courses are added as the master's progresses.
 
 - **Global search** — <kbd>Ctrl</kbd>+<kbd>K</kbd> or <kbd>/</kbd> searches titles, sections and text across every course (accent-insensitive) and jumps straight to the matching section. The index is built in the browser from the published pages, so it never goes stale and needs no build step.
 - **Works offline** — a service worker stores the whole site on first visit, so every topic, formula and the search keep working without a connection. It can be installed as an app (PWA) on desktop and mobile.
+- **Shareable links** — every page has Open Graph and Twitter Card tags with a preview image, a canonical URL on meium.space, and is listed in `sitemap.xml`. Unknown addresses get a friendly 404 page with search and links to every course.
 - **Self-contained notes** — each topic stands on its own, with examples that can be worked through by hand and code that runs on datasets bundled with scikit-learn, so readers do not need the original slides.
 - **Interactive widgets** — more than 20 SVG-based visualisations: confusion matrices, ROC curves, the LASSO path, decision-tree pruning, k-fold cross-validation, bootstrap sampling, distributed architectures with simulated node failures, Ansible idempotency, VM overcommit, and more.
 - **Review built in** — every topic ends with a cheat sheet, common pitfalls, multiple-choice questions with explanations and worked exercises.
@@ -53,6 +54,7 @@ More courses are added as the master's progresses.
 
 ```
 index.html                 Home page (course list, generated from the catalogue)
+404.html                   Not-found page (served by Vercel for any unknown path)
 daa/                       Data and Machine Learning
   index.html               Course page (topic list)
   01-…html … 07-…html      One file per topic
@@ -67,8 +69,10 @@ assets/
   js/app.js                Navigation, routing, pagination, quizzes, code blocks, settings
   js/i18n.js               Interface strings in Portuguese and English
   js/widgets.js            Reusable interactive widgets
-  img/                     Favicon and app icons
+  img/                     Favicon, app icons and the link-preview image (og.png)
 templates/topic.html       Starter file showing every available component
+tools/seo.py               Generates sharing meta tags and sitemap.xml
+sitemap.xml, robots.txt    For search engines
 sw.js                      Service worker (offline cache)
 manifest.webmanifest       App manifest (installable PWA)
 vercel.json
@@ -91,7 +95,7 @@ Then visit <http://localhost:5173>.
 1. Copy `templates/topic.html` to `<course>/NN-slug.html`.
 2. Set `data-uc` and `data-topic` on the `<body>` element.
 3. Register the topic in `assets/js/catalog.js` with `status: 'ready'` (the `file` field must match the file name).
-4. Bump `VERSION` in `sw.js` so returning visitors download the new topic for offline use.
+4. Run `python tools/seo.py` to add the sharing tags (Open Graph, canonical URL) to the new page and refresh `sitemap.xml`.
 
 The sidebar, pagination, topic map and links between topics are generated automatically.
 
