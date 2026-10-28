@@ -50,7 +50,17 @@ window.I18N = {
     restart: '↺ Recomeçar',
     score: (ok, ans, n) => `${ok} certas em ${ans} respondidas (de ${n})`,
     nQuestions: n => `${n} perguntas`,
-    widgetError: 'Erro ao carregar o exemplo interativo.'
+    widgetError: 'Erro ao carregar o exemplo interativo.',
+    // pesquisa
+    search: 'Pesquisar', close: 'Fechar',
+    searchPlaceholder: 'Pesquisar em todas as UCs… ex.: matriz de confusão, PIM, Ansible',
+    searchResults: 'Resultados da pesquisa',
+    searchMove: 'navegar', searchOpen: 'abrir',
+    searchHint: 'Escreve para pesquisar títulos, secções e texto de todos os temas.',
+    searchLoading: 'A preparar o índice de pesquisa…',
+    searchEmpty: q => `Sem resultados para "${q}". Experimenta outras palavras ou o termo em inglês.`,
+    searchFile: 'A pesquisa precisa que o site seja servido por HTTP (ex.: <code>python -m http.server</code>); não funciona ao abrir os ficheiros diretamente.',
+    searchFail: 'Não foi possível carregar o índice de pesquisa. Verifica a ligação e tenta de novo.'
   },
   en: {
     langName: 'English',
@@ -93,6 +103,15 @@ window.I18N = {
     restart: '↺ Restart',
     score: (ok, ans, n) => `${ok} correct out of ${ans} answered (${n} in total)`,
     nQuestions: n => `${n} questions`,
-    widgetError: 'Could not load the interactive example.'
+    widgetError: 'Could not load the interactive example.',
+    search: 'Search', close: 'Close',
+    searchPlaceholder: 'Search all courses… e.g. confusion matrix, PIM, Ansible',
+    searchResults: 'Search results',
+    searchMove: 'move', searchOpen: 'open',
+    searchHint: 'Type to search titles, sections and text across all topics. Content is in Portuguese, but English technical terms work too.',
+    searchLoading: 'Preparing the search index…',
+    searchEmpty: q => `No results for "${q}". Try other words, or the Portuguese term.`,
+    searchFile: 'Search needs the site to be served over HTTP (e.g. <code>python -m http.server</code>); it does not work when opening the files directly.',
+    searchFail: 'Could not load the search index. Check your connection and try again.'
   }
 };

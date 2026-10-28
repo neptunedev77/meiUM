@@ -60,6 +60,9 @@
     const w = uiLang(document.createElement('div'));
     w.className = 'tools' + (opts.up ? ' up' : '') + (opts.left ? ' left' : '');
     w.innerHTML = `
+      <button type="button" class="icon-btn" data-a="search" title="${t('search')} (Ctrl+K)" aria-label="${t('search')}">
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
       <span class="lang-seg" role="group" aria-label="${t('language')}">
         <button type="button" data-lang="pt" lang="pt" title="Português">PT</button><button type="button" data-lang="en" lang="en" title="English">EN</button>
       </span>
@@ -91,6 +94,7 @@
       const v = THEMES[(THEMES.indexOf(store.get('theme', 'auto')) + 1) % THEMES.length];
       store.set('theme', v); applyTheme(v); document.dispatchEvent(new CustomEvent('meium:prefs'));
     });
+    $('[data-a="search"]', w).addEventListener('click', () => openSearch());
     w.addEventListener('click', e => {
       const l = e.target.closest('[data-lang]'), f = e.target.closest('[data-fs]');
       if (l && l.dataset.lang !== LANG) { store.set('lang', l.dataset.lang); location.reload(); }
@@ -108,6 +112,149 @@
 
   /* a etiqueta "complemento" das páginas acompanha o idioma da interface */
   function localizeTags() { if (LANG === 'en') $$('.xtag').forEach(x => { x.textContent = t('extraTag'); }); }
+
+  /* =====================================================================
+     Pesquisa global (Ctrl+K ou /)
+     O índice constrói-se no browser na primeira pesquisa: vai buscar as páginas
+     dos temas prontos (catalog.js), parte-as em secções (um h2 = uma entrada)
+     e guarda o resultado na sessão. Não há passo de build nem índice desatualizado.
+     ===================================================================== */
+  const SEARCH_KEY = 'meium:search:v4:' + CAT.ucs.map(u => u.id + u.topics.filter(x => x.status === 'ready').length).join('');
+  let INDEX = null, indexing = null;
+  /* minúsculas e sem acentos, mantendo o comprimento (para destacar no texto original) */
+  const fold = s => s.split('').map(c => (c.normalize('NFD')[0] || c)).join('').toLowerCase();
+  const clean = s => s.replace(/\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)/g, ' ').replace(/\s+/g, ' ').trim();
+
+  function parseTopic(html, u, x) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    $$('script, style, svg, .widget', doc).forEach(e => e.remove());
+    /* separar o texto de elementos vizinhos (células, itens, botões), senão as palavras colam */
+    $$('p, li, td, th, dt, dd, div, button, h1, h3, summary, pre, br, span.en, .tag, .lbl, .pill', doc).forEach(e => { e.prepend(' '); e.append(' '); });
+    const out = [];
+    $$('article.page', doc).forEach(a => {
+      const base = { uc: u.code, href: `${u.id}/${x.file}`, tid: x.id, tt: x.title, te: x.en, page: a.dataset.page, pt: a.dataset.title, num: a.dataset.num || '' };
+      const ph = $('.ph', a);
+      out.push({ ...base, sec: -1, h: a.dataset.title, text: clean(ph ? ph.textContent : '') });
+      $$('h2', a).forEach((h, i) => {
+        /* o texto da secção vai do h2 até ao h2 seguinte (há secções com vários h2) */
+        let txt = '', n = h.nextElementSibling;
+        while (n && n.tagName !== 'H2') { txt += ' ' + n.textContent; n = n.nextElementSibling; }
+        if (!h.nextElementSibling && h.parentElement !== a) txt = h.parentElement.textContent.replace(h.textContent, '');
+        const sn = $('.sn', h);
+        out.push({ ...base, sec: i, h: clean(h.textContent.replace(sn ? sn.textContent : '', '')), text: clean(txt) });
+      });
+    });
+    return out;
+  }
+  function buildIndex() {
+    if (INDEX) return Promise.resolve(INDEX);
+    if (indexing) return indexing;
+    try { const c = sessionStorage.getItem(SEARCH_KEY); if (c) { INDEX = JSON.parse(c); return Promise.resolve(INDEX); } } catch { /* sem cache */ }
+    const jobs = [];
+    CAT.ucs.forEach(u => u.topics.filter(x => x.status === 'ready').forEach(x => jobs.push(
+      fetch(url(`${u.id}/${x.file}`)).then(r => { if (!r.ok) throw new Error(r.status); return r.text(); }).then(h => parseTopic(h, u, x)))));
+    indexing = Promise.all(jobs).then(r => {
+      INDEX = r.flat();
+      try {
+        Object.keys(sessionStorage).filter(k => k.startsWith('meium:search:') && k !== SEARCH_KEY).forEach(k => sessionStorage.removeItem(k));
+        sessionStorage.setItem(SEARCH_KEY, JSON.stringify(INDEX));
+      } catch { /* demasiado grande ou bloqueado */ }
+      return INDEX;
+    }).finally(() => { indexing = null; });
+    return indexing;
+  }
+  function runSearch(q) {
+    const toks = fold(q).split(/\s+/).filter(w => w.length > 1 || /\d/.test(w));
+    if (!toks.length) return [];
+    const whole = fold(q.trim());
+    return INDEX.map(it => {
+      const H = fold(it.h), P = fold(it.pt + ' ' + it.tt + ' ' + (it.te || '') + ' ' + it.uc), T = fold(it.text);
+      let s = 0;
+      for (const k of toks) {
+        const inH = H.includes(k), inP = P.includes(k), inT = T.includes(k);
+        if (!inH && !inP && !inT) return null;
+        s += (inH ? 12 : 0) + (inP ? 4 : 0) + (inT ? 1 + Math.min(4, T.split(k).length - 2) : 0);
+      }
+      if (H.includes(whole)) s += 20; else if (T.includes(whole)) s += 6;
+      if (it.sec === -1) s += 2;
+      return { it, s };
+    }).filter(Boolean).sort((a, b) => b.s - a.s).slice(0, 30);
+  }
+  /* excerto à volta da primeira ocorrência, com os termos destacados */
+  function snippet(text, toks) {
+    const F = fold(text);
+    let at = -1; for (const k of toks) { const i = F.indexOf(k); if (i >= 0 && (at < 0 || i < at)) at = i; }
+    const a = Math.max(0, at - 70), b = Math.min(text.length, (at < 0 ? 0 : at) + 150);
+    return (a > 0 ? '… ' : '') + mark(text.slice(a, b), toks) + (b < text.length ? ' …' : '');
+  }
+  function mark(s, toks) {
+    const F = fold(s), hit = new Array(s.length).fill(false);
+    toks.forEach(k => { let i = F.indexOf(k); while (i >= 0) { for (let j = i; j < i + k.length; j++) hit[j] = true; i = F.indexOf(k, i + k.length); } });
+    let out = '', on = false;
+    for (let i = 0; i < s.length; i++) { if (hit[i] !== on) { out += hit[i] ? '<mark>' : '</mark>'; on = hit[i]; } out += esc(s[i]); }
+    return out + (on ? '</mark>' : '');
+  }
+
+  let SM = null;
+  function openSearch() {
+    if (!SM) {
+      SM = uiLang(document.createElement('div'));
+      SM.className = 'search-modal'; SM.hidden = true;
+      SM.innerHTML = `<div class="sm-box" role="dialog" aria-modal="true" aria-label="${t('search')}">
+          <div class="sm-bar"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+            <input type="search" placeholder="${t('searchPlaceholder')}" aria-label="${t('search')}" autocomplete="off" spellcheck="false">
+            <button type="button" class="sm-esc" aria-label="${t('close')}">Esc</button></div>
+          <div class="sm-results" role="listbox" aria-label="${t('searchResults')}"></div>
+          <div class="sm-foot"><span><kbd>↑</kbd> <kbd>↓</kbd> ${t('searchMove')}</span><span><kbd>Enter</kbd> ${t('searchOpen')}</span><span><kbd>Esc</kbd> ${t('close')}</span></div>
+        </div>`;
+      document.body.appendChild(SM);
+      const inp = $('input', SM), res = $('.sm-results', SM);
+      let sel = 0, items = [], timer;
+      const hrefOf = it => url(it.href) + '#' + it.page + (it.sec >= 0 ? '/' + it.sec : '');
+      const paintSel = () => $$('.sm-item', res).forEach((a, i) => { a.setAttribute('aria-selected', i === sel); if (i === sel) a.scrollIntoView({ block: 'nearest' }); });
+      const render = () => {
+        const q = inp.value;
+        if (!q.trim()) { res.innerHTML = `<p class="sm-msg">${t('searchHint')}</p>`; items = []; return; }
+        if (!INDEX) { res.innerHTML = `<p class="sm-msg">${t('searchLoading')}</p>`; return; }
+        const toks = fold(q).split(/\s+/).filter(w => w.length > 1 || /\d/.test(w));
+        items = runSearch(q); sel = 0;
+        res.innerHTML = items.length ? items.map(({ it }, i) => `<a class="sm-item" role="option" href="${hrefOf(it)}" data-i="${i}" lang="pt">
+            <span class="sm-path">${esc(it.uc)} · ${esc(t('topicN', it.tid))} · ${esc((LANG === 'en' && it.te) || it.tt)}${it.sec >= 0 ? ' · ' + esc(it.num) + ' ' + esc(it.pt) : ''}</span>
+            <b>${mark(it.h, toks)}</b>
+            <span class="sm-snip">${snippet(it.text, toks)}</span></a>`).join('')
+          : `<p class="sm-msg">${t('searchEmpty', esc(q))}</p>`;
+        paintSel();
+      };
+      const go = a => {
+        const target = new URL(a.href, location.href);
+        close();
+        if (target.pathname === location.pathname) location.hash = target.hash.slice(1);
+        else location.href = a.href;
+      };
+      inp.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(render, 90); });
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (items.length) { sel = (sel + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length; paintSel(); } }
+        if (e.key === 'Enter') { const a = $$('.sm-item', res)[sel]; if (a) { e.preventDefault(); go(a); } }
+      });
+      res.addEventListener('click', e => { const a = e.target.closest('.sm-item'); if (a && !e.ctrlKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); go(a); } });
+      res.addEventListener('mousemove', e => { const a = e.target.closest('.sm-item'); if (a && +a.dataset.i !== sel) { sel = +a.dataset.i; paintSel(); } });
+      SM.addEventListener('click', e => { if (e.target === SM || e.target.closest('.sm-esc')) close(); });
+      SM.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
+      SM._render = render;
+    }
+    SM.hidden = false; document.body.classList.add('sm-open');
+    const inp = $('input', SM); inp.focus(); inp.select();
+    SM._render();
+    if (!INDEX) buildIndex().then(() => SM._render()).catch(() => {
+      $('.sm-results', SM).innerHTML = `<p class="sm-msg">${location.protocol === 'file:' ? t('searchFile') : t('searchFail')}</p>`;
+    });
+  }
+  function close() { if (SM) { SM.hidden = true; document.body.classList.remove('sm-open'); } }
+  document.addEventListener('keydown', e => {
+    const typing = e.target.closest && e.target.closest('input, textarea, select, [contenteditable]');
+    if ((e.key === 'k' || e.key === 'K') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); SM && !SM.hidden ? close() : openSearch(); }
+    else if (e.key === '/' && !typing && !(SM && !SM.hidden)) { e.preventDefault(); openSearch(); }
+  });
 
   /* =====================================================================
      Vistas de índice
@@ -254,23 +401,36 @@
         <span class="d">${esc(a.dataset.desc || '')}</span></a>`).join('');
     });
 
-    /* --- encaminhamento por #hash --- */
+    /* --- encaminhamento por #hash: #sub-pagina ou #sub-pagina/n (n = n-ésimo h2, vindo da pesquisa) --- */
     let current = null;
     function show(id, scroll) {
-      const el = pages.find(a => a.dataset.page === id) || pages[0];
+      const [pid, sec] = String(id).split('/');
+      const el = pages.find(a => a.dataset.page === pid) || pages[0];
       current = el;
       pages.forEach(a => { a.hidden = a !== el; });
       $$('.sublink').forEach(l => l.setAttribute('aria-current', l.dataset.p === el.dataset.page ? 'page' : 'false'));
       $('#topTitle').textContent = el.dataset.title;
       document.title = `${el.dataset.title} · ${tName(topic)} · ${uc.code}`;
-      if (scroll) window.scrollTo({ top: 0, behavior: 'instant' });
+      const h = sec !== undefined && $$('h2', el)[+sec];
+      if (h) {
+        /* esperar pelo layout (e pelas fórmulas) antes de deslocar até à secção */
+        const go = () => {
+          h.scrollIntoView({ block: 'start', behavior: 'instant' });
+          $$('h2.flash').forEach(x => x.classList.remove('flash'));
+          void h.offsetWidth; h.classList.add('flash');
+          setTimeout(() => h.classList.remove('flash'), 2400);
+        };
+        setTimeout(go, 30);
+        if (document.readyState !== 'complete') window.addEventListener('load', go, { once: true });
+      } else if (scroll) window.scrollTo({ top: 0, behavior: 'instant' });
       setDrawer(false);
       document.dispatchEvent(new CustomEvent('meium:page', { detail: el }));
     }
     window.addEventListener('hashchange', () => show(location.hash.slice(1), true));
     document.addEventListener('keydown', e => {
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-      if (e.target.closest('input,textarea,select,[contenteditable]')) return;
+      if (e.target.closest && e.target.closest('input,textarea,select,[contenteditable]')) return;
+      if (document.body.classList.contains('sm-open')) return;   /* a pesquisa está aberta */
       const i = pages.indexOf(current);
       if (e.key === 'ArrowRight' && pages[i + 1]) location.hash = pages[i + 1].dataset.page;
       if (e.key === 'ArrowLeft' && pages[i - 1]) location.hash = pages[i - 1].dataset.page;

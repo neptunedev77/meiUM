@@ -26,6 +26,7 @@ More courses are added as the master's progresses.
 
 ## Features
 
+- **Global search** — <kbd>Ctrl</kbd>+<kbd>K</kbd> or <kbd>/</kbd> searches titles, sections and text across every course (accent-insensitive) and jumps straight to the matching section. The index is built in the browser from the published pages, so it never goes stale and needs no build step.
 - **Self-contained notes** — each topic stands on its own, with examples that can be worked through by hand and code that runs on datasets bundled with scikit-learn, so readers do not need the original slides.
 - **Interactive widgets** — more than 20 SVG-based visualisations: confusion matrices, ROC curves, the LASSO path, decision-tree pruning, k-fold cross-validation, bootstrap sampling, distributed architectures with simulated node failures, Ansible idempotency, VM overcommit, and more.
 - **Review built in** — every topic ends with a cheat sheet, common pitfalls, multiple-choice questions with explanations and worked exercises.
