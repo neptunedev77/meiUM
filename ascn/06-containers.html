@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Virtualização: Contentores · ASCN · meiUM</title>
+<meta name="description" content="ASCN · Tema 6: contentores Linux, namespaces e cgroups, Docker (imagens, volumes, redes), Kubernetes (cluster, Pods, Deployments, Services, armazenamento) e comparação com máquinas virtuais.">
+<!-- partilha: gerado por tools/seo.py -->
+<link rel="canonical" href="https://meium.space/ascn/06-containers.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="meiUM">
+<meta property="og:locale" content="pt_PT">
+<meta property="og:title" content="Virtualização: Contentores · ASCN">
+<meta property="og:description" content="ASCN · Tema 6: contentores Linux, namespaces e cgroups, Docker (imagens, volumes, redes), Kubernetes (cluster, Pods, Deployments, Services, armazenamento) e comparação com máquinas virtuais.">
+<meta property="og:url" content="https://meium.space/ascn/06-containers.html">
+<meta property="og:image" content="https://meium.space/assets/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="meiUM: apontamentos do Mestrado em Engenharia Informática da Universidade do Minho">
+<meta name="twitter:card" content="summary_large_image">
+<!-- /partilha -->
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../assets/img/icon-192.png">
+<meta name="theme-color" content="#151d36">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var d=document.documentElement,g=function(k){return JSON.parse(localStorage.getItem('meium:'+k))},t=g('theme'),f=g('fontScale');if(t==='light'||t==='dark')d.dataset.theme=t;if(f)d.style.setProperty('--fs',f);if(g('showExtra')===false)d.classList.add('hide-extra')}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="ascn" data-topic="06" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 6.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="6.0" data-title="Visão geral" data-desc="O que é um contentor e para que serve.">
+  <header class="ph">
+    <h1>Virtualização: Contentores<span class="en">Virtualization (Part II)</span></h1>
+    <p class="lede">Um <strong>contentor</strong> é um ambiente virtual leve que agrupa e isola um conjunto de <strong>processos e recursos</strong> (memória, CPU, disco…), tanto do host como de outros contentores.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">6.0.1</span>Porque são úteis</h2>
+    <div class="two">
+      <div class="card"><span class="tag">Versões isoladas</span><p>Correr versões diferentes do mesmo software (ex.: duas versões de uma base de dados) sobre o mesmo SO e kernel, sem conflitos.</p></div>
+      <div class="card"><span class="tag">Portabilidade</span><p>Mover ou migrar a aplicação entre servidores.</p></div>
+      <div class="card"><span class="tag">Empacotamento</span><p>Juntar a aplicação e as suas dependências num único pacote, fácil de distribuir.</p></div>
+    </div>
+    <p>O tema segue três níveis: o <strong>mecanismo</strong> (contentores Linux), a <strong>ferramenta</strong> para um servidor (Docker) e o <strong>orquestrador</strong> para muitos servidores (Kubernetes).</p>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <p class="src">Baseado nas aulas de ASCN (Virtualization, Part II). Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 6.1 CONTENTORES LINUX ============================ -->
+<article class="page" data-page="linux" data-num="6.1" data-title="Contentores Linux" data-desc="Arquitetura, namespaces, cgroups, SELinux e tipos.">
+  <header class="ph">
+    <h1>Contentores Linux<span class="en">Linux Containers</span></h1>
+    <p class="lede">Os contentores são leves porque <strong>não virtualizam por completo</strong> o CPU, a RAM, a rede e o armazenamento, ao contrário das VMs: partilham o kernel do host.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">6.1.1</span>Arquitetura: VMs vs. contentores</h2>
+    <div class="card">
+      <svg class="w-svg" viewBox="0 0 660 270" role="img" aria-label="Comparação de camadas: nas VMs cada aplicação tem um SO convidado sobre um hypervisor; nos contentores as aplicações partilham o kernel do host através de um motor">
+        <g style="font-family:var(--f-display);font-size:12px;font-weight:600">
+          <text x="155" y="16" text-anchor="middle" style="fill:var(--ink);font-size:14px">Máquinas virtuais</text>
+          <text x="505" y="16" text-anchor="middle" style="fill:var(--ink);font-size:14px">Contentores</text>
+          <g id="vm-col">
+            <rect x="10" y="28" width="92" height="38" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="56" y="44" text-anchor="middle" style="fill:var(--ink)">Aplicações</text><text x="56" y="59" text-anchor="middle" style="fill:var(--muted);font-weight:500;font-size:11px">Bibliotecas</text>
+            <rect x="109" y="28" width="92" height="38" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="155" y="44" text-anchor="middle" style="fill:var(--ink)">Aplicações</text><text x="155" y="59" text-anchor="middle" style="fill:var(--muted);font-weight:500;font-size:11px">Bibliotecas</text>
+            <rect x="208" y="28" width="92" height="38" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="254" y="44" text-anchor="middle" style="fill:var(--ink)">Aplicações</text><text x="254" y="59" text-anchor="middle" style="fill:var(--muted);font-weight:500;font-size:11px">Bibliotecas</text>
+            <rect x="10" y="72" width="92" height="44" rx="5" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="56" y="98" text-anchor="middle" style="fill:var(--ink)">SO convidado</text>
+            <rect x="109" y="72" width="92" height="44" rx="5" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="155" y="98" text-anchor="middle" style="fill:var(--ink)">SO convidado</text>
+            <rect x="208" y="72" width="92" height="44" rx="5" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="254" y="98" text-anchor="middle" style="fill:var(--ink)">SO convidado</text>
+            <rect x="10" y="126" width="290" height="44" rx="5" style="fill:var(--warn-bg);stroke:var(--warn)"/><text x="155" y="152" text-anchor="middle" style="fill:var(--ink)">Hypervisor</text>
+            <rect x="10" y="180" width="290" height="44" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="155" y="206" text-anchor="middle" style="fill:var(--ink)">SO / kernel do host</text>
+          </g>
+          <rect x="360" y="72" width="92" height="44" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="406" y="90" text-anchor="middle" style="fill:var(--ink)">Aplicações</text><text x="406" y="105" text-anchor="middle" style="fill:var(--muted);font-weight:500;font-size:11px">Bibliotecas</text>
+          <rect x="459" y="72" width="92" height="44" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="505" y="90" text-anchor="middle" style="fill:var(--ink)">Aplicações</text><text x="505" y="105" text-anchor="middle" style="fill:var(--muted);font-weight:500;font-size:11px">Bibliotecas</text>
+          <rect x="558" y="72" width="92" height="44" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="604" y="90" text-anchor="middle" style="fill:var(--ink)">Aplicações</text><text x="604" y="105" text-anchor="middle" style="fill:var(--muted);font-weight:500;font-size:11px">Bibliotecas</text>
+          <rect x="360" y="126" width="290" height="44" rx="5" style="fill:var(--warn-bg);stroke:var(--warn)"/><text x="505" y="152" text-anchor="middle" style="fill:var(--ink)">Motor de contentores (engine)</text>
+          <rect x="360" y="180" width="290" height="44" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="505" y="206" text-anchor="middle" style="fill:var(--ink)">SO / kernel do host</text>
+          <text x="155" y="250" text-anchor="middle" style="fill:var(--muted);font-family:var(--f-mono);font-size:11px;font-weight:500">um kernel por VM</text>
+          <text x="505" y="250" text-anchor="middle" style="fill:var(--muted);font-family:var(--f-mono);font-size:11px;font-weight:500">um único kernel, partilhado</text>
+        </g>
+      </svg>
+    </div>
+    <p>O <strong>motor (engine)</strong> isola e configura os recursos:</p>
+    <ul>
+      <li>Os contentores estão <strong>isolados entre si</strong>: o host fica compartimentado em CPU, RAM e disco.</li>
+      <li>Cada contentor <strong>partilha o hardware e o kernel/SO</strong> com o host. É daqui que vem tanto a leveza como a menor segurança face às VMs.</li>
+    </ul>
+
+    <h2><span class="sn">6.1.2</span>Blocos de construção</h2>
+    <p>Os contentores não são uma peça única: assentam em componentes do kernel Linux.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Componente</th><th>Função</th><th>O que faz</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Namespaces</strong></td><td>Isolamento</td><td>Dividem recursos do host (rede, sistema de ficheiros…) em recursos dedicados, acessíveis só a um grupo de processos. Respondem a <em>"o que é que o contentor vê?"</em></td></tr>
+        <tr><td><strong>Control groups (cgroups)</strong></td><td>Gestão de recursos</td><td>Distribuem CPU, RAM, disco e rede por grupos de processos e limitam o que cada contentor pode usar. Respondem a <em>"quanto é que o contentor pode gastar?"</em></td></tr>
+        <tr><td><strong>SELinux</strong></td><td>Segurança</td><td>Impõe controlo de acessos e políticas de segurança, para lá dos namespaces, para um contentor não comprometer o host nem os outros contentores.</td></tr>
+      </tbody></table></div>
+    <div class="note"><span class="lbl">Exemplo</span>
+      <p>Dois contentores podem ter ambos um servidor na porta 80, porque cada um tem o seu namespace de rede. Se um deles tiver um limite de 512 MB no cgroup, não consegue esgotar a RAM do host.</p></div>
+
+    <h2><span class="sn">6.1.3</span>Tipos de contentores</h2>
+    <div class="two">
+      <div class="card"><span class="tag">Contentores de SO</span><p>Ex.: <strong>LXC</strong>. Correm vários processos e simulam um sistema operativo "leve".</p></div>
+      <div class="card"><span class="tag">Contentores de aplicação</span><p>Ex.: <strong>Docker</strong>. Focados em instalar aplicações, cada uma vista como um processo independente.</p></div>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 6.2 DOCKER ============================ -->
+<article class="page" data-page="docker" data-num="6.2" data-title="Docker" data-desc="Cliente, daemon, imagens, volumes, redes e registo.">
+  <header class="ph">
+    <h1>Docker</h1>
+    <p class="lede">A plataforma de contentores mais conhecida. Suporta Ubuntu, Fedora, RHEL, CentOS, Windows, entre outros.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">6.2.1</span>Cliente, daemon e objetos</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Peça</th><th>Papel</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Docker Client</strong></td><td>É por onde o utilizador interage com a plataforma. Usa a API do Docker para correr e gerir contentores, gerir redes e volumes, ler logs e métricas, descarregar e gerir imagens.</td></tr>
+        <tr><td><strong>Docker Daemon</strong></td><td>Recebe os pedidos do cliente pela API e gere imagens, contentores, volumes e redes.</td></tr>
+        <tr><td><strong>Imagem</strong></td><td>Ficheiro <strong>imutável</strong> com o código, as bibliotecas e os restantes ficheiros de que a aplicação precisa para correr.</td></tr>
+        <tr><td><strong>Contentor</strong></td><td><strong>Instância em execução</strong> de uma imagem.</td></tr>
+        <tr><td><strong>Registo (registry)</strong></td><td>Repositório de imagens, ex.: Docker Hub.</td></tr>
+      </tbody></table></div>
+    <div class="note"><span class="lbl">Imagem vs. contentor</span>
+      <p>A relação é a de uma classe e dos seus objetos: da mesma imagem podem sair muitos contentores, e alterar um deles não muda a imagem.</p></div>
+    <pre data-title="Do registo ao contentor"><code class="language-bash">docker pull nginx:1.27                        # descarrega a imagem do registo
+docker run -d --name web -p 8080:80 nginx:1.27  # cria e arranca um contentor
+docker ps                                     # lista os contentores em execução
+docker logs web                               # lê os logs
+docker stop web &amp;&amp; docker rm web              # para e remove o contentor</code></pre>
+
+    <div class="note extra"><span class="lbl">Construir a própria imagem <span class="xtag">complemento</span></span>
+      <p>Uma imagem descreve-se num <code>Dockerfile</code> e constrói-se com <code>docker build -t app:1.0 .</code>. Cada instrução cria uma camada reutilizável, por isso copiar primeiro a lista de dependências evita reinstalá-las sempre que o código muda.</p>
+      <pre data-title="Dockerfile"><code class="language-text">FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . .
+CMD ["python", "app.py"]</code></pre></div>
+
+    <h2><span class="sn">6.2.2</span>Volumes: guardar dados</h2>
+    <p>O sistema de ficheiros interno de um contentor é <strong>efémero</strong>: os dados desaparecem quando o contentor é <strong>removido</strong>. Para os manter, monta-se um ficheiro ou diretório do host, independente do contentor.</p>
+    <div class="two">
+      <div class="card"><span class="tag">Bind mount</span><p>Um diretório qualquer do host. Tanto os contentores como os processos do host lhe podem aceder.</p></div>
+      <div class="card"><span class="tag">Volume</span><p>Um diretório especial do host, <strong>gerido pelo Docker</strong> e destinado apenas a ser acedido por contentores.</p></div>
+    </div>
+    <pre data-title="Os dados sobrevivem ao contentor"><code class="language-bash">docker volume create dados
+docker run -d --name bd -e POSTGRES_PASSWORD=segredo \
+  -v dados:/var/lib/postgresql/data postgres:16   # volume
+docker rm -f bd                                   # remove o contentor; o volume fica
+
+docker run -d --name web -v "$PWD/site:/usr/share/nginx/html" nginx:1.27   # bind mount</code></pre>
+
+    <h2><span class="sn">6.2.3</span>Redes</h2>
+    <div class="two">
+      <div class="card"><span class="tag">Host</span><p>O contentor partilha o namespace de rede do host. Os seus serviços aparecem na rede como se fossem do próprio host, e as <strong>portas são partilhadas</strong> (ex.: só um serviço pode usar a porta 80).</p></div>
+      <div class="card"><span class="tag">Bridge</span><p>O contentor tem o seu próprio endereço e é visto como <strong>mais um nó da rede</strong>.</p></div>
+    </div>
+    <div class="note extra"><span class="lbl">A bridge por omissão <span class="xtag">complemento</span></span>
+      <p>Na configuração habitual do Docker, essa rede é uma <strong>bridge virtual privada dentro do host</strong> (ex.: <code>172.17.0.0/16</code>), diferente do modo bridge das VMs. Os contentores falam entre si, mas de fora só se chega a eles publicando portas (<code>-p 8080:80</code>). Para um contentor aparecer diretamente na rede física existe o driver <code>macvlan</code>.</p></div>
+  </section>
+</article>
+
+<!-- ============================ 6.3 KUBERNETES: CLUSTER ============================ -->
+<article class="page" data-page="cluster" data-num="6.3" data-title="Kubernetes: o cluster" data-desc="Control Plane, nós, componentes e fluxo de trabalho.">
+  <header class="ph">
+    <h1>Kubernetes: o cluster<span class="en">Kubernetes (K8s)</span></h1>
+    <p class="lede">O Docker gere contentores num servidor. O <strong>Kubernetes</strong> é uma plataforma de <strong>orquestração</strong>: automatiza a instalação, o escalamento e a gestão de contentores em muitos servidores.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">6.3.1</span>O que oferece</h2>
+    <ul>
+      <li><strong>Escalonamento, auto-recuperação (self-healing) e escalamento</strong> de contentores, simplificados e automáticos.</li>
+      <li><strong>Gestão de rede</strong>: descoberta de serviços e balanceamento de carga.</li>
+      <li><strong>Orquestração modular de armazenamento</strong>: iSCSI, NFS, Ceph, AWS, GCP…</li>
+    </ul>
+
+    <h2><span class="sn">6.3.2</span>Componentes</h2>
+    <p>Um cluster é formado por um <strong>Control Plane</strong> e um conjunto de <strong>nós</strong>. Os nós alojam os <strong>Pods</strong>, que correm as aplicações em contentores; o Control Plane gere os nós, a rede, o armazenamento e os Pods.</p>
+    <div class="card">
+      <svg class="w-svg" viewBox="0 0 660 330" role="img" aria-label="Cluster Kubernetes: o kubectl fala com o API Server do Control Plane, que contém também etcd, Scheduler e Controller Manager; cada nó tem kubelet, kube-proxy, container runtime e Pods">
+        <g style="font-family:var(--f-display);font-size:12px;font-weight:600">
+          <rect x="10" y="10" width="110" height="40" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="65" y="35" text-anchor="middle" style="fill:var(--ink);font-family:var(--f-mono)">kubectl</text>
+          <path d="M120 30h34" style="stroke:var(--ink-2);stroke-width:1.5;fill:none"/><path d="M154 30l-7-4v8z" style="fill:var(--ink-2)"/>
+          <rect x="160" y="4" width="490" height="108" rx="8" style="fill:var(--accent-soft);stroke:var(--accent)"/>
+          <text x="405" y="24" text-anchor="middle" style="fill:var(--ink);font-size:13px">Control Plane</text>
+          <rect x="172" y="36" width="108" height="62" rx="5" style="fill:var(--card);stroke:var(--rule)"/><text x="226" y="71" text-anchor="middle" style="fill:var(--ink)">API Server</text>
+          <rect x="289" y="36" width="108" height="62" rx="5" style="fill:var(--card);stroke:var(--rule)"/><text x="343" y="71" text-anchor="middle" style="fill:var(--ink)">etcd</text>
+          <rect x="406" y="36" width="108" height="62" rx="5" style="fill:var(--card);stroke:var(--rule)"/><text x="460" y="71" text-anchor="middle" style="fill:var(--ink)">Scheduler</text>
+          <rect x="523" y="36" width="116" height="62" rx="5" style="fill:var(--card);stroke:var(--rule)"/><text x="581" y="65" text-anchor="middle" style="fill:var(--ink)">Controller</text><text x="581" y="81" text-anchor="middle" style="fill:var(--ink)">Manager</text>
+          <path d="M226 112v26" style="stroke:var(--ink-2);stroke-width:1.5;fill:none"/><path d="M226 138l-4-7h8z" style="fill:var(--ink-2)"/>
+          <path d="M226 124H500v14" style="stroke:var(--ink-2);stroke-width:1.5;fill:none"/><path d="M500 138l-4-7h8z" style="fill:var(--ink-2)"/>
+          <rect x="10" y="140" width="315" height="182" rx="8" style="fill:var(--card-2);stroke:var(--rule)"/><text x="167" y="160" text-anchor="middle" style="fill:var(--ink);font-size:13px">Nó 1</text>
+          <rect x="24" y="170" width="86" height="72" rx="5" style="fill:var(--warn-bg);stroke:var(--warn)"/><text x="67" y="186" text-anchor="middle" style="fill:var(--ink)">Pod</text><rect x="34" y="194" width="66" height="36" rx="3" style="fill:var(--card);stroke:var(--rule)"/><text x="67" y="216" text-anchor="middle" style="fill:var(--ink);font-size:11px">contentor</text>
+          <rect x="124" y="170" width="184" height="72" rx="5" style="fill:var(--warn-bg);stroke:var(--warn)"/><text x="216" y="186" text-anchor="middle" style="fill:var(--ink)">Pod</text><rect x="134" y="194" width="78" height="36" rx="3" style="fill:var(--card);stroke:var(--rule)"/><text x="173" y="216" text-anchor="middle" style="fill:var(--ink);font-size:11px">contentor</text><rect x="220" y="194" width="78" height="36" rx="3" style="fill:var(--card);stroke:var(--rule)"/><text x="259" y="216" text-anchor="middle" style="fill:var(--ink);font-size:11px">contentor</text>
+          <rect x="24" y="252" width="136" height="26" rx="4" style="fill:var(--card);stroke:var(--rule)"/><text x="92" y="270" text-anchor="middle" style="fill:var(--ink);font-family:var(--f-mono);font-size:11px">kubelet</text>
+          <rect x="172" y="252" width="136" height="26" rx="4" style="fill:var(--card);stroke:var(--rule)"/><text x="240" y="270" text-anchor="middle" style="fill:var(--ink);font-family:var(--f-mono);font-size:11px">kube-proxy</text>
+          <rect x="24" y="286" width="284" height="26" rx="4" style="fill:var(--card);stroke:var(--rule)"/><text x="166" y="304" text-anchor="middle" style="fill:var(--ink);font-size:11px">Container runtime</text>
+          <rect x="335" y="140" width="315" height="182" rx="8" style="fill:var(--card-2);stroke:var(--rule)"/><text x="492" y="160" text-anchor="middle" style="fill:var(--ink);font-size:13px">Nó 2</text>
+          <rect x="349" y="170" width="86" height="72" rx="5" style="fill:var(--warn-bg);stroke:var(--warn)"/><text x="392" y="186" text-anchor="middle" style="fill:var(--ink)">Pod</text><rect x="359" y="194" width="66" height="36" rx="3" style="fill:var(--card);stroke:var(--rule)"/><text x="392" y="216" text-anchor="middle" style="fill:var(--ink);font-size:11px">contentor</text>
+          <rect x="449" y="170" width="86" height="72" rx="5" style="fill:var(--warn-bg);stroke:var(--warn)"/><text x="492" y="186" text-anchor="middle" style="fill:var(--ink)">Pod</text><rect x="459" y="194" width="66" height="36" rx="3" style="fill:var(--card);stroke:var(--rule)"/><text x="492" y="216" text-anchor="middle" style="fill:var(--ink);font-size:11px">contentor</text>
+          <rect x="349" y="252" width="136" height="26" rx="4" style="fill:var(--card);stroke:var(--rule)"/><text x="417" y="270" text-anchor="middle" style="fill:var(--ink);font-family:var(--f-mono);font-size:11px">kubelet</text>
+          <rect x="497" y="252" width="136" height="26" rx="4" style="fill:var(--card);stroke:var(--rule)"/><text x="565" y="270" text-anchor="middle" style="fill:var(--ink);font-family:var(--f-mono);font-size:11px">kube-proxy</text>
+          <rect x="349" y="286" width="284" height="26" rx="4" style="fill:var(--card);stroke:var(--rule)"/><text x="491" y="304" text-anchor="middle" style="fill:var(--ink);font-size:11px">Container runtime</text>
+        </g>
+      </svg>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>Onde</th><th>Componente</th><th>O que faz</th></tr></thead>
+      <tbody>
+        <tr><td rowspan="4"><strong>Control Plane</strong></td><td><strong>API Server</strong></td><td>O servidor central, que expõe a API HTTP do Kubernetes.</td></tr>
+        <tr><td><strong>etcd</strong></td><td>Base de dados chave-valor com a configuração e o estado do cluster.</td></tr>
+        <tr><td><strong>Scheduler</strong></td><td>Distribui os Pods ainda sem nó pelos nós disponíveis.</td></tr>
+        <tr><td><strong>Controller Manager</strong></td><td>Corre os controladores (ex.: de replicação, de namespaces) que implementam o comportamento da API.</td></tr>
+        <tr><td rowspan="3"><strong>Nó</strong></td><td><strong>Kubelet</strong></td><td>Gere os contentores de acordo com as especificações dos Pods que recebe.</td></tr>
+        <tr><td><strong>Kube-proxy</strong></td><td>Aceita e controla as ligações de rede para os Pods do nó.</td></tr>
+        <tr><td><strong>Container runtime</strong></td><td>O software que corre os contentores (ex.: Docker).</td></tr>
+      </tbody></table></div>
+    <div class="note extra"><span class="lbl">O runtime hoje <span class="xtag">complemento</span></span>
+      <p>Desde a versão 1.24, o Kubernetes já não inclui suporte direto ao Docker Engine: os clusters usam normalmente <strong>containerd</strong> ou <strong>CRI-O</strong>. As imagens construídas com Docker continuam a funcionar, porque seguem o mesmo formato (OCI).</p></div>
+
+    <h3>Em que parte do cluster está?</h3>
+    <div class="classify" data-options="Control Plane,Nó">
+      <div class="ci" data-answer="Control Plane" data-why="O Scheduler decide em que nó fica cada Pod, mas não o executa.">Decidir em que servidor fica um novo Pod</div>
+      <div class="ci" data-answer="Nó" data-why="É o kubelet de cada nó que garante que os contentores estão a correr.">Arrancar os contentores descritos na especificação de um Pod</div>
+      <div class="ci" data-answer="Control Plane" data-why="O estado do cluster vive no etcd.">Guardar o estado do cluster</div>
+      <div class="ci" data-answer="Nó" data-why="É a função do kube-proxy.">Encaminhar uma ligação de rede para um Pod desse servidor</div>
+      <div class="ci" data-answer="Control Plane" data-why="Todas as interações passam pelo API Server.">Receber os pedidos do kubectl</div>
+    </div>
+
+    <h2><span class="sn">6.3.3</span>Como se usa</h2>
+    <ul>
+      <li>O <strong>administrador</strong> monta o cluster com o <code>kubeadm</code>: <code>kubeadm init</code> para o inicializar e <code>kubeadm reset</code> para o destruir.</li>
+      <li>Os <strong>clientes</strong> interagem com o cluster, através do Control Plane, usando o <code>kubectl</code>.</li>
+    </ul>
+    <p>O fluxo é <strong>declarativo</strong>: descreve-se o que se quer, não os passos para lá chegar.</p>
+    <ol class="steps-list">
+      <li><div>Submete-se um ficheiro de configuração <strong>YAML</strong> a descrever o que se pretende.</div></li>
+      <li><div>O <strong>Control Plane</strong> valida-o e guarda o estado no <strong>etcd</strong>.</div></li>
+      <li><div>O <strong>Scheduler</strong> atribui os Pods aos nós.</div></li>
+      <li><div>O <strong>Kubelet</strong> garante que esses Pods estão a correr.</div></li>
+      <li><div>O <strong>Controller Manager</strong> mantém tudo sincronizado, de forma automática.</div></li>
+    </ol>
+  </section>
+</article>
+
+<!-- ============================ 6.4 WORKLOADS ============================ -->
+<article class="page" data-page="workloads" data-num="6.4" data-title="Pods e Deployments" data-desc="A unidade de execução e como se escala.">
+  <header class="ph">
+    <h1>Pods e Deployments<span class="en">Kubernetes Workloads</span></h1>
+    <p class="lede">Um <strong>workload</strong> é uma aplicação a correr no Kubernetes. Seja um só componente ou vários a trabalhar em conjunto, corre sempre dentro de um conjunto de <strong>Pods</strong>.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">6.4.1</span>Pod</h2>
+    <p>Um <strong>Pod</strong> é um grupo de <strong>um ou mais contentores</strong>, com armazenamento e rede partilhados e uma especificação de como os correr. É a <strong>menor unidade que se pode instalar</strong> no Kubernetes: não se instala um contentor isolado.</p>
+
+    <h2><span class="sn">6.4.2</span>Deployment e ReplicaSet</h2>
+    <div class="two">
+      <div class="card"><span class="tag">Deployment</span><p>Forma <strong>declarativa</strong> de gerir e escalar um conjunto de Pods idênticos (réplicas). Define o <strong>estado desejado</strong> (ex.: quantas réplicas) e gere o ciclo de vida dos Pods.</p></div>
+      <div class="card"><span class="tag">ReplicaSet</span><p>Garante que está a correr, em cada momento, o <strong>número indicado de réplicas</strong>. O Deployment é um conceito de nível superior, que gere automaticamente os ReplicaSets.</p></div>
+    </div>
+    <p>Na prática, escreve-se o Deployment; a hierarquia é <strong>Deployment → ReplicaSet → Pods</strong>.</p>
+    <pre data-title="web-deployment.yaml"><code class="language-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 3                # estado desejado
+  selector:
+    matchLabels:
+      app: web
+  template:                  # modelo dos Pods
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80</code></pre>
+    <pre data-title="Aplicar e escalar"><code class="language-bash">kubectl apply -f web-deployment.yaml      # submete o estado desejado
+kubectl get pods                          # vê os Pods criados
+kubectl scale deployment web --replicas=5 # altera o estado desejado</code></pre>
+
+    <div class="widget" data-widget="k8s"></div>
+    <div class="note"><span class="lbl">A ideia a reter</span>
+      <p>O Kubernetes compara continuamente o <strong>estado desejado</strong> com o <strong>estado real</strong> e corrige a diferença. A auto-recuperação não é um mecanismo à parte: um Pod que morre é só uma diferença a corrigir.</p></div>
+  </section>
+</article>
+
+<!-- ============================ 6.5 REDE E ARMAZENAMENTO ============================ -->
+<article class="page" data-page="servicos" data-num="6.5" data-title="Rede, armazenamento e configuração" data-desc="Services, volumes persistentes, ConfigMaps e Secrets.">
+  <header class="ph">
+    <h1>Rede, armazenamento e configuração<span class="en">Network, Storage and Configuration</span></h1>
+    <p class="lede">Os Pods são substituídos a qualquer momento. Por isso, é preciso um ponto de acesso estável para os alcançar e um sítio para os dados que tenha de sobreviver a cada Pod.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">6.5.1</span>Rede de Pods</h2>
+    <p>Cada Pod tem um <strong>endereço IP único em todo o cluster</strong>. A comunicação entre Pods, mesmo em nós diferentes, é assegurada por uma <strong>rede overlay</strong> (ex.: Flannel, Calico).</p>
+
+    <h2><span class="sn">6.5.2</span>Services</h2>
+    <p>Um <strong>Service</strong> é uma abstração, construída sobre a overlay, para expor um grupo de Pods na rede. Define um conjunto lógico de destinos (ex.: Pods) e uma política de acesso. Assim, quem usa o serviço não precisa de conhecer os IPs dos Pods, que mudam quando estes são recriados.</p>
+    <div class="tw"><table>
+      <thead><tr><th>Tipo</th><th>Expõe o serviço…</th><th>Uso típico</th></tr></thead>
+      <tbody>
+        <tr><td><strong>ClusterIP</strong></td><td>num IP <strong>interno</strong> do cluster</td><td>Comunicação interna, ex.: a aplicação web a falar com a base de dados</td></tr>
+        <tr><td><strong>NodePort</strong></td><td>no IP de <strong>cada nó</strong>, numa porta estática</td><td>Acesso externo simples</td></tr>
+        <tr><td><strong>LoadBalancer</strong></td><td><strong>externamente</strong>, com um balanceador de carga externo</td><td>Produção, em cloud</td></tr>
+      </tbody></table></div>
+    <pre data-title="web-service.yaml"><code class="language-yaml">apiVersion: v1
+kind: Service
+metadata:
+  name: web
+spec:
+  type: NodePort
+  selector:
+    app: web          # encaminha para os Pods com esta etiqueta
+  ports:
+    - port: 80        # porta do Service
+      targetPort: 80  # porta do contentor
+      nodePort: 30080 # porta aberta em cada nó</code></pre>
+
+    <h2><span class="sn">6.5.3</span>Armazenamento</h2>
+    <p>Os Pods acedem a volumes de vários backends (iSCSI, NFS, AWS, GCP…), que podem ser:</p>
+    <ul>
+      <li><strong>Efémeros</strong>: disponíveis durante a vida do Pod.</li>
+      <li><strong>Persistentes</strong>: continuam disponíveis mesmo depois de o Pod terminar.</li>
+    </ul>
+    <div class="tw"><table>
+      <thead><tr><th>Objeto</th><th>O que é</th><th>Quem o cria</th></tr></thead>
+      <tbody>
+        <tr><td><strong>PersistentVolume (PV)</strong></td><td>Um pedaço de armazenamento do cluster</td><td>O administrador, ou dinamicamente através de uma Storage Class</td></tr>
+        <tr><td><strong>PersistentVolumeClaim (PVC)</strong></td><td>O <strong>pedido</strong> de armazenamento para um Pod. Liga-se a um PV</td><td>O programador da aplicação</td></tr>
+        <tr><td><strong>Storage Class (SC)</strong></td><td>Descreve os tipos de armazenamento disponíveis (mais rápido/lento, local/remoto)</td><td>O administrador</td></tr>
+      </tbody></table></div>
+    <div class="card">
+      <svg class="w-svg" viewBox="0 0 640 96" role="img" aria-label="O Pod usa um volume que referencia um PVC; o PVC liga-se a um PV, provisionado pelo fornecedor de cloud">
+        <g style="font-family:var(--f-display);font-size:13px;font-weight:600">
+          <rect x="10" y="26" width="110" height="44" rx="6" style="fill:var(--warn-bg);stroke:var(--warn)"/><text x="65" y="53" text-anchor="middle" style="fill:var(--ink)">Pod</text>
+          <rect x="178" y="26" width="110" height="44" rx="6" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="233" y="53" text-anchor="middle" style="fill:var(--ink)">PVC</text>
+          <rect x="346" y="26" width="110" height="44" rx="6" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="401" y="53" text-anchor="middle" style="fill:var(--ink)">PV</text>
+          <rect x="514" y="26" width="116" height="44" rx="6" style="fill:var(--card-2);stroke:var(--rule)"/><text x="572" y="53" text-anchor="middle" style="fill:var(--ink)">Armazenamento</text>
+          <path d="M120 48h52M288 48h52M456 48h52" style="stroke:var(--ink-2);stroke-width:1.5;fill:none"/><path d="M178 48l-8-4v8zM346 48l-8-4v8zM514 48l-8-4v8z" style="fill:var(--ink-2)"/>
+          <g style="fill:var(--muted);font-family:var(--f-mono);font-size:11px;font-weight:500"><text x="149" y="38" text-anchor="middle">usa</text><text x="317" y="38" text-anchor="middle">liga-se</text><text x="485" y="38" text-anchor="middle">aponta</text></g>
+        </g>
+      </svg>
+    </div>
+    <pre data-title="dados-pvc.yaml"><code class="language-yaml">apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dados
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: rapido    # tipo de armazenamento pedido
+  resources:
+    requests:
+      storage: 10Gi</code></pre>
+    <div class="note"><span class="lbl">Porquê PV e PVC separados?</span>
+      <p>Separa os papéis: quem escreve a aplicação pede "10 GiB rápidos" sem saber onde estão; quem administra o cluster decide o que há por baixo.</p></div>
+
+    <h2><span class="sn">6.5.4</span>ConfigMaps e Secrets</h2>
+    <div class="two">
+      <div class="card"><span class="tag">ConfigMap</span><p>Guarda e atualiza a configuração <strong>não confidencial</strong> dos Pods, em pares chave-valor (ex.: variáveis de ambiente, argumentos da linha de comandos).</p></div>
+      <div class="card"><span class="tag">Secret</span><p>Guarda os dados <strong>confidenciais</strong> dos Pods (ex.: palavras-passe, tokens, chaves).</p></div>
+    </div>
+    <p>Ambos permitem usar a mesma imagem em vários ambientes, sem pôr configuração nem credenciais dentro dela.</p>
+    <pre data-title="Usar no contentor de um Pod"><code class="language-yaml">env:
+  - name: DB_HOST
+    valueFrom:
+      configMapKeyRef:
+        name: app-config
+        key: db_host
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: app-secrets
+        key: db_password</code></pre>
+    <div class="note extra warn"><span class="lbl">Um Secret não é cifrado por omissão <span class="xtag">complemento</span></span>
+      <p>Por omissão, os valores estão apenas codificados em <strong>base64</strong> e guardados sem cifra no etcd: quem tiver acesso ao etcd ou permissão de leitura sobre o Secret consegue lê-los. Em produção, ativa-se a cifra em repouso e restringe-se o acesso com RBAC. E um Secret nunca deve ir para o repositório Git.</p></div>
+  </section>
+</article>
+
+<!-- ============================ 6.6 CONTENTORES VS VMS ============================ -->
+<article class="page" data-page="comparacao" data-num="6.6" data-title="Contentores vs. VMs" data-desc="Vantagens, desvantagens e quando usar cada um.">
+  <header class="ph">
+    <h1>Contentores vs. VMs<span class="en">Containers vs. VMs</span></h1>
+    <p class="lede">Cada tecnologia foi feita com objetivos diferentes: nenhuma é sempre melhor, a escolha depende do caso de uso.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">6.6.1</span>Quando usar cada um</h2>
+    <div class="two">
+      <div class="card"><span class="tag">VMs</span><p>Quando é preciso virtualizar um <strong>servidor completo, com o seu SO</strong>.</p></div>
+      <div class="card"><span class="tag">Contentores</span><p>Para gerir ambientes virtuais com <strong>bibliotecas e aplicações heterogéneas</strong>.</p></div>
+    </div>
+
+    <h2><span class="sn">6.6.2</span>Vantagens e desvantagens</h2>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Contentores face às VMs</th><th>Porquê</th></tr></thead>
+      <tbody>
+        <tr><td><span class="pill p-good">+</span></td><td>Teste, provisionamento e migração mais rápidos</td><td>São mais leves</td></tr>
+        <tr><td><span class="pill p-good">+</span></td><td>Melhor utilização de recursos e melhor desempenho</td><td>Não há um SO convidado por instância</td></tr>
+        <tr><td><span class="pill p-good">+</span></td><td>Instalam-se facilmente em servidores físicos e virtualizados</td><td>Uma VM dentro de outra VM exige virtualização aninhada, que só alguns hypervisors suportam</td></tr>
+        <tr><td><span class="pill p-bad">−</span></td><td>Isolamento e segurança mais fracos</td><td>O SO e o kernel são partilhados</td></tr>
+        <tr><td><span class="pill p-bad">−</span></td><td>Menos flexibilidade para correr SOs diferentes (Linux, Windows, BSD…)</td><td>Pela mesma razão: há um só kernel</td></tr>
+      </tbody></table></div>
+
+    <h3>VM ou contentor?</h3>
+    <div class="classify" data-options="VM,Contentor">
+      <div class="ci" data-answer="VM" data-why="Precisa de outro SO, logo de outro kernel: num host Linux, um contentor não o oferece.">Correr uma aplicação que só funciona em Windows num servidor Linux</div>
+      <div class="ci" data-answer="Contentor" data-why="Isolam as versões, partilhando o mesmo kernel com pouco custo.">Correr duas versões da mesma base de dados no mesmo servidor, para testes</div>
+      <div class="ci" data-answer="VM" data-why="Com clientes que não confiam uns nos outros, um kernel partilhado é um risco maior.">Alojar, no mesmo host, código de clientes que não confiam uns nos outros</div>
+      <div class="ci" data-answer="Contentor" data-why="Arrancam depressa, por não terem de arrancar um SO completo.">Lançar dezenas de instâncias em segundos para responder a um pico de carga</div>
+    </div>
+    <div class="note"><span class="lbl">Não são alternativas exclusivas</span>
+      <p>É comum usar os dois: na cloud, os nós de um cluster Kubernetes são muitas vezes VMs, e os contentores correm dentro delas.</p></div>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo e perguntas para testar.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Conceito</th><th>Ideia-chave</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Contentor</strong></td><td>Processos isolados, que partilham o kernel do host.</td></tr>
+        <tr><td><strong>Namespaces / cgroups / SELinux</strong></td><td>Isolamento (o que vê) / recursos (quanto gasta) / segurança (o que pode fazer).</td></tr>
+        <tr><td><strong>LXC vs. Docker</strong></td><td>Contentor de SO, vários processos / contentor de aplicação, um processo independente.</td></tr>
+        <tr><td><strong>Imagem vs. contentor</strong></td><td>Ficheiro imutável / instância em execução dessa imagem.</td></tr>
+        <tr><td><strong>Bind mount vs. volume</strong></td><td>Diretório qualquer do host, acessível a todos / diretório gerido pelo Docker, para contentores.</td></tr>
+        <tr><td><strong>Rede host vs. bridge</strong></td><td>Partilha o namespace e as portas do host / endereço próprio, mais um nó da rede.</td></tr>
+        <tr><td><strong>Control Plane</strong></td><td>API Server, etcd (estado), Scheduler (coloca Pods), Controller Manager (mantém o estado).</td></tr>
+        <tr><td><strong>Nó</strong></td><td>Kubelet (corre os Pods), kube-proxy (rede), container runtime.</td></tr>
+        <tr><td><strong>Pod</strong></td><td>Menor unidade instalável: um ou mais contentores com rede e armazenamento partilhados.</td></tr>
+        <tr><td><strong>Deployment → ReplicaSet</strong></td><td>Estado desejado e ciclo de vida → mantém o número de réplicas.</td></tr>
+        <tr><td><strong>ClusterIP / NodePort / LoadBalancer</strong></td><td>IP interno / porta estática em cada nó / balanceador externo.</td></tr>
+        <tr><td><strong>PV / PVC / SC</strong></td><td>O armazenamento / o pedido / os tipos disponíveis.</td></tr>
+        <tr><td><strong>ConfigMap / Secret</strong></td><td>Configuração não confidencial / dados confidenciais.</td></tr>
+      </tbody></table></div>
+    <div class="note warn"><span class="lbl">Erros comuns</span>
+      <ul>
+        <li>Pensar que um contentor traz o seu próprio kernel. Traz bibliotecas, mas o kernel é o do host.</li>
+        <li>Guardar dados só no sistema de ficheiros interno do contentor: perdem-se quando este é removido.</li>
+        <li>Confundir o papel do Scheduler (decide onde) com o do Kubelet (faz correr).</li>
+        <li>Ligar a aplicação diretamente ao IP de um Pod: muda quando o Pod é recriado. Usa-se um Service.</li>
+      </ul></div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.2</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">Qual é a razão fundamental para os contentores serem mais leves do que as VMs?</p>
+        <div class="opts"><button>Só podem correr um processo</button><button data-ok>Partilham o kernel do host, em vez de terem cada um o seu SO convidado</button><button>Não têm qualquer isolamento</button></div>
+        <p class="why">Não há um SO completo por instância. É também por isso que o isolamento é mais fraco.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Um contentor não pode usar mais de 2 núcleos e 1 GB de RAM. Que mecanismo do kernel o garante?</p>
+        <div class="opts"><button>Namespaces</button><button data-ok>Control groups (cgroups)</button><button>SELinux</button></div>
+        <p class="why">Os cgroups limitam recursos; os namespaces isolam o que cada contentor vê.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Removes um contentor de base de dados que guardava tudo no seu sistema de ficheiros interno. O que acontece aos dados?</p>
+        <div class="opts"><button>Ficam guardados na imagem</button><button data-ok>Perdem-se, porque esse sistema de ficheiros é efémero</button><button>Passam automaticamente para um volume</button></div>
+        <p class="why">Para persistir é preciso montar um volume ou um bind mount. A imagem é imutável.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">O que é uma imagem Docker?</p>
+        <div class="opts"><button data-ok>Um ficheiro imutável com o código e as dependências da aplicação</button><button>Uma instância da aplicação em execução</button><button>Um repositório de contentores</button></div>
+        <p class="why">A instância em execução é o contentor; o repositório de imagens é o registo.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual é a menor unidade que se pode instalar no Kubernetes?</p>
+        <div class="opts"><button>O contentor</button><button data-ok>O Pod</button><button>O Deployment</button></div>
+        <p class="why">Um Pod agrupa um ou mais contentores, que partilham rede e armazenamento.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Um Deployment pede 3 réplicas e um dos Pods morre. O que acontece?</p>
+        <div class="opts"><button>O Deployment passa a pedir 2 réplicas</button><button data-ok>O estado real difere do desejado, por isso é criado um novo Pod</button><button>Fica assim até o administrador intervir</button></div>
+        <p class="why">O ReplicaSet mantém o número de réplicas e o Scheduler coloca o novo Pod num nó.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Que componente escolhe o nó onde um novo Pod vai correr?</p>
+        <div class="opts"><button>Kubelet</button><button data-ok>Scheduler</button><button>etcd</button></div>
+        <p class="why">O Scheduler decide; depois, o kubelet desse nó põe o Pod a correr. O etcd guarda o estado.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">A aplicação web tem de falar com a base de dados dentro do cluster, sem a expor para fora. Que tipo de Service usas?</p>
+        <div class="opts"><button data-ok>ClusterIP</button><button>NodePort</button><button>LoadBalancer</button></div>
+        <p class="why">O ClusterIP só é acessível dentro do cluster; os outros dois expõem o serviço para o exterior.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Quem usa um PersistentVolumeClaim (PVC)?</p>
+        <div class="opts"><button>O administrador, para descrever os tipos de armazenamento</button><button data-ok>A aplicação, para pedir armazenamento para um Pod</button><button>O Scheduler, para escolher um nó</button></div>
+        <p class="why">O PVC é o pedido, o PV é o armazenamento e a Storage Class descreve os tipos disponíveis.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Onde deves guardar a palavra-passe da base de dados de uma aplicação em Kubernetes?</p>
+        <div class="opts"><button>Na imagem do contentor</button><button>Num ConfigMap</button><button data-ok>Num Secret</button></div>
+        <p class="why">Os ConfigMaps são para configuração não confidencial; a imagem é partilhada e não deve conter credenciais.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual destas é uma desvantagem dos contentores face às VMs?</p>
+        <div class="opts"><button>Migração mais lenta</button><button>Pior utilização de recursos</button><button data-ok>Isolamento mais fraco, porque o kernel é partilhado</button></div>
+        <p class="why">As outras duas são precisamente vantagens dos contentores.</p>
+      </div>
+    </div>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="../assets/vendor/katex/katex.min.js" defer></script>
+<script src="../assets/vendor/katex/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/i18n.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

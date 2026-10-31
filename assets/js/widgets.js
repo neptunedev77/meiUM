@@ -984,6 +984,68 @@
   };
 
   /* =====================================================================
+     k8s — um Deployment a manter o estado desejado (self-healing e scheduling)
+     cada nó aguenta 3 Pods; o controlador faz uma correção de cada vez
+     ===================================================================== */
+  W.k8s = el => {
+    const CAP = 3;
+    let nodes = [true, true, true], pods = [], desired = 3, seq = 0, timer = null, msg = '';
+    el.innerHTML = head(el, 'Um Deployment a manter o estado desejado', 'Pede um número de réplicas, clica num Pod para o matar ou desliga um nó. Cada nó aguenta no máximo 3 Pods.') + `
+      <div class="row">
+        <label class="f grow"><span>réplicas desejadas = <b data-dv></b></span><input type="range" min="0" max="10" step="1" value="3"></label>
+        <label class="set-check"><input type="checkbox" data-ctl checked> controladores ativos</label>
+      </div>
+      <div class="k8s-nodes"></div><dl class="kpis"></dl><p class="w-out"></p>`;
+    const box = el.querySelector('.k8s-nodes'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out');
+    const rg = el.querySelector('input[type=range]'), ctl = el.querySelector('[data-ctl]');
+    const count = i => pods.filter(p => p.node === i).length;
+    /* Scheduler: o nó ligado com menos Pods e com espaço */
+    const pickNode = () => nodes.map((up, i) => ({ up, i, n: count(i) })).filter(x => x.up && x.n < CAP).sort((a, b) => a.n - b.n)[0];
+    function step() {
+      timer = null;
+      if (!el.isConnected || !ctl.checked) return;
+      if (pods.length > desired) {
+        const p = pods[pods.length - 1]; pods.pop();
+        msg = `Há Pods a mais: o ReplicaSet removeu o <b>pod-${p.id}</b>.`;
+      } else if (pods.length < desired) {
+        const n = pickNode();
+        if (!n) { draw(); return; }
+        pods.push({ id: ++seq, node: n.i });
+        msg = `Faltam Pods: o ReplicaSet pediu um novo e o Scheduler colocou o <b>pod-${seq}</b> no <b>nó ${n.i + 1}</b>, o que tem menos carga.`;
+      }
+      draw();
+    }
+    function draw() {
+      el.querySelector('[data-dv]').textContent = desired;
+      box.innerHTML = nodes.map((up, i) => `<div class="k8s-node${up ? '' : ' down'}">
+        <div class="k8s-nh"><b>Nó ${i + 1}</b><button type="button" class="btn sm" data-node="${i}">${up ? 'Desligar' : 'Ligar'}</button></div>
+        <div class="k8s-pods">${pods.filter(p => p.node === i).map(p => `<button type="button" class="chip in" data-pod="${p.id}" title="Matar este Pod" aria-label="Matar o pod-${p.id}">pod-${p.id}</button>`).join('') || `<span class="muted small">${up ? 'sem Pods' : 'indisponível'}</span>`}</div></div>`).join('');
+      const pending = Math.max(0, desired - pods.length), stuck = pending > 0 && !pickNode();
+      kp.innerHTML = kpi('desejado', desired, true) + kpi('a correr', pods.length) + kpi('por colocar', ctl.checked ? pending : '—');
+      let text = msg;
+      if (!ctl.checked) text = pods.length === desired ? 'Controladores parados. Mata um Pod: ninguém vai corrigir a diferença.' : `Controladores parados: o estado real (${pods.length}) já não coincide com o desejado (${desired}) e <b>ninguém o corrige</b>. Volta a ativá-los.`;
+      else if (stuck) text = `Faltam ${pending} Pod(s), mas <b>nenhum nó tem espaço</b>: ficam em estado <i>Pending</i> até haver capacidade. Liga um nó ou baixa as réplicas.`;
+      else if (pods.length === desired && !timer && !msg) text = 'Estado real igual ao desejado: não há nada a corrigir.';
+      out.innerHTML = text;
+      if (ctl.checked && pods.length !== desired && !stuck && !timer) timer = setTimeout(step, 700);
+    }
+    el.addEventListener('click', e => {
+      const p = e.target.closest('[data-pod]');
+      if (p) { pods = pods.filter(x => x.id !== +p.dataset.pod); msg = `O <b>pod-${p.dataset.pod}</b> morreu.`; draw(); return; }
+      const n = e.target.closest('[data-node]');
+      if (n) {
+        const i = +n.dataset.node, lost = count(i);
+        nodes[i] = !nodes[i];
+        if (!nodes[i]) { pods = pods.filter(x => x.node !== i); msg = `O nó ${i + 1} falhou e perderam-se ${lost} Pod(s).`; } else msg = `O nó ${i + 1} voltou a estar disponível.`;
+        draw();
+      }
+    });
+    rg.addEventListener('input', () => { desired = +rg.value; msg = ''; draw(); });
+    ctl.addEventListener('change', () => { msg = ''; draw(); });
+    draw();
+  };
+
+  /* =====================================================================
      p2pdist — tempo mínimo para distribuir um ficheiro: cliente-servidor vs. P2P
      unidades: F/u = 1 hora; u_s = k·u; d_min ≥ u_s (não limita)
      ===================================================================== */

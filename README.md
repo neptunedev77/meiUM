@@ -19,7 +19,7 @@ The site is fully static: plain HTML, CSS and JavaScript, no build step, no fram
 | Course | Topics |
 | --- | --- |
 | **DAA** — Dados e Aprendizagem Automática *(Data and Machine Learning)* | Data science concepts · Quality metrics and model validation · Data exploration and preparation · Linear and logistic regression · Feature engineering · Decision tree pruning and hyperparameter tuning · Ensemble learning |
-| **ASCN** — Aplicações e Serviços de Computação em Nuvem *(Cloud Computing Applications and Services)* | DevOps and infrastructure as code · Distributed applications · System provisioning (Ansible) · Cloud computing (IaaS, PaaS, SaaS, OpenStack) · Virtualisation (VMs) |
+| **ASCN** — Aplicações e Serviços de Computação em Nuvem *(Cloud Computing Applications and Services)* | DevOps and infrastructure as code · Distributed applications · System provisioning (Ansible) · Cloud computing (IaaS, PaaS, SaaS, OpenStack) · Virtualisation (VMs) · Containers (Docker, Kubernetes) |
 | **ESR** — Engenharia de Serviços em Rede *(Network Services Engineering)* | Application layer principles · P2P and BitTorrent · Multimedia, video streaming (DASH) and CDNs · Socket programming · IP multicast (IGMP, PIM) |
 
 More courses are added as the master's progresses.

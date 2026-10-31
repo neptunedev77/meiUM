@@ -436,6 +436,15 @@ h2{scroll-margin-top:72px;border-radius:4px}
   .topic{grid-template-columns:40px minmax(0,1fr)}
   .topic .tr{grid-column:2;align-items:flex-start}
 }
+.k8s-nodes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:10px}
+.k8s-node{display:flex;flex-direction:column;gap:10px;padding:12px;background:var(--card-2);border:1px solid var(--rule);border-radius:8px;min-height:112px}
+.k8s-node.down{opacity:.55;border-style:dashed}
+.k8s-nh{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.k8s-nh b{font-family:var(--f-display)}
+.k8s-pods{display:flex;flex-wrap:wrap;gap:6px}
+.k8s-pods .chip{width:auto;padding:0 8px;cursor:pointer;color:var(--ink);font-size:12px}
+.k8s-pods .chip:hover{background:var(--bad-bg);border-color:var(--bad)}
+
 /* ---------- modo exame ---------- */
 .ex-cta{display:flex;align-items:center;gap:16px;padding:16px 18px;margin-bottom:28px;background:var(--card);border:1px solid var(--rule);border-left:4px solid var(--accent);border-radius:10px;text-decoration:none;color:var(--ink);transition:border-color .15s}
 .ex-cta:hover{border-color:var(--accent)}
