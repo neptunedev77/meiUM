@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Armazenamento · ASCN · meiUM</title>
+<meta name="description" content="ASCN · Tema 7: armazenamento: cargas de trabalho (arquivo, backup, primário), meios, interfaces (bloco, ficheiro, objeto), do local ao P2P, replicação, erasure codes, cache, deduplicação, cifra e Software-Defined Storage.">
+<!-- partilha: gerado por tools/seo.py -->
+<link rel="canonical" href="https://meium.space/ascn/07-storage.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="meiUM">
+<meta property="og:locale" content="pt_PT">
+<meta property="og:title" content="Armazenamento · ASCN">
+<meta property="og:description" content="ASCN · Tema 7: armazenamento: cargas de trabalho (arquivo, backup, primário), meios, interfaces (bloco, ficheiro, objeto), do local ao P2P, replicação, erasure codes, cache, deduplicação, cifra e Software-Defined Storage.">
+<meta property="og:url" content="https://meium.space/ascn/07-storage.html">
+<meta property="og:image" content="https://meium.space/assets/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="meiUM: apontamentos do Mestrado em Engenharia Informática da Universidade do Minho">
+<meta name="twitter:card" content="summary_large_image">
+<!-- /partilha -->
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../assets/img/icon-192.png">
+<meta name="theme-color" content="#151d36">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var d=document.documentElement,g=function(k){return JSON.parse(localStorage.getItem('meium:'+k))},t=g('theme'),f=g('fontScale');if(t==='light'||t==='dark')d.dataset.theme=t;if(f)d.style.setProperty('--fs',f);if(g('showExtra')===false)d.classList.add('hide-extra')}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="ascn" data-topic="07" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 7.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="7.0" data-title="Visão geral" data-desc="Porque é que o armazenamento importa.">
+  <header class="ph">
+    <h1>Armazenamento<span class="en">Storage</span></h1>
+    <p class="lede">Bases de dados, analytics, machine learning, a cloud, a computação de alto desempenho (HPC), a IoT: todos assentam num sistema de armazenamento. É ele que garante que os dados <strong>persistem</strong> e estão <strong>disponíveis</strong>.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">7.0.1</span>O desempenho conta</h2>
+    <p>Guardar e ler dados devagar dá aplicações e serviços lentos. Por isso, não há um armazenamento "certo": há o adequado a cada <strong>tipo de uso</strong>, com um <strong>meio</strong>, uma <strong>interface</strong>, uma <strong>escala</strong> e um conjunto de <strong>funcionalidades</strong> próprios. O tema percorre essas cinco perguntas e termina numa forma de as combinar com flexibilidade: o Software-Defined Storage.</p>
+    <div class="three">
+      <div class="card"><span class="tag">Para quê?</span><p>Arquivo, backup ou dados primários.</p></div>
+      <div class="card"><span class="tag">Onde e como?</span><p>Fita, HDD, SSD, memória; bloco, ficheiro ou objeto.</p></div>
+      <div class="card"><span class="tag">A que escala?</span><p>Um disco, um servidor, um centro de dados, milhões de nós.</p></div>
+    </div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <p class="src">Baseado nas aulas de ASCN (Storage). Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 7.1 CARGAS ============================ -->
+<article class="page" data-page="cargas" data-num="7.1" data-title="Cargas de trabalho" data-desc="Arquivo, backup e armazenamento primário.">
+  <header class="ph">
+    <h1>Cargas de trabalho<span class="en">Storage Workloads</span></h1>
+    <p class="lede">A mesma pergunta, "como guardar estes dados?", tem respostas diferentes consoante o padrão de acesso: quanto, com que frequência, por que ordem e se os dados mudam.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Arquivo</th><th>Backup</th><th>Primário</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Para quê</strong></td><td>Informação raramente acedida, que pode ser útil no futuro</td><td>Cópias de dados recentes, ainda em uso e que podem ser precisos em breve</td><td>Os dados de bases de dados, analytics, frameworks de IA, VMs…</td></tr>
+        <tr><td><strong>Prioridade</strong></td><td><strong>Débito</strong> (throughput) mais do que latência: ler e escrever muitos dados com eficiência</td><td>Ainda o <strong>débito</strong></td><td><strong>Débito e/ou latência baixa</strong>: muitos dados, mas também escritas e leituras pequenas e rápidas</td></tr>
+        <tr><td><strong>Padrão de acesso</strong></td><td><strong>Sequencial e append-only</strong>: escreve-se uma vez e não se altera no sítio</td><td>Sobretudo sequencial, às vezes só partes de ficheiros</td><td><strong>Sequencial e aleatório</strong>: partes de ficheiros, fora de ordem</td></tr>
+        <tr><td><strong>Atualizações</strong></td><td>Nenhuma</td><td>Esporádicas; por vezes só se guardam as diferenças entre backups</td><td><strong>Frequentes</strong>; acesso intenso a dados e a metadados</td></tr>
+        <tr><td><strong>Serviço na cloud (AWS)</strong></td><td>Amazon Glacier</td><td>Amazon S3</td><td>Amazon EBS</td></tr>
+      </tbody></table></div>
+    <div class="note"><span class="lbl">"Primário" não é só a RAM</span>
+      <p>Armazenamento primário são os dados de que as aplicações precisam para trabalhar no dia a dia: o disco onde vive a base de dados, o volume de uma VM. Pode estar em RAM, mas sobretudo em discos e SSDs.</p></div>
+
+    <h3>Que tipo de carga?</h3>
+    <div class="classify" data-options="Arquivo,Backup,Primário">
+      <div class="ci" data-answer="Arquivo" data-why="Escrito uma vez, quase nunca lido, sem alterações: sequencial e append-only.">Registos fiscais que têm de ser guardados 10 anos</div>
+      <div class="ci" data-answer="Primário" data-why="Leituras e escritas pequenas, aleatórias e frequentes, onde a latência conta.">As tabelas de uma base de dados de encomendas online</div>
+      <div class="ci" data-answer="Backup" data-why="Cópia de dados recentes, que pode ser precisa em breve; às vezes só se guardam as diferenças.">A cópia noturna das pastas de trabalho da equipa</div>
+      <div class="ci" data-answer="Primário" data-why="O sistema operativo e as aplicações da VM leem e escrevem nele a toda a hora.">O disco de uma máquina virtual em execução</div>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 7.2 MEIOS ============================ -->
+<article class="page" data-page="meios" data-num="7.2" data-title="Meios de armazenamento" data-desc="Fita, HDD, SSD, memória persistente e RAM.">
+  <header class="ph">
+    <h1>Meios de armazenamento<span class="en">Storage Mediums</span></h1>
+    <p class="lede">Cada meio é um compromisso entre <strong>custo</strong>, <strong>velocidade</strong> (sobretudo em acessos aleatórios) e <strong>persistência</strong>, e serve melhor umas cargas do que outras.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="tw"><table>
+      <thead><tr><th>Meio</th><th>Características</th><th>Usado para</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Fita</strong></td><td>Fiável e barata; suporte limitado a acessos aleatórios e a atualizações no sítio</td><td>Arquivo</td></tr>
+        <tr><td><strong>HDD</strong></td><td>Ainda barato; suporta acessos aleatórios e atualizações no sítio</td><td>Arquivo, backup e, em alguns casos, dados primários</td></tr>
+        <tr><td><strong>SSD</strong> (SATA, NVMe)</td><td>Mais caro do que o HDD mas mais rápido, sobretudo em acessos aleatórios</td><td>Backup e dados primários</td></tr>
+        <tr><td><strong>Memória persistente</strong></td><td>Velocidade próxima da RAM, em acessos sequenciais e aleatórios, mas cara</td><td>Primário, sobretudo como cache</td></tr>
+        <tr><td><strong>RAM</strong></td><td><strong>Volátil</strong>: os dados perdem-se quando a máquina reinicia</td><td>Primário, como cache</td></tr>
+      </tbody></table></div>
+    <p>A memória persistente da Intel (Optane) foi entretanto descontinuada.</p>
+    <div class="note extra"><span class="lbl">Ordens de grandeza <span class="xtag">complemento</span></span>
+      <p>Latência típica de um acesso aleatório: RAM ≈ 100 ns; SSD NVMe ≈ 10–100 µs; HDD ≈ 5–10 ms (o braço tem de se mover e o disco de rodar); fita: segundos a minutos (é preciso montar e enrolar a fita). Entre a RAM e o HDD há um fator de cerca de <strong>100 000</strong>. É por isso que o padrão de acesso (sequencial ou aleatório) pesa tanto na escolha do meio, e porque é que as caches valem tanto.</p></div>
+  </section>
+</article>
+
+<!-- ============================ 7.3 INTERFACES ============================ -->
+<article class="page" data-page="interfaces" data-num="7.3" data-title="Interfaces" data-desc="Bloco, ficheiro e objeto.">
+  <header class="ph">
+    <h1>Interfaces de armazenamento<span class="en">Storage Interfaces</span></h1>
+    <p class="lede">A mesma informação pode ser apresentada a quem a usa de três formas diferentes, com níveis de abstração diferentes.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="three">
+      <div class="card"><span class="tag">Bloco</span><p>Os dados são um conjunto de <strong>blocos</strong> numerados: é a abstração mais próxima do disco.</p><p class="small">Ex.: block device Linux, iSCSI, Amazon EBS, Ceph</p></div>
+      <div class="card"><span class="tag">Sistema de ficheiros</span><p>Uma <strong>hierarquia de ficheiros e diretorias</strong>: a abstração que a maioria das pessoas usa no seu computador.</p><p class="small">Ex.: Ext4, NFS, HDFS, Lustre, Ceph</p></div>
+      <div class="card"><span class="tag">Objeto</span><p>Os dados são <strong>objetos</strong>, por exemplo um par chave-valor por ficheiro: a chave é um identificador único e o valor o conteúdo.</p><p class="small">Ex.: Amazon S3, OpenStack Swift, Ceph</p></div>
+    </div>
+    <p>O Ceph aparece nas três colunas: é um sistema distribuído que oferece as três interfaces sobre o mesmo armazenamento.</p>
+    <div class="note extra"><span class="lbl">Na prática <span class="xtag">complemento</span></span>
+      <ul>
+        <li><strong>Bloco</strong>: quem o usa tem de pôr por cima um sistema de ficheiros ou uma base de dados. É o "disco" de uma VM.</li>
+        <li><strong>Ficheiro</strong>: caminhos, permissões, operações POSIX (abrir, ler, escrever num deslocamento, renomear).</li>
+        <li><strong>Objeto</strong>: um espaço de nomes plano, acedido por HTTP (<code>PUT</code>, <code>GET</code>, <code>DELETE</code> de objetos inteiros), com metadados à medida e escala praticamente ilimitada. Não se altera "um bocado" de um objeto: substitui-se. É ideal para backups, media e dados de analytics, e pouco adequado a uma base de dados.</li>
+      </ul></div>
+  </section>
+</article>
+
+<!-- ============================ 7.4 ÂMBITO ============================ -->
+<article class="page" data-page="ambito" data-num="7.4" data-title="Do local ao P2P" data-desc="Local, remoto, distribuído e altamente distribuído.">
+  <header class="ph">
+    <h1>Do local ao peer-to-peer<span class="en">Storage Scope</span></h1>
+    <p class="lede">O mesmo pedido de uma aplicação, "lê os bytes deste ficheiro", pode ser servido por um disco local, por um servidor na rede, por um cluster com centenas de servidores ou por milhões de nós.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">7.4.1</span>Local</h2>
+    <p>O <strong>sistema operativo</strong> faz de intermediário entre os pedidos de I/O das aplicações e os discos locais, através das chamadas ao sistema.</p>
+    <div class="card">
+      <svg class="w-svg" viewBox="0 0 640 300" role="img" aria-label="Pilha de I/O local: aplicação, API POSIX, VFS e page cache, sistemas de ficheiros, camada de blocos genérica, driver, disco">
+        <g style="font-family:var(--f-display);font-size:12px;font-weight:600">
+          <rect x="140" y="8" width="360" height="30" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="320" y="28" text-anchor="middle" style="fill:var(--ink)">Aplicação</text>
+          <text x="320" y="54" text-anchor="middle" style="fill:var(--muted);font-family:var(--f-mono);font-size:11px;font-weight:500">API POSIX (open, read, write…)</text>
+          <line x1="20" x2="620" y1="64" y2="64" style="stroke:var(--ink-2);stroke-dasharray:6 4"/><text x="24" y="58" style="fill:var(--muted);font-family:var(--f-mono);font-size:10.5px">utilizador</text><text x="24" y="78" style="fill:var(--muted);font-family:var(--f-mono);font-size:10.5px">kernel</text>
+          <rect x="140" y="86" width="270" height="32" rx="5" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="275" y="107" text-anchor="middle" style="fill:var(--ink)">Virtual File System (VFS)</text>
+          <rect x="420" y="86" width="80" height="32" rx="5" style="fill:var(--warn-bg);stroke:var(--warn)"/><text x="460" y="107" text-anchor="middle" style="fill:var(--ink)">page cache</text>
+          <rect x="140" y="128" width="85" height="30" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="182" y="148" text-anchor="middle" style="fill:var(--ink)">Ext4</text>
+          <rect x="232" y="128" width="85" height="30" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="274" y="148" text-anchor="middle" style="fill:var(--ink)">ZFS</text>
+          <rect x="324" y="128" width="86" height="30" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="367" y="148" text-anchor="middle" style="fill:var(--ink)">…</text>
+          <rect x="140" y="170" width="360" height="30" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="320" y="190" text-anchor="middle" style="fill:var(--ink)">Camada de blocos genérica</text>
+          <rect x="140" y="212" width="360" height="30" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="320" y="232" text-anchor="middle" style="fill:var(--ink)">Driver do dispositivo (ATA, SCSI, NVMe)</text>
+          <rect x="140" y="256" width="360" height="34" rx="5" style="fill:var(--ink-2);stroke:var(--ink-2)"/><text x="320" y="278" text-anchor="middle" style="fill:var(--paper)">Disco</text>
+          <path d="M560 30V270" style="stroke:var(--s1);stroke-width:2;fill:none"/><path d="M560 270l-4-8h8z" style="fill:var(--s1)"/>
+          <text x="572" y="150" style="fill:var(--ink);font-size:11px" transform="rotate(90 572 150)" text-anchor="middle">acesso direto a blocos</text>
+        </g>
+      </svg>
+    </div>
+    <ul>
+      <li>As aplicações podem falar diretamente com a <strong>camada de blocos</strong> (uma base de dados que gere o disco sozinha), ou com um <strong>sistema de ficheiros</strong> (ext4, ZFS, XFS).</li>
+      <li>O <strong>VFS</strong> (Virtual File System) dá uma interface e uma abstração comuns: cada sistema de ficheiros implementa essa abstração, especializando-a para as suas necessidades.</li>
+      <li>A <strong>page cache</strong> do SO guarda em memória o conteúdo dos ficheiros, para acessos mais rápidos.</li>
+    </ul>
+
+    <h2><span class="sn">7.4.2</span>Remoto</h2>
+    <p>O armazenamento é oferecido através da rede, seja como dispositivo de blocos (iSCSI) ou como sistema de ficheiros (NFS), numa arquitetura <strong>cliente-servidor</strong>. No cliente, os pedidos de I/O são intercetados (no caso do NFS, pela especialização NFS do VFS) e enviados pela rede. No servidor, são entregues ao componente servidor (o servidor NFS), que os guarda no seu disco local. Para a aplicação, tudo parece local.</p>
+
+    <h2><span class="sn">7.4.3</span>Distribuído (centro de dados)</h2>
+    <p>Na cloud e em HPC, dezenas a centenas de servidores guardam os dados: HDFS, Ceph, Lustre, GPFS.</p>
+    <ul>
+      <li><strong>Sem ponto único de falha</strong>: os dados estão distribuídos, replicados ou particionados (sharding), pelos <strong>nós de dados</strong>.</li>
+      <li>Os <strong>metadados</strong> (onde está cada ficheiro, permissões) são geridos por <strong>nós de metadados</strong> independentes.</li>
+      <li>O cliente pergunta aos nós de metadados <strong>onde</strong> estão os dados, e depois lê-os ou atualiza-os <strong>diretamente</strong> nos nós de dados. Os metadados não se tornam um gargalo para o tráfego de dados.</li>
+      <li>É um desenho <strong>gestor-trabalhador</strong>, otimizado para um <strong>churn estável</strong>: servidores a falhar a um ritmo baixo e previsível.</li>
+    </ul>
+
+    <h2><span class="sn">7.4.4</span>Altamente distribuído (peer-to-peer)</h2>
+    <p>Milhares a milhões de nós, por exemplo numa infraestrutura de IoT: Napster, Gnutella, CFS, DataFlasks.</p>
+    <ul>
+      <li>Dados <strong>e</strong> metadados replicados por muitos nós, <strong>sem nós especializados</strong>.</li>
+      <li>As aplicações podem fazer pedidos a <strong>qualquer</strong> nó.</li>
+      <li>É difícil manter uma <strong>visão consistente</strong> em todos os nós: garantir que clientes ligados a nós diferentes, ao mesmo tempo, veem os mesmos ficheiros e o mesmo conteúdo.</li>
+      <li>Desenho <strong>P2P</strong>, otimizado para <strong>churn alto</strong>: espera-se que os nós falhem e voltem com frequência.</li>
+    </ul>
+
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Local</th><th>Remoto</th><th>Distribuído</th><th>P2P</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Escala</strong></td><td>Um servidor</td><td>Cliente + servidor</td><td>Dezenas a centenas de servidores</td><td>Milhares a milhões de nós</td></tr>
+        <tr><td><strong>Exemplos</strong></td><td>Ext4, ZFS</td><td>NFS, iSCSI</td><td>HDFS, Ceph, Lustre</td><td>Gnutella, DataFlasks</td></tr>
+        <tr><td><strong>Metadados</strong></td><td>No SO</td><td>No servidor</td><td>Nós de metadados dedicados</td><td>Em todos os nós</td></tr>
+        <tr><td><strong>Ponto único de falha</strong></td><td>Sim</td><td>O servidor</td><td>Não</td><td>Não</td></tr>
+        <tr><td><strong>Churn</strong></td><td>—</td><td>—</td><td>Estável</td><td>Alto</td></tr>
+      </tbody></table></div>
+  </section>
+</article>
+
+<!-- ============================ 7.5 FUNCIONALIDADES ============================ -->
+<article class="page" data-page="funcionalidades" data-num="7.5" data-title="Funcionalidades" data-desc="Disponibilidade, desempenho, espaço e segurança.">
+  <header class="ph">
+    <h1>Funcionalidades<span class="en">Storage Features</span></h1>
+    <p class="lede">Por cima do armazenamento em si, os sistemas oferecem funcionalidades com quatro objetivos: <strong>disponibilidade</strong>, <strong>desempenho</strong>, <strong>eficiência de espaço</strong> e <strong>segurança</strong>.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">7.5.1</span>Disponibilidade</h2>
+    <div class="three">
+      <div class="card"><span class="tag">RAID</span><p><em>Redundant Array of Inexpensive Drives</em>: dados replicados ou repartidos por vários discos <strong>de um só servidor</strong>, para disponibilidade e para repartir a carga.</p></div>
+      <div class="card"><span class="tag">Replicação</span><p>Cópias exatas em <strong>vários servidores</strong>. Fator 3: aguenta 2 falhas, com 3× o espaço.</p></div>
+      <div class="card"><span class="tag">Erasure codes</span><p>Os dados dividem-se em <strong>k blocos</strong>, a que se juntam <strong>m blocos de paridade</strong>, espalhados por servidores. Reed-Solomon (6, 3): aguenta 3 falhas, com só 1.5× o espaço.</p></div>
+    </div>
+    <div class="formula"><div class="cap">Custo em espaço e falhas toleradas</div>\[\text{replicação }r:\ \ r\times,\ \ r-1\text{ falhas}\qquad\text{erasure code }(k,m):\ \ \frac{k+m}{k}\times,\ \ m\text{ falhas}\]</div>
+    <div class="widget" data-widget="redund"></div>
+    <div class="note extra"><span class="lbl">Então porque não usar sempre erasure codes? <span class="xtag">complemento</span></span>
+      <p>Para ler os dados quando falta um fragmento, é preciso ir buscar k fragmentos a k servidores e recalcular. Isso custa <strong>rede e CPU</strong>, e aumenta a latência. Por isso é comum replicar os dados "quentes" (acedidos muitas vezes) e usar erasure codes para os "frios": backups e arquivo.</p></div>
+
+    <h2><span class="sn">7.5.2</span>Desempenho</h2>
+    <div class="two">
+      <div class="card"><span class="tag">Localidade dos dados</span><p>Levar a <strong>computação para perto dos dados</strong>: processar no mesmo servidor ou dispositivo onde os dados estão guardados, o que torna o acesso mais rápido. Ex.: HBase sobre HDFS, active storage.</p></div>
+      <div class="card"><span class="tag">Cache</span><p>Manter os dados perto do cliente, ou numa fonte mais rápida (RAM), para não esperar pelo armazenamento local ou remoto. Ex.: a page cache do sistema de ficheiros, o Alluxio (sistema de ficheiros distribuído em memória).</p></div>
+    </div>
+
+    <h2><span class="sn">7.5.3</span>Eficiência de espaço</h2>
+    <div class="two">
+      <div class="card"><span class="tag">Compressão</span><p>Remove conteúdo redundante (bytes) <strong>dentro</strong> de ficheiros e entre eles. Usa-se sobretudo como técnica <strong>estática</strong>: em conjuntos de ficheiros que não vão ser alterados.</p></div>
+      <div class="card"><span class="tag">Deduplicação</span><p>Elimina <strong>cópias redundantes</strong> (de ficheiros ou blocos) no sistema de armazenamento, guardando cada uma só uma vez. É uma técnica <strong>dinâmica</strong>: funciona com ficheiros e blocos que vão continuar a ser atualizados.</p></div>
+    </div>
+    <div class="widget" data-widget="dedup"></div>
+
+    <h2><span class="sn">7.5.4</span>Segurança</h2>
+    <ul>
+      <li><strong>Cifra em repouso</strong>: os dados são cifrados antes de serem guardados.</li>
+      <li><strong>Cifra em trânsito</strong>: os dados são cifrados antes de atravessarem a rede, nos sistemas de armazenamento remotos.</li>
+      <li><strong>Controlo de acesso</strong>: impedir acessos não autorizados aos dados dos utilizadores.</li>
+    </ul>
+    <div class="note extra"><span class="lbl">Cifrar em trânsito vs. no cliente <span class="xtag">complemento</span></span>
+      <p>Na prática, "em trânsito" costuma significar proteger a ligação (TLS): os dados são decifrados quando chegam ao servidor. Se forem cifrados <strong>no próprio cliente</strong> e só ele tiver a chave, nem o fornecedor do armazenamento os consegue ler: é a <em>client-side encryption</em>, a proteção mais forte. O preço é que o servidor deixa de conseguir comprimir ou deduplicar esses dados, porque os dados cifrados parecem aleatórios.</p></div>
+  </section>
+</article>
+
+<!-- ============================ 7.6 SDS ============================ -->
+<article class="page" data-page="sds" data-num="7.6" data-title="Software-Defined Storage" data-desc="Separar o plano de dados do plano de controlo.">
+  <header class="ph">
+    <h1>Software-Defined Storage</h1>
+    <p class="lede">Num centro de dados, um pedido de I/O atravessa uma pilha longa: a aplicação, o sistema de ficheiros local, a VM, o armazenamento remoto, os discos. Cada camada oferece uma <strong>combinação fixa</strong> de funcionalidades. Mas a melhor combinação depende da aplicação.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">7.6.1</span>O problema</h2>
+    <p>O que convém a uma aplicação não convém a outra: ficheiros pequenos ou grandes, padrões de acesso diferentes, informação sensível ou não. Uma solução <strong>monolítica e complexa</strong>, com as mesmas funcionalidades para todos, é demasiado rígida.</p>
+
+    <h2><span class="sn">7.6.2</span>Os princípios</h2>
+    <ul>
+      <li>Os <strong>fluxos de I/O</strong> (plano de dados) estão <strong>separados</strong> do <strong>fluxo de controlo</strong> (plano de controlo).</li>
+      <li>O plano de controlo tem o <strong>controlo global</strong> dos fluxos de I/O, de forma <strong>logicamente centralizada</strong>.</li>
+    </ul>
+    <div class="card">
+      <svg class="w-svg" viewBox="0 0 640 250" role="img" aria-label="Plano de controlo com aplicações de controlo configura os estágios do plano de dados no caminho de I/O de cada aplicação">
+        <g style="font-family:var(--f-display);font-size:12px;font-weight:600">
+          <rect x="20" y="10" width="600" height="64" rx="8" style="fill:var(--warn-bg);stroke:var(--warn)"/>
+          <text x="320" y="30" text-anchor="middle" style="fill:var(--ink);font-size:13px">Plano de controlo (logicamente centralizado, distribuído)</text>
+          <rect x="40" y="40" width="170" height="26" rx="4" style="fill:var(--card);stroke:var(--rule)"/><text x="125" y="58" text-anchor="middle" style="fill:var(--ink)">app de controlo: QoS</text>
+          <rect x="235" y="40" width="170" height="26" rx="4" style="fill:var(--card);stroke:var(--rule)"/><text x="320" y="58" text-anchor="middle" style="fill:var(--ink)">app de controlo: cifra</text>
+          <rect x="430" y="40" width="170" height="26" rx="4" style="fill:var(--card);stroke:var(--rule)"/><text x="515" y="58" text-anchor="middle" style="fill:var(--ink)">app de controlo: …</text>
+          <g style="stroke:var(--ink-2);stroke-width:1.2;stroke-dasharray:4 3;fill:none"><path d="M125 74V112M320 74V112M515 74V112"/></g>
+          <text x="560" y="96" style="fill:var(--muted);font-family:var(--f-mono);font-size:10.5px;font-weight:500">configura</text>
+          <rect x="20" y="112" width="600" height="96" rx="8" style="fill:var(--card-2);stroke:var(--rule)"/>
+          <text x="320" y="130" text-anchor="middle" style="fill:var(--ink);font-size:13px">Plano de dados: estágios no caminho de I/O</text>
+          <rect x="60" y="142" width="130" height="28" rx="4" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="125" y="161" text-anchor="middle" style="fill:var(--ink)">cache</text>
+          <rect x="255" y="142" width="130" height="28" rx="4" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="320" y="161" text-anchor="middle" style="fill:var(--ink)">compressão</text>
+          <rect x="450" y="142" width="130" height="28" rx="4" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="515" y="161" text-anchor="middle" style="fill:var(--ink)">cifra</text>
+          <path d="M20 186H620" style="stroke:var(--s1);stroke-width:2.2;fill:none"/><path d="M620 186l-9-4v8z" style="fill:var(--s1)"/>
+          <text x="320" y="202" text-anchor="middle" style="fill:var(--muted);font-family:var(--f-mono);font-size:10.5px;font-weight:500">pedidos de I/O das aplicações → armazenamento</text>
+          <text x="320" y="236" text-anchor="middle" style="fill:var(--muted);font-family:var(--f-mono);font-size:11px;font-weight:500">aplicações, VMs, contentores ↑ · discos e servidores de armazenamento ↓</text>
+        </g>
+      </svg>
+    </div>
+
+    <h2><span class="sn">7.6.3</span>Plano de dados</h2>
+    <ul>
+      <li>Organizado em <strong>camadas</strong>, com <strong>estágios</strong>.</li>
+      <li>Cada estágio trata os pedidos no caminho de I/O e oferece uma funcionalidade: cache, compressão, cifra…</li>
+      <li>É <strong>programável e extensível</strong>: podem acrescentar-se estágios com novas funcionalidades.</li>
+    </ul>
+
+    <h2><span class="sn">7.6.4</span>Plano de controlo</h2>
+    <ul>
+      <li>Tem uma <strong>visão global</strong> das aplicações, dos estágios e dos recursos da infraestrutura: é o "cérebro" que coordena o conjunto.</li>
+      <li>É <strong>distribuído</strong>, para escalar e para estar sempre disponível.</li>
+      <li><strong>Configura e afina</strong> os estágios para impor políticas de I/O:
+        <ul>
+          <li><strong>qualidade de serviço</strong>: equidade entre aplicações, ou prioridades;</li>
+          <li><strong>transformações</strong>: cifra, compressão.</li>
+        </ul></li>
+      <li>As políticas são definidas através de <strong>aplicações de controlo</strong>.</li>
+    </ul>
+    <p><strong>Exemplo</strong>: uma política diz "os ficheiros da aplicação de saúde são cifrados; o backup noturno não pode tirar mais de 30% do débito à base de dados". O plano de controlo liga o estágio de cifra no caminho da primeira e limita o débito do segundo, sem mudar nenhuma das aplicações.</p>
+    <div class="note extra"><span class="lbl">A mesma ideia nas redes <span class="xtag">complemento</span></span>
+      <p>O SDS segue o modelo das <strong>Software-Defined Networks</strong> (SDN), onde os switches só encaminham pacotes (plano de dados) e um controlador central decide as regras (plano de controlo). Em ambos, separar o "fazer" do "decidir" torna a infraestrutura programável.</p></div>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo, exercícios e perguntas.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de exercícios e perguntas.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Conceito</th><th>Ideia-chave</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Arquivo / backup / primário</strong></td><td>Débito, sequencial, append-only (Glacier) / débito, atualizações esporádicas (S3) / latência, aleatório, atualizações frequentes (EBS)</td></tr>
+        <tr><td><strong>Meios</strong></td><td>Fita → HDD → SSD → memória persistente → RAM: cada vez mais rápido e mais caro; a RAM é volátil</td></tr>
+        <tr><td><strong>Interfaces</strong></td><td>Bloco (iSCSI, EBS) · ficheiro (Ext4, NFS, HDFS) · objeto (S3, Swift); o Ceph tem as três</td></tr>
+        <tr><td><strong>Âmbito</strong></td><td>Local (VFS, page cache) · remoto (NFS, cliente-servidor) · distribuído (metadados separados, churn estável) · P2P (sem nós especiais, churn alto)</td></tr>
+        <tr><td><strong>Disponibilidade</strong></td><td>RAID (num servidor) · replicação r (r×, r−1 falhas) · erasure codes (k, m) ((k+m)/k ×, m falhas)</td></tr>
+        <tr><td><strong>Desempenho</strong></td><td>Localidade dos dados, cache</td></tr>
+        <tr><td><strong>Espaço</strong></td><td>Compressão (estática) · deduplicação (dinâmica)</td></tr>
+        <tr><td><strong>Segurança</strong></td><td>Cifra em repouso e em trânsito, controlo de acesso</td></tr>
+        <tr><td><strong>SDS</strong></td><td>Plano de dados (estágios programáveis) separado do plano de controlo (visão global, políticas de QoS e transformações)</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">Σ.2</span>Exercícios</h2>
+    <details class="ans"><summary>1. Quer guardar 200 TB tolerando a falha de quaisquer 2 servidores. Quanto espaço bruto precisa com replicação, e com um erasure code (10, 2)?</summary>
+      <div><p>Replicação: para aguentar 2 falhas é preciso r = 3, ou seja <strong>600 TB</strong>. Erasure code (10, 2): aguenta m = 2 falhas com (10 + 2) / 10 = 1.2×, ou seja <strong>240 TB</strong>. Poupam-se 360 TB, à custa de reconstruções mais caras quando há falhas.</p></div></details>
+    <details class="ans"><summary>2. Um código Reed-Solomon (k = 6, m = 3): quantos fragmentos, quantos servidores podem falhar, e qual é o custo em espaço?</summary>
+      <div><p>9 fragmentos (6 de dados + 3 de paridade), em 9 servidores; aguenta <strong>3 falhas</strong>; ocupa 9/6 = <strong>1.5×</strong> o espaço original.</p></div></details>
+    <details class="ans"><summary>3. Num sistema de ficheiros distribuído, porque é que o cliente lê os dados diretamente dos nós de dados, e não através dos nós de metadados?</summary>
+      <div><p>Para que os nós de metadados não se tornem um <strong>gargalo</strong>: só respondem a perguntas pequenas ("onde está o ficheiro A?"), enquanto o tráfego pesado (o conteúdo) vai em paralelo para os nós de dados.</p></div></details>
+    <details class="ans"><summary>4. Para backups diários de uma pasta que muda pouco de um dia para o outro, compressão ou deduplicação?</summary>
+      <div><p>Sobretudo <strong>deduplicação</strong>: a maior parte dos blocos repete-se de um backup para o seguinte e só se guarda uma vez, mesmo que os ficheiros continuem a mudar. As duas técnicas também se combinam: comprimem-se os blocos únicos.</p></div></details>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.3</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">O que caracteriza uma carga de trabalho de arquivo?</p>
+        <div class="opts"><button>Latência baixa e acessos aleatórios</button><button data-ok>Prioridade ao débito; escrita sequencial, append-only, sem atualizações no sítio</button><button>Atualizações frequentes de metadados</button></div>
+        <p class="why">Os dados de arquivo escrevem-se uma vez e raramente se leem. Um exemplo na cloud é o Amazon Glacier.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Uma base de dados transacional precisa sobretudo de…</p>
+        <div class="opts"><button>Fita magnética</button><button data-ok>Armazenamento primário com baixa latência em acessos aleatórios, como SSDs</button><button>Armazenamento de objetos, como o S3</button></div>
+        <p class="why">Escritas e leituras pequenas, aleatórias e frequentes. O armazenamento de objetos substitui objetos inteiros e não é adequado a isto.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual destas é uma interface de armazenamento de blocos?</p>
+        <div class="opts"><button>NFS</button><button data-ok>iSCSI</button><button>Amazon S3</button></div>
+        <p class="why">O NFS é um sistema de ficheiros remoto; o S3 é armazenamento de objetos.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual é o papel do VFS no kernel?</p>
+        <div class="opts"><button>Guardar o conteúdo dos ficheiros em memória</button><button data-ok>Dar uma interface comum, que cada sistema de ficheiros (Ext4, ZFS, NFS…) implementa</button><button>Falar diretamente com o disco</button></div>
+        <p class="why">Guardar os ficheiros em memória é o papel da page cache; falar com o disco cabe ao driver.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Num sistema de ficheiros distribuído como o HDFS ou o Ceph, como se acede a um ficheiro?</p>
+        <div class="opts"><button>Todo o tráfego passa por um servidor central</button><button data-ok>Pergunta-se aos nós de metadados onde está, e lê-se diretamente dos nós de dados</button><button>Pergunta-se a qualquer nó, porque todos são iguais</button></div>
+        <p class="why">Todos os nós serem iguais é o desenho P2P, pensado para churn alto.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Um erasure code (6, 3) face à replicação com fator 3:</p>
+        <div class="opts"><button>Aguenta menos falhas e ocupa mais espaço</button><button data-ok>Aguenta 3 falhas (a replicação aguenta 2) e ocupa 1.5× (a replicação ocupa 3×)</button><button>É igual em tudo</button></div>
+        <p class="why">O custo escondido do erasure code está na reconstrução: ler k fragmentos e recalcular.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual é a diferença entre compressão e deduplicação, tal como são usadas habitualmente?</p>
+        <div class="opts"><button>Não há diferença</button><button data-ok>A compressão é sobretudo estática (dados que não mudam); a deduplicação é dinâmica (dados que continuam a ser atualizados)</button><button>A deduplicação só funciona dentro de um ficheiro</button></div>
+        <p class="why">A deduplicação elimina cópias repetidas de ficheiros ou blocos em todo o sistema.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">No Software-Defined Storage, o que faz o plano de controlo?</p>
+        <div class="opts"><button>Processa cada pedido de I/O</button><button data-ok>Tem a visão global e configura os estágios do plano de dados para impor políticas (QoS, cifra, compressão)</button><button>Guarda os metadados dos ficheiros</button></div>
+        <p class="why">Processar os pedidos é o papel do plano de dados, nos seus estágios.</p>
+      </div>
+    </div>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="../assets/vendor/katex/katex.min.js" defer></script>
+<script src="../assets/vendor/katex/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/i18n.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

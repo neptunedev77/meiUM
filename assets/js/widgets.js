@@ -984,6 +984,70 @@
   };
 
   /* =====================================================================
+     redund — replicação vs. erasure codes: espaço e falhas toleradas
+     ===================================================================== */
+  W.redund = el => {
+    el.innerHTML = head(el, 'Replicação vs. erasure codes', 'Guardar 1 TB num cluster. Escolhe o fator de replicação e os parâmetros do código (k blocos de dados + m de paridade), e faz servidores falhar. No pior caso, as falhas atingem justamente os servidores com estes dados.') + `
+      <div class="row">
+        <label class="f grow"><span>replicação: r = <b data-rv></b> cópias</span><input type="range" min="1" max="5" step="1" value="3" data-i="r"></label>
+        <label class="f grow"><span>erasure code: k = <b data-kv></b> dados</span><input type="range" min="2" max="12" step="1" value="6" data-i="k"></label>
+        <label class="f grow"><span>m = <b data-mv></b> paridade</span><input type="range" min="1" max="6" step="1" value="3" data-i="m"></label>
+      </div>
+      <label class="f"><span>servidores com falha: f = <b data-fv></b></span><input type="range" min="0" max="6" step="1" value="0" data-i="f"></label>
+      <div class="rd-grid"></div><p class="w-out"></p>`;
+    const grid = el.querySelector('.rd-grid'), out = el.querySelector('.w-out'), I = k => +el.querySelector(`[data-i="${k}"]`).value;
+    function draw() {
+      const r = I('r'), k = I('k'), m = I('m'), f = I('f');
+      ['r', 'k', 'm', 'f'].forEach(x => { el.querySelector(`[data-${x}v]`).textContent = I(x); });
+      const repOk = f < r, ecOk = f <= m;
+      const boxes = (n, lab, cls) => Array.from({ length: n }, (_, i) => `<span class="rd-b ${cls(i)}${i < f ? ' fail' : ''}">${lab(i)}</span>`).join('');
+      grid.innerHTML = `
+        <div class="rd-row"><b>Replicação</b><span class="rd-bs">${boxes(r, i => 'R' + (i + 1), () => 'data')}</span>
+          <span class="rd-m"><span class="pill p-acc">${r}× espaço · ${r} TB</span><span class="pill ${repOk ? 'p-good' : 'p-bad'}">aguenta ${r - 1} falhas · ${repOk ? 'dados acessíveis' : 'DADOS PERDIDOS'}</span></span></div>
+        <div class="rd-row"><b>Erasure code (${k}, ${m})</b><span class="rd-bs">${boxes(k + m, i => (i < k ? 'D' + (i + 1) : 'P' + (i - k + 1)), i => (i < k ? 'data' : 'par'))}</span>
+          <span class="rd-m"><span class="pill p-acc">${fmt((k + m) / k, 2)}× espaço · ${fmt((k + m) / k, 2)} TB</span><span class="pill ${ecOk ? 'p-good' : 'p-bad'}">aguenta ${m} falhas · ${ecOk ? 'dados acessíveis' : 'DADOS PERDIDOS'}</span></span></div>`;
+      let msg = `Com ${r} cópias, cada falha extra custa mais 1 TB inteiro. O código (${k}, ${m}) aguenta ${m} falhas com só ${fmt(100 * m / k, 0)}% de espaço extra.`;
+      if (f > 0 && ecOk && f >= 1) msg += ` Com ${f} servidor(es) em baixo, para ler o ficheiro é preciso <b>reconstruir</b> os blocos perdidos a partir de ${k} fragmentos: mais leituras, mais rede, mais CPU. É o preço da poupança de espaço.`;
+      if (!repOk && ecOk) msg += ' Aqui, o código sobreviveu e a replicação não, gastando menos espaço.';
+      out.innerHTML = msg;
+    }
+    el.querySelectorAll('input').forEach(i => i.addEventListener('input', draw));
+    draw();
+  };
+
+  /* =====================================================================
+     dedup — deduplicação por blocos de tamanho fixo
+     ===================================================================== */
+  W.dedup = el => {
+    const B = 4;
+    const V = ['o gato comeu o peixe; o cão dormiu', 'o gato comeu o peixe; o cão ladrou', 'X o gato comeu o peixe; o cão ladrou'];
+    el.innerHTML = head(el, 'Deduplicação por blocos', `Três versões de um ficheiro (backups sucessivos), partidas em blocos de ${B} caracteres. Cada bloco é identificado pelo seu conteúdo (na prática, por uma hash), e um bloco repetido só é guardado uma vez. Edita os textos.`) + `
+      ${V.map((v, i) => `<label class="f"><span>versão ${i + 1}</span><input type="text" value="${v}" data-v="${i}" spellcheck="false" style="font-family:var(--f-mono)"></label>`).join('')}
+      <div class="dd-out"></div><dl class="kpis"></dl><p class="w-out"></p>`;
+    const box = el.querySelector('.dd-out'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out');
+    function draw() {
+      const vs = [...el.querySelectorAll('[data-v]')].map(i => i.value);
+      const seen = new Map();
+      let logical = 0;
+      const rows = vs.map((v, i) => {
+        const ch = v.match(new RegExp(`[\\s\\S]{1,${B}}`, 'g')) || [];
+        logical += ch.length;
+        return `<div class="dd-row"><span class="lbl-mono">v${i + 1}</span><span class="dd-bs">${ch.map(c => {
+          const dup = seen.has(c);
+          if (!dup) seen.set(c, seen.size);
+          return `<span class="dd-b${dup ? ' dup' : ''}" title="${dup ? 'já guardado: só se guarda uma referência' : 'bloco novo: guardado'}">${esc(c).replace(/ /g, '·')}</span>`;
+        }).join('')}</span></div>`;
+      }).join('');
+      box.innerHTML = rows;
+      const phys = seen.size;
+      kp.innerHTML = kpi('blocos lógicos', logical) + kpi('blocos guardados', phys, true) + kpi('poupança', fmt(100 * (1 - phys / Math.max(1, logical)), 0) + '%');
+      out.innerHTML = 'Os blocos a tracejado já existiam: guarda-se só uma referência. Repara na <b>versão 3</b>: um único caractere inserido no início desloca as fronteiras de todos os blocos, e quase nada é reconhecido como repetido. É o ponto fraco dos blocos de tamanho fixo, e a razão para os sistemas reais cortarem os blocos pelo conteúdo (fronteiras que "acompanham" o texto).';
+    }
+    el.querySelectorAll('[data-v]').forEach(i => i.addEventListener('input', draw));
+    draw();
+  };
+
+  /* =====================================================================
      playout — VoIP: atraso de reprodução fixo vs. adaptativo (EWMA)
      10 talk spurts de 8 pacotes (um a cada 20 ms); a congestão sobe e desce aos poucos
      ===================================================================== */
