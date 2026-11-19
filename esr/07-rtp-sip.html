@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Protocolos de Tempo Real: RTP, RTCP e SIP · ESR · meiUM</title>
+<meta name="description" content="ESR · Tema 7: protocolos para aplicações conversacionais em tempo real: RTP (cabeçalho, payload type, timestamps, SSRC), RTCP (relatórios, sincronização, largura de banda), SIP (chamadas, registrar, proxy) e H.323.">
+<!-- partilha: gerado por tools/seo.py -->
+<link rel="canonical" href="https://meium.space/esr/07-rtp-sip.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="meiUM">
+<meta property="og:locale" content="pt_PT">
+<meta property="og:title" content="Protocolos de Tempo Real: RTP, RTCP e SIP · ESR">
+<meta property="og:description" content="ESR · Tema 7: protocolos para aplicações conversacionais em tempo real: RTP (cabeçalho, payload type, timestamps, SSRC), RTCP (relatórios, sincronização, largura de banda), SIP (chamadas, registrar, proxy) e H.323.">
+<meta property="og:url" content="https://meium.space/esr/07-rtp-sip.html">
+<meta property="og:image" content="https://meium.space/assets/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="meiUM: apontamentos do Mestrado em Engenharia Informática da Universidade do Minho">
+<meta name="twitter:card" content="summary_large_image">
+<!-- /partilha -->
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../assets/img/icon-192.png">
+<meta name="theme-color" content="#151d36">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var d=document.documentElement,g=function(k){return JSON.parse(localStorage.getItem('meium:'+k))},t=g('theme'),f=g('fontScale');if(t==='light'||t==='dark')d.dataset.theme=t;if(f)d.style.setProperty('--fs',f);if(g('showExtra')===false)d.classList.add('hide-extra')}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="esr" data-topic="07" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 7.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="7.0" data-title="Visão geral" data-desc="Que protocolo faz o quê numa chamada.">
+  <header class="ph">
+    <h1>Protocolos de Tempo Real: RTP, RTCP e SIP<span class="en">Protocols for Real-Time Conversational Applications</span></h1>
+    <p class="lede">Uma chamada ou videoconferência pela Internet precisa de três coisas: <strong>combinar</strong> a chamada, <strong>transportar</strong> o áudio e o vídeo, e <strong>acompanhar</strong> a qualidade. Há um protocolo para cada uma.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">7.0.1</span>Quem faz o quê</h2>
+    <div class="three">
+      <div class="card"><span class="tag">SIP · sinalização</span><p>Estabelece, altera e termina a chamada; encontra o IP de quem se quer contactar; negoceia os codecs.</p></div>
+      <div class="card"><span class="tag">RTP · dados</span><p>Transporta os pedaços de áudio e vídeo, com tipo de codificação, número de sequência e timestamp.</p></div>
+      <div class="card"><span class="tag">RTCP · controlo</span><p>Relatórios periódicos sobre a qualidade (perdas, jitter) e sincronização entre fluxos.</p></div>
+    </div>
+    <div class="card">
+      <svg class="w-svg" viewBox="0 0 640 170" role="img" aria-label="Pilha: SIP sobre UDP ou TCP; RTP e RTCP sobre UDP; tudo sobre IP">
+        <g style="font-family:var(--f-display);font-size:13px;font-weight:600">
+          <rect x="20" y="10" width="220" height="40" rx="5" style="fill:var(--warn-bg);stroke:var(--warn)"/><text x="130" y="35" text-anchor="middle" style="fill:var(--ink)">SIP (+ SDP)</text>
+          <rect x="260" y="10" width="170" height="40" rx="5" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="345" y="35" text-anchor="middle" style="fill:var(--ink)">RTP</text>
+          <rect x="440" y="10" width="180" height="40" rx="5" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="530" y="35" text-anchor="middle" style="fill:var(--ink)">RTCP</text>
+          <rect x="20" y="60" width="220" height="40" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="130" y="85" text-anchor="middle" style="fill:var(--ink)">UDP ou TCP (porta 5060)</text>
+          <rect x="260" y="60" width="360" height="40" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="440" y="85" text-anchor="middle" style="fill:var(--ink)">UDP (portas diferentes para RTP e RTCP)</text>
+          <rect x="20" y="110" width="600" height="40" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="320" y="135" text-anchor="middle" style="fill:var(--ink)">IP: melhor esforço, sem garantias</text>
+        </g>
+      </svg>
+    </div>
+    <h3>Que protocolo?</h3>
+    <div class="classify" data-options="SIP,RTP,RTCP">
+      <div class="ci" data-answer="SIP" data-why="A sinalização (convidar, aceitar, recusar) é do SIP.">Avisar o Bob de que a Alice o quer chamar</div>
+      <div class="ci" data-answer="RTP" data-why="O payload type vai no cabeçalho RTP de cada pacote.">Indicar que este pacote de áudio está codificado em GSM</div>
+      <div class="ci" data-answer="RTCP" data-why="Os receiver reports trazem a fração de perdas e o jitter.">Informar o emissor de que se perderam 3% dos pacotes</div>
+      <div class="ci" data-answer="SIP" data-why="O registrar SIP associa o endereço SIP ao IP atual.">Descobrir o IP atual de bob@domain.com</div>
+      <div class="ci" data-answer="RTCP" data-why="Os sender reports associam o timestamp RTP ao relógio real.">Sincronizar o áudio com o vídeo de uma videoconferência</div>
+    </div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <p class="src">Baseado nas aulas de ESR (Multimedia Networking, protocolos para aplicações conversacionais) e no livro de Kurose e Ross. Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 7.1 RTP ============================ -->
+<article class="page" data-page="rtp" data-num="7.1" data-title="RTP" data-desc="O formato dos pacotes de áudio e vídeo.">
+  <header class="ph">
+    <h1>RTP<span class="en">Real-Time Protocol · RFC 3550</span></h1>
+    <p class="lede">O RTP define a <strong>estrutura dos pacotes</strong> que levam áudio e vídeo. Cada pacote identifica o tipo de codificação, tem um número de sequência e um timestamp.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">7.1.1</span>Onde vive</h2>
+    <ul>
+      <li>Corre nos <strong>sistemas terminais</strong>, e não nos routers.</li>
+      <li>Os pacotes RTP vão encapsulados em segmentos <strong>UDP</strong>. As bibliotecas RTP dão à aplicação uma interface que estende o UDP: portas e endereços IP, mais o tipo de payload, a numeração de sequência e os timestamps.</li>
+      <li><strong>Interoperabilidade</strong>: duas aplicações VoIP que usem RTP podem conseguir falar uma com a outra.</li>
+    </ul>
+    <p><strong>Exemplo</strong>: voz PCM a 64 kbps. A aplicação junta os dados em chunks de 20 ms, ou seja 160 bytes. Chunk + cabeçalho RTP = pacote RTP, que vai num segmento UDP. O cabeçalho indica a codificação de cada pacote, e o emissor pode mudá-la a meio de uma conferência.</p>
+    <div class="note warn"><span class="lbl">O RTP não garante qualidade de serviço</span>
+      <p>O RTP não tem nenhum mecanismo para garantir que os dados chegam a tempo, nem outras garantias de QoS. O encapsulamento RTP só é visto nos sistemas terminais: para os routers, um pacote RTP é um datagrama UDP como outro qualquer, tratado em melhor esforço.</p></div>
+
+    <h2><span class="sn">7.1.2</span>O cabeçalho</h2>
+    <div class="card">
+      <svg class="w-svg" viewBox="0 0 640 96" role="img" aria-label="Cabeçalho RTP: payload type, número de sequência, timestamp, SSRC, outros campos">
+        <g style="font-family:var(--f-display);font-size:12px;font-weight:600">
+          <rect x="10" y="20" width="100" height="44" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="60" y="40" text-anchor="middle" style="fill:var(--ink)">payload type</text><text x="60" y="56" text-anchor="middle" style="fill:var(--muted);font-family:var(--f-mono);font-size:10.5px">7 bits</text>
+          <rect x="110" y="20" width="120" height="44" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="170" y="40" text-anchor="middle" style="fill:var(--ink)">n.º sequência</text><text x="170" y="56" text-anchor="middle" style="fill:var(--muted);font-family:var(--f-mono);font-size:10.5px">16 bits</text>
+          <rect x="230" y="20" width="140" height="44" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="300" y="40" text-anchor="middle" style="fill:var(--ink)">timestamp</text><text x="300" y="56" text-anchor="middle" style="fill:var(--muted);font-family:var(--f-mono);font-size:10.5px">32 bits</text>
+          <rect x="370" y="20" width="140" height="44" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="440" y="40" text-anchor="middle" style="fill:var(--ink)">SSRC</text><text x="440" y="56" text-anchor="middle" style="fill:var(--muted);font-family:var(--f-mono);font-size:10.5px">32 bits</text>
+          <rect x="510" y="20" width="120" height="44" style="fill:var(--card-2);stroke:var(--rule)"/><text x="570" y="46" text-anchor="middle" style="fill:var(--ink)">outros campos</text>
+        </g>
+      </svg>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>Campo</th><th>Bits</th><th>Para quê</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Payload type</strong></td><td>7</td><td>A codificação usada. Se o emissor mudar de codec a meio da chamada, o recetor sabe por este campo.</td></tr>
+        <tr><td><strong>Número de sequência</strong></td><td>16</td><td>Aumenta 1 por pacote enviado: permite <strong>detetar perdas</strong> e <strong>repor a ordem</strong>.</td></tr>
+        <tr><td><strong>Timestamp</strong></td><td>32</td><td>O instante de amostragem do primeiro byte do pacote. Permite reproduzir com o tempo certo e calcular o jitter.</td></tr>
+        <tr><td><strong>SSRC</strong></td><td>32</td><td><em>Synchronization source</em>: identifica a fonte do fluxo. Cada fluxo numa sessão RTP tem um SSRC diferente.</td></tr>
+      </tbody></table></div>
+    <div class="tw"><table>
+      <thead><tr><th>Payload type</th><th>Codificação</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>PCM µ-law, 64 kbps</td></tr>
+        <tr><td>3</td><td>GSM, 13 kbps</td></tr>
+        <tr><td>7</td><td>LPC, 2.4 kbps</td></tr>
+        <tr><td>26</td><td>Motion JPEG</td></tr>
+        <tr><td>31</td><td>H.261</td></tr>
+        <tr><td>33</td><td>Vídeo MPEG-2</td></tr>
+      </tbody></table></div>
+
+    <h2><span class="sn">7.1.3</span>Como avança o timestamp</h2>
+    <p>No áudio, o relógio do timestamp avança <strong>uma unidade por período de amostragem</strong>: a 8 kHz, uma a cada 125 µs. Se cada pacote leva 160 amostras (20 ms), o timestamp aumenta <strong>160</strong> de pacote para pacote enquanto a fonte está ativa.</p>
+    <p>Durante os silêncios não se enviam pacotes, mas o relógio <strong>continua a contar</strong>. Por isso, um salto de timestamp maior do que 160 mostra ao recetor quanto tempo durou o silêncio. O número de sequência, esse, só avança com os pacotes enviados.</p>
+    <pre data-title="Exemplo: dois talk spurts com 1 s de silêncio"><code class="language-text">pacote   seq    timestamp
+  1     1000      8000
+  2     1001      8160
+  3     1002      8320
+  ...     (1 s de silêncio = 8000 amostras, sem pacotes)
+  4     1003     16480       ← seq contínuo, timestamp salta: novo talk spurt</code></pre>
+    <div class="note extra"><span class="lbl">Quanto pesam os cabeçalhos <span class="xtag">complemento</span></span>
+      <p>O cabeçalho RTP fixo tem 12 bytes. Num pacote de voz a 64 kbps com chunks de 20 ms: 160 (voz) + 12 (RTP) + 8 (UDP) + 20 (IPv4) = <strong>200 bytes</strong>, 50 vezes por segundo, ou seja <strong>80 kbps</strong> na rede, para 64 kbps de voz. Chunks maiores reduzem esta sobrecarga, mas aumentam o atraso.</p></div>
+    <p>Num exercício clássico, constrói-se um servidor que lê frames de um vídeo guardado, junta-lhes os cabeçalhos RTP (com números de sequência e timestamps) e as envia num socket UDP, e um cliente que controla a sessão com comandos RTSP (play, pause).</p>
+  </section>
+</article>
+
+<!-- ============================ 7.2 RTCP ============================ -->
+<article class="page" data-page="rtcp" data-num="7.2" data-title="RTCP" data-desc="Relatórios, sincronização e escala.">
+  <header class="ph">
+    <h1>RTCP<span class="en">Real-Time Control Protocol</span></h1>
+    <p class="lede">Trabalha em conjunto com o RTP: cada participante numa sessão envia periodicamente pacotes de controlo RTCP a <strong>todos</strong> os outros, com estatísticas sobre o que enviou e recebeu.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">7.2.1</span>Para que serve</h2>
+    <ul>
+      <li>Os relatórios trazem estatísticas úteis à aplicação: pacotes enviados, pacotes perdidos, jitter entre chegadas.</li>
+      <li>São <strong>feedback</strong>: o emissor pode mudar a forma de enviar, por exemplo baixando o débito do codec se houver muitas perdas.</li>
+      <li>Uma sessão RTP usa tipicamente um único endereço <strong>multicast</strong>. Todos os pacotes RTP e RTCP da sessão vão para esse endereço, e distinguem-se por <strong>portas diferentes</strong>.</li>
+    </ul>
+
+    <h2><span class="sn">7.2.2</span>Tipos de pacote</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Pacote</th><th>Enviado por</th><th>Contém</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Receiver report</strong></td><td>Recetores</td><td>Fração de pacotes perdidos, último número de sequência recebido, jitter médio entre chegadas</td></tr>
+        <tr><td><strong>Sender report</strong></td><td>Emissores</td><td>SSRC do fluxo, hora atual, número de pacotes e de bytes enviados</td></tr>
+        <tr><td><strong>Source description</strong></td><td>Todos</td><td>E-mail e nome do emissor, SSRC do fluxo: liga o SSRC a um utilizador ou máquina</td></tr>
+      </tbody></table></div>
+
+    <h2><span class="sn">7.2.3</span>Sincronizar fluxos</h2>
+    <p>Numa videoconferência, cada emissor gera <strong>dois</strong> fluxos RTP, um de áudio e um de vídeo. Os timestamps RTP de cada um estão ligados ao <strong>relógio de amostragem</strong> desse fluxo, e não ao relógio real, por isso não se comparam diretamente.</p>
+    <p>A solução está nos <strong>sender reports</strong>: cada um traz, para o pacote mais recente do fluxo, o seu <strong>timestamp RTP</strong> e a <strong>hora real</strong> (wall-clock) a que foi criado. Com essa correspondência para os dois fluxos, o recetor sabe que áudio e que imagem foram captados ao mesmo tempo, e sincroniza a reprodução (lip-sync).</p>
+
+    <h2><span class="sn">7.2.4</span>Escalar com o número de participantes</h2>
+    <p>Se cada participante enviasse relatórios a ritmo fixo, o tráfego de controlo cresceria com o tamanho da conferência. Por isso, o RTCP limita-se a <strong>5% da largura de banda da sessão</strong>, e cada participante reduz o seu tráfego RTCP à medida que o número de participantes aumenta.</p>
+    <div class="formula"><div class="cap">Repartição (R recetores, um emissor)</div>\[\underbrace{0.05\,B}_{\text{RTCP}}=\underbrace{0.25\times0.05\,B}_{\text{emissor}}+R\times\underbrace{\frac{0.75\times0.05\,B}{R}}_{\text{cada recetor}}\]</div>
+    <p><strong>Exemplo</strong>: um emissor com vídeo a 2 Mbps. O RTCP fica com 100 kbps: 25 kbps para o emissor e 75 kbps repartidos pelos recetores, ou seja 75/R kbps cada. Cada participante calcula o seu <strong>período de envio</strong> dividindo o tamanho médio dos pacotes RTCP (medido em toda a sessão) pelo débito que lhe cabe.</p>
+    <div class="widget" data-widget="rtcp"></div>
+  </section>
+</article>
+
+<!-- ============================ 7.3 SIP ============================ -->
+<article class="page" data-page="sip" data-num="7.3" data-title="SIP" data-desc="Estabelecer chamadas, registrar e proxy.">
+  <header class="ph">
+    <h1>SIP<span class="en">Session Initiation Protocol · RFC 3261</span></h1>
+    <p class="lede">A visão a longo prazo: todas as chamadas e videoconferências feitas pela Internet, com as pessoas identificadas por <strong>nomes ou e-mails</strong> em vez de números, e contactáveis onde quer que estejam e em qualquer dispositivo.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">7.3.1</span>O que oferece</h2>
+    <div class="three">
+      <div class="card"><span class="tag">Estabelecer a chamada</span><ul><li>Avisar quem é chamado de que se quer falar</li><li>Acordar o tipo de media e a codificação</li><li>Terminar a chamada</li></ul></div>
+      <div class="card"><span class="tag">Localizar</span><p>Descobrir o IP atual de quem é chamado: converter um identificador fácil de lembrar no endereço atual.</p></div>
+      <div class="card"><span class="tag">Gerir a chamada</span><ul><li>Acrescentar fluxos de media</li><li>Mudar a codificação</li><li>Convidar outros participantes</li><li>Transferir ou pôr em espera</li></ul></div>
+    </div>
+
+    <h2><span class="sn">7.3.2</span>Chamada para um IP conhecido</h2>
+    <div class="card">
+      <svg class="w-svg" viewBox="0 0 640 250" role="img" aria-label="Alice envia INVITE com PCM mu-law, Bob responde 200 OK com GSM, Alice envia ACK, depois fluxos de media RTP nos dois sentidos">
+        <g style="font-family:var(--f-display);font-size:12px;font-weight:600">
+          <text x="120" y="18" text-anchor="middle" style="fill:var(--ink)">Alice · 167.180.112.24</text>
+          <text x="520" y="18" text-anchor="middle" style="fill:var(--ink)">Bob · 193.64.210.89</text>
+          <line x1="120" x2="120" y1="26" y2="240" style="stroke:var(--rule);stroke-width:2"/><line x1="520" x2="520" y1="26" y2="240" style="stroke:var(--rule);stroke-width:2"/>
+          <path d="M120 44L520 74" style="stroke:var(--accent);stroke-width:1.8"/><path d="M520 74l-9-6 1 9z" style="fill:var(--accent)"/>
+          <text x="320" y="46" text-anchor="middle" style="fill:var(--ink)">INVITE bob@193.64.210.89 · m=audio 38060 RTP/AVP 0</text>
+          <path d="M520 98L120 128" style="stroke:var(--accent);stroke-width:1.8"/><path d="M120 128l9-6 -1 9z" style="fill:var(--accent)"/>
+          <text x="320" y="102" text-anchor="middle" style="fill:var(--ink)">200 OK · m=audio 48753 RTP/AVP 3</text>
+          <path d="M120 146L520 170" style="stroke:var(--accent);stroke-width:1.8"/><path d="M520 170l-9-6 1 9z" style="fill:var(--accent)"/>
+          <text x="320" y="152" text-anchor="middle" style="fill:var(--ink)">ACK</text>
+          <path d="M120 196H520" style="stroke:var(--s2);stroke-width:2.4;stroke-dasharray:7 4"/>
+          <path d="M520 220H120" style="stroke:var(--s3);stroke-width:2.4;stroke-dasharray:7 4"/>
+          <text x="320" y="190" text-anchor="middle" style="fill:var(--ink)">áudio para o Bob em GSM (o que ele pediu)</text>
+          <text x="320" y="236" text-anchor="middle" style="fill:var(--ink)">áudio para a Alice em PCM µ-law (o que ela pediu)</text>
+          <text x="20" y="80" style="fill:var(--muted);font-family:var(--f-mono);font-size:10.5px;font-weight:500">porta 5060</text>
+        </g>
+      </svg>
+    </div>
+    <ul>
+      <li>O <strong>INVITE</strong> da Alice indica a sua porta, o seu IP e a codificação em que <strong>prefere receber</strong> (PCM µ-law).</li>
+      <li>O <strong>200 OK</strong> do Bob indica a porta, o IP e a codificação dele (GSM).</li>
+      <li>A Alice confirma com um <strong>ACK</strong> e os dois começam a enviar media, cada um na codificação que o outro pediu.</li>
+      <li>As mensagens SIP podem ir sobre <strong>UDP ou TCP</strong>, e a porta SIP por omissão é a <strong>5060</strong>. A media vai normalmente em RTP, mas o SIP não obriga a isso.</li>
+    </ul>
+    <div class="two">
+      <div class="card"><span class="tag">Negociar o codec</span><p>Se o Bob não tiver o codificador PCM µ-law, responde <strong>606 Not Acceptable</strong> com a lista dos codecs que suporta. A Alice envia então um novo INVITE com outro codec.</p></div>
+      <div class="card"><span class="tag">Recusar a chamada</span><p>O Bob pode responder "busy", "gone", "payment required", "forbidden", entre outras.</p></div>
+    </div>
+
+    <h2><span class="sn">7.3.3</span>Uma mensagem SIP</h2>
+    <pre data-title="INVITE (cabeçalhos SIP + corpo SDP)"><code class="language-text">INVITE sip:bob@domain.com SIP/2.0
+Via: SIP/2.0/UDP 167.180.112.24
+From: sip:alice@hereway.com
+To: sip:bob@domain.com
+Call-ID: a2e3a@pigeon.hereway.com
+Content-Type: application/sdp
+Content-Length: 885
+
+c=IN IP4 167.180.112.24
+m=audio 38060 RTP/AVP 0</code></pre>
+    <ul>
+      <li>A sintaxe é a das mensagens <strong>HTTP</strong>: uma linha de pedido, cabeçalhos e um corpo.</li>
+      <li>O corpo está em <strong>SDP</strong> (<em>Session Description Protocol</em>): <code>c=</code> dá o endereço onde a Alice quer receber a media; <code>m=audio 38060 RTP/AVP 0</code> diz "áudio, na porta 38060, por RTP, com payload type 0", que é o PCM µ-law da tabela do RTP.</li>
+      <li>O <code>Call-ID</code> é único para cada chamada.</li>
+      <li>O <code>Via</code> indica que o cliente SIP da Alice envia e recebe as mensagens SIP por UDP.</li>
+      <li>Aqui, a Alice <strong>não sabe o IP do Bob</strong>, só o endereço SIP. É preciso a ajuda de servidores SIP intermédios.</li>
+    </ul>
+
+    <h2><span class="sn">7.3.4</span>Encontrar o Bob: registrar e proxy</h2>
+    <p>Quem chama só tem o nome ou o e-mail de quem quer contactar, mas o IP dessa pessoa muda: anda de um lado para o outro, recebe endereços por DHCP, usa vários dispositivos (PC, telemóvel, carro). E a resposta pode depender da hora (trabalho ou casa), de quem liga (o chefe não ao fim de semana) ou do estado de quem é chamado (se já está numa chamada, vai para o voicemail).</p>
+    <div class="two">
+      <div class="card"><span class="tag">Registrar</span><p>Quando o cliente SIP do Bob arranca, envia um <strong>REGISTER</strong> ao registrar do seu domínio, a dizer onde está. O registrar guarda a associação entre o endereço SIP e o IP atual.</p>
+        <pre><code class="language-text">REGISTER sip:domain.com SIP/2.0
+Via: SIP/2.0/UDP 193.64.210.89
+From: sip:bob@domain.com
+To: sip:bob@domain.com
+Expires: 3600</code></pre></div>
+      <div class="card"><span class="tag">Proxy</span><p>A Alice envia o INVITE para o <strong>seu proxy</strong>, que fica responsável por encaminhar as mensagens até ao Bob, possivelmente através de vários proxies. A resposta do Bob volta pelo mesmo caminho, e traz o IP dele.</p><p>Um proxy SIP faz o papel de um servidor DNS local, mais o estabelecimento da ligação.</p></div>
+    </div>
+
+    <h2><span class="sn">7.3.5</span>Exemplo: jim@umass.edu liga a keith@poly.edu</h2>
+    <ol class="steps-list">
+      <li><div>O Jim envia o INVITE ao <strong>proxy SIP da UMass</strong>.</div></li>
+      <li><div>O proxy reencaminha o pedido para o <strong>registrar da Poly</strong>.</div></li>
+      <li><div>O registrar da Poly responde com um <strong>redirect</strong>: o Keith está agora em keith@eurecom.fr.</div></li>
+      <li><div>O proxy da UMass envia o INVITE ao <strong>registrar da Eurecom</strong>.</div></li>
+      <li><div>O registrar da Eurecom reencaminha o INVITE para 197.87.54.21, onde corre o cliente SIP do Keith.</div></li>
+      <li><div>A resposta SIP volta ao Jim pelo mesmo caminho (passos 6 a 8).</div></li>
+      <li><div>A media passa a ir <strong>diretamente</strong> entre os dois clientes (passo 9). Os servidores SIP só tratam da sinalização.</div></li>
+    </ol>
+  </section>
+</article>
+
+<!-- ============================ 7.4 H.323 ============================ -->
+<article class="page" data-page="h323" data-num="7.4" data-title="SIP vs. H.323" data-desc="Duas filosofias de sinalização.">
+  <header class="ph">
+    <h1>SIP vs. H.323</h1>
+    <p class="lede">O <strong>H.323</strong> é outro protocolo de sinalização para multimédia interativa em tempo real. A comparação mostra duas filosofias: a da Web e a da telefonia.</p>
+  </header>
+
+  <section class="blk prose">
+    <div class="tw"><table>
+      <thead><tr><th></th><th>H.323</th><th>SIP</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Origem</strong></td><td>ITU (telefonia)</td><td>IETF, com muitos conceitos emprestados do HTTP</td></tr>
+        <tr><td><strong>Âmbito</strong></td><td>Conjunto completo e verticalmente integrado: sinalização, registo, controlo de admissão, transporte, codecs</td><td>Uma só peça: a sinalização. Funciona com RTP mas não o exige, e combina-se com outros protocolos e serviços</td></tr>
+        <tr><td><strong>Estilo</strong></td><td>Sabor a telefonia</td><td>Sabor a Web</td></tr>
+        <tr><td><strong>Filosofia</strong></td><td>Tudo especificado</td><td>KISS: <em>Keep It Simple, Stupid</em></td></tr>
+      </tbody></table></div>
+    <div class="note extra"><span class="lbl">Na prática <span class="xtag">complemento</span></span>
+      <p>O SIP tornou-se o padrão da telefonia IP: operadores, centrais telefónicas (PBX) empresariais, e a voz sobre 4G e 5G (VoLTE e VoNR, com o IMS). O H.323 ficou sobretudo em sistemas de videoconferência mais antigos. As aplicações web, como o Google Meet, usam WebRTC, que define o transporte da media (sobre RTP) mas deixa a sinalização à escolha de cada aplicação.</p></div>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo, exercícios e perguntas.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de exercícios e perguntas.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Protocolo</th><th>Papel</th><th>Pormenores a reter</th></tr></thead>
+      <tbody>
+        <tr><td><strong>RTP</strong></td><td>Transporta a media, sobre UDP</td><td>Payload type (7 b), seq (16 b), timestamp (32 b, ao ritmo de amostragem), SSRC (32 b). Sem QoS; os routers não o veem</td></tr>
+        <tr><td><strong>RTCP</strong></td><td>Controlo e feedback</td><td>Receiver/sender reports, source description; sincronização com wall-clock; 5% da sessão, 25% emissores / 75% recetores</td></tr>
+        <tr><td><strong>SIP</strong></td><td>Sinalização</td><td>INVITE / 200 OK / ACK; SDP para os codecs; porta 5060, UDP ou TCP; registrar (REGISTER) e proxy</td></tr>
+        <tr><td><strong>H.323</strong></td><td>Sinalização (ITU)</td><td>Suite completa, estilo telefonia; o SIP é uma peça só, estilo Web</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">Σ.2</span>Exercícios</h2>
+    <details class="ans"><summary>1. Áudio amostrado a 16 kHz, enviado em pacotes de 30 ms. Quanto aumenta o timestamp RTP de um pacote para o seguinte? E o número de sequência?</summary>
+      <div><p>16 000 × 0.030 = <strong>480</strong> amostras por pacote, logo o timestamp sobe 480. O número de sequência sobe sempre <strong>1</strong>.</p></div></details>
+    <details class="ans"><summary>2. Dois pacotes RTP seguidos têm seq 5000 e 5001, e timestamps 32 000 e 48 160 (a 8 kHz, com 160 amostras por pacote). O que aconteceu?</summary>
+      <div><p>Os números de sequência são seguidos, portanto não se perdeu nenhum pacote. O timestamp saltou 16 160 em vez de 160: houve um <strong>silêncio de 16 000 amostras = 2 s</strong>, e o segundo pacote é o início de um novo talk spurt.</p></div></details>
+    <details class="ans"><summary>3. Uma sessão de 1 Mbps tem um emissor e 25 recetores. Quanto pode cada recetor enviar em RTCP? Com pacotes RTCP de 125 bytes, de quanto em quanto tempo envia um relatório?</summary>
+      <div><p>RTCP total = 5% × 1000 = 50 kbps; recetores = 75% × 50 = 37.5 kbps; cada um = 37.5 / 25 = <strong>1.5 kbps</strong>. Um pacote tem 1000 bits, logo <strong>um relatório a cada ≈ 0.67 s</strong>.</p></div></details>
+    <details class="ans"><summary>4. Num INVITE aparece <code>m=audio 5004 RTP/AVP 3</code>. O que significa?</summary>
+      <div><p>O emissor quer receber <strong>áudio</strong> na <strong>porta 5004</strong>, por <strong>RTP</strong>, com payload type <strong>3</strong> (<strong>GSM</strong>, 13 kbps).</p></div></details>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.3</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">O RTP garante que os pacotes de voz chegam a tempo?</p>
+        <div class="opts"><button>Sim, os routers dão-lhe prioridade</button><button data-ok>Não: corre só nos sistemas terminais e os routers tratam-no como UDP em melhor esforço</button><button>Sim, através do RTCP</button></div>
+        <p class="why">O RTP dá estrutura aos pacotes (tipo, ordem, tempo), não garantias de QoS.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Que campo do cabeçalho RTP permite ao recetor detetar pacotes perdidos?</p>
+        <div class="opts"><button>Timestamp</button><button data-ok>Número de sequência</button><button>SSRC</button></div>
+        <p class="why">Aumenta 1 por pacote enviado: um buraco na numeração é uma perda. O timestamp salta também nos silêncios.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Durante um silêncio, o que acontece ao timestamp RTP?</p>
+        <div class="opts"><button>Fica parado até a fonte voltar a falar</button><button data-ok>Continua a avançar ao ritmo de amostragem, embora não se enviem pacotes</button><button>Volta a zero</button></div>
+        <p class="why">É assim que o recetor sabe quanto tempo durou o silêncio.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Para que serve o SSRC?</p>
+        <div class="opts"><button>Para indicar o codec</button><button data-ok>Para identificar a fonte de cada fluxo RTP numa sessão</button><button>Para sincronizar com o relógio real</button></div>
+        <p class="why">Cada fluxo tem um SSRC diferente; o RTCP source description associa-o ao nome do utilizador.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Como é que o RTCP evita que o tráfego de controlo cresça com o número de participantes?</p>
+        <div class="opts"><button>Só o emissor envia relatórios</button><button data-ok>Limita-se a 5% da sessão, e cada participante envia menos à medida que o grupo cresce</button><button>Envia os relatórios por TCP</button></div>
+        <p class="why">75% dessa fatia é repartida pelos R recetores: o período de cada um aumenta com R.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Como sincroniza um recetor o áudio com o vídeo do mesmo emissor?</p>
+        <div class="opts"><button>Os timestamps RTP dos dois fluxos usam o mesmo relógio</button><button data-ok>Os sender reports RTCP associam o timestamp RTP de cada fluxo à hora real</button><button>Pelo número de sequência</button></div>
+        <p class="why">Os timestamps RTP seguem o relógio de amostragem de cada fluxo; só a hora real os torna comparáveis.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">O Bob não suporta o codec pedido no INVITE. O que responde?</p>
+        <div class="opts"><button>200 OK</button><button data-ok>606 Not Acceptable, com a lista dos codecs que suporta</button><button>Nada: a chamada expira</button></div>
+        <p class="why">A Alice pode então enviar um novo INVITE com outro codec.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual é o papel do registrar SIP?</p>
+        <div class="opts"><button>Transportar o áudio da chamada</button><button data-ok>Guardar onde está cada utilizador, a partir das mensagens REGISTER</button><button>Medir o jitter</button></div>
+        <p class="why">Associa o endereço SIP ao IP atual; o proxy usa isso para encaminhar o INVITE.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Depois de a chamada SIP estar estabelecida, por onde passa o áudio?</p>
+        <div class="opts"><button>Pelos proxies SIP</button><button data-ok>Diretamente entre os clientes, normalmente em RTP</button><button>Pelo registrar</button></div>
+        <p class="why">Os servidores SIP só tratam da sinalização.</p>
+      </div>
+    </div>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="../assets/vendor/katex/katex.min.js" defer></script>
+<script src="../assets/vendor/katex/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/i18n.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

@@ -436,6 +436,16 @@ h2{scroll-margin-top:72px;border-radius:4px}
   .topic{grid-template-columns:40px minmax(0,1fr)}
   .topic .tr{grid-column:2;align-items:flex-start}
 }
+.fec-pk,.fec-out{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.fec-row{display:flex;flex-wrap:wrap;gap:8px}
+.fec-p{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 10px;border:1.5px solid var(--accent);background:var(--accent-soft);color:var(--ink);border-radius:8px;cursor:pointer;font-family:var(--f-mono);font-size:12px}
+.fec-p b{font-size:13px}
+.fec-p.lost{border-style:dashed;border-color:var(--bad);background:var(--bad-bg);opacity:.7;text-decoration:line-through}
+.fec-c{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--rule);border-radius:8px;background:var(--card)}
+.fec-c b{font-family:var(--f-mono)}
+.fec-c span{display:flex;gap:3px}
+.fec-c i{width:22px;height:14px;border-radius:3px}
+.fec-c i.ok{background:var(--good)} .fec-c i.rec{background:var(--warn)} .fec-c i.miss{background:var(--bad-bg);border:1px dashed var(--bad)}
 .sh-pick{display:inline-flex;align-items:center;gap:8px;font-size:14px}
 .sh-tab .num{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .sh-tab .mono{font-family:var(--f-mono)}

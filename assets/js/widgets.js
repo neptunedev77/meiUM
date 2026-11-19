@@ -984,6 +984,141 @@
   };
 
   /* =====================================================================
+     playout — VoIP: atraso de reprodução fixo vs. adaptativo (EWMA)
+     10 talk spurts de 8 pacotes (um a cada 20 ms); a congestão sobe e desce aos poucos
+     ===================================================================== */
+  W.playout = el => {
+    const r = prng(11), g = gaussGen(r);
+    const BASE = [40, 40, 55, 80, 110, 130, 110, 80, 55, 40], N = 8;   /* atraso base de cada spurt, ms */
+    const pk = [];
+    BASE.forEach((b, s) => { for (let i = 0; i < N; i++) pk.push({ s, d: Math.max(5, b + 8 * Math.abs(g()) + (r() < 0.04 ? 60 * r() : 0)) }); });
+    const calm = p => BASE[p.s] <= 55;
+    let mode = 'fixed', q = 130, K = 4;
+    el.innerHTML = head(el, 'Quando reproduzir cada pacote?', 'Dez talk spurts de 8 pacotes de voz (um a cada 20 ms). A meio da chamada, a rede congestiona aos poucos e depois recupera. Cada ponto é o atraso de rede de um pacote; a linha é o atraso de reprodução. Pontos acima da linha chegam tarde e perdem-se.') + `
+      <div class="row"><span class="lang-seg" role="group" aria-label="Estratégia"><button type="button" data-m="fixed">Atraso fixo q</button><button type="button" data-m="adapt">Adaptativo (EWMA)</button></span></div>
+      <label class="f" data-fq><span>q = <b data-qv></b> ms</span><input type="range" min="40" max="300" step="10" value="130" data-i="q"></label>
+      <label class="f" data-fk><span>K = <b data-kv></b> (margem em desvios)</span><input type="range" min="0" max="8" step="1" value="4" data-i="k"></label>
+      <svg class="w-svg" viewBox="0 0 640 260" role="img" aria-label="Atraso de rede de cada pacote e atraso de reprodução"></svg>
+      <dl class="kpis"></dl><p class="w-out"></p>`;
+    const svg = el.querySelector('svg'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out');
+    const X = scale(0, pk.length - 1, 46, 624), Y = scale(0, 260, 236, 12);
+    function schedule() {
+      if (mode === 'fixed') return pk.map(() => q);
+      /* em cada pacote: di = 0.9·di−1 + 0.1·(ri − ti) e vi = 0.9·vi−1 + 0.1·|ri − ti − di|;
+         no 1.º pacote de cada spurt fixa-se o atraso t + di + K·vi para o spurt inteiro */
+      let d = null, v = 15, cur = 0, last = -1;
+      return pk.map(p => {
+        d = d === null ? p.d : 0.9 * d + 0.1 * p.d;
+        v = 0.9 * v + 0.1 * Math.abs(p.d - d);
+        if (p.s !== last) { cur = d + K * v; last = p.s; }
+        return cur;
+      });
+    }
+    function draw() {
+      el.querySelectorAll('[data-m]').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === mode));
+      el.querySelector('[data-fq]').hidden = mode !== 'fixed'; el.querySelector('[data-fk]').hidden = mode !== 'adapt';
+      el.querySelector('[data-qv]').textContent = q; el.querySelector('[data-kv]').textContent = K;
+      const sch = schedule();
+      const late = pk.map((p, i) => p.d > sch[i]);
+      const nLate = late.filter(Boolean).length, avg = sch.reduce((a, b) => a + b, 0) / sch.length;
+      const ci = pk.map((p, i) => (calm(p) ? i : -1)).filter(i => i >= 0), avgCalm = ci.reduce((a, i) => a + sch[i], 0) / ci.length;
+      const grid = [0, 50, 100, 150, 200, 250].map(v => `<line class="ax" x1="46" x2="624" y1="${Y(v)}" y2="${Y(v)}" style="opacity:.35"/><text x="40" y="${Y(v) + 4}" text-anchor="end">${v}</text>`).join('');
+      const seps = BASE.slice(1).map((_, s) => { const x = (X((s + 1) * N - 1) + X((s + 1) * N)) / 2; return `<line x1="${x}" x2="${x}" y1="12" y2="236" style="stroke:var(--rule);stroke-dasharray:3 4"/>`; }).join('');
+      const line = `<path d="M${sch.map((v, i) => `${X(i).toFixed(1)},${Y(Math.min(v, 258)).toFixed(1)}`).join(' L')}" style="fill:none;stroke:var(--accent);stroke-width:2.2"/>`;
+      const dots = pk.map((p, i) => `<circle cx="${X(i).toFixed(1)}" cy="${Y(Math.min(p.d, 258)).toFixed(1)}" r="3" style="fill:${late[i] ? 'var(--bad)' : 'var(--ink-2)'}"/>`).join('');
+      svg.innerHTML = grid + seps + line + dots + `<text x="${X(0)}" y="254">calma</text><text x="${X(5 * N)}" y="254" text-anchor="middle">congestão</text><text x="${X(pk.length - 1)}" y="254" text-anchor="end">calma</text><text x="8" y="12">ms</text>`;
+      kp.innerHTML = kpi('perdidos por atraso', `${nLate} de ${pk.length} (${fmt(100 * nLate / pk.length, 0)}%)`, true) + kpi('atraso médio', fmt(avg, 0) + ' ms') + kpi('atraso nas fases calmas', fmt(avgCalm, 0) + ' ms');
+      let msg;
+      if (mode === 'fixed') {
+        msg = nLate > 4 ? `Com q = ${q} ms, <b>${nLate} pacotes chegam tarde</b> na fase congestionada: "um pacote atrasado é um pacote perdido".` : `Quase sem perdas, mas <b>todos</b> os pacotes esperam ${q} ms, mesmo quando a rede está calma e chegam em ≈ 45 ms.`;
+        msg += ' Um q fixo tem de escolher entre servir a fase calma ou a congestionada.';
+      } else {
+        msg = `No início de cada talk spurt, o recetor marca a reprodução para t + d + K·v, com d e v estimados por EWMA (α = β = 0.1). Nas fases calmas o atraso desce (≈ ${fmt(avgCalm, 0)} ms) e sobe quando a rede piora.`;
+        msg += K <= 1 ? ' Com uma margem K pequena, perdem-se muitos pacotes.' : nLate ? ' As perdas que restam são no início da congestão: a média reage com algum atraso.' : '';
+      }
+      out.innerHTML = msg;
+    }
+    el.addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (b) { mode = b.dataset.m; draw(); } });
+    el.querySelector('[data-i="q"]').addEventListener('input', e => { q = +e.target.value; draw(); });
+    el.querySelector('[data-i="k"]').addEventListener('input', e => { K = +e.target.value; draw(); });
+    draw();
+  };
+
+  /* =====================================================================
+     fec — recuperar perdas em VoIP: FEC por XOR vs. interleaving
+     ===================================================================== */
+  W.fec = el => {
+    let mode = 'xor', lost = new Set([1]);
+    el.innerHTML = head(el, 'Perder pacotes de voz sem retransmitir', 'Clica num pacote para o perder (ou recuperar). Quatro chunks de 20 ms de áudio, A a D, cada um dividido em quatro unidades de 5 ms.') + `
+      <div class="row"><span class="lang-seg" role="group" aria-label="Técnica"><button type="button" data-m="xor">FEC simples (XOR)</button><button type="button" data-m="int">Interleaving</button></span></div>
+      <div class="fec-pk"></div><div class="fec-out"></div><p class="w-out"></p>`;
+    const pkb = el.querySelector('.fec-pk'), ob = el.querySelector('.fec-out'), out = el.querySelector('.w-out');
+    const CH = ['A', 'B', 'C', 'D'];
+    function draw() {
+      el.querySelectorAll('[data-m]').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === mode));
+      const n = mode === 'xor' ? 5 : 4;
+      [...lost].forEach(i => { if (i >= n) lost.delete(i); });
+      /* conteúdo de cada pacote: lista de [chunk, unidade] */
+      const content = i => mode === 'xor'
+        ? (i < 4 ? [0, 1, 2, 3].map(u => [i, u]) : 'xor')
+        : [0, 1, 2, 3].map(c => [c, i]);
+      pkb.innerHTML = '<span class="lbl-mono">pacotes enviados</span><div class="fec-row">' + Array.from({ length: n }, (_, i) => {
+        const c = content(i);
+        return `<button type="button" class="fec-p${lost.has(i) ? ' lost' : ''}" data-p="${i}" aria-pressed="${lost.has(i)}"><b>P${i + 1}</b><span>${c === 'xor' ? 'A⊕B⊕C⊕D' : c.map(([ch, u]) => CH[ch] + (u + 1)).join(' ')}</span></button>`;
+      }).join('') + '</div>';
+      /* o que o recetor consegue reproduzir */
+      const have = CH.map(() => [true, true, true, true]);
+      for (let i = 0; i < n; i++) if (lost.has(i)) { const c = content(i); if (c !== 'xor') c.forEach(([ch, u]) => { have[ch][u] = false; }); }
+      let recovered = null;
+      if (mode === 'xor') {
+        const lostData = [...lost].filter(i => i < 4);
+        if (lostData.length === 1 && !lost.has(4)) { recovered = lostData[0]; have[recovered] = [true, true, true, true]; }
+      }
+      ob.innerHTML = '<span class="lbl-mono">áudio reproduzido</span><div class="fec-row">' + CH.map((c, ch) => `<div class="fec-c"><b>${c}</b><span>${have[ch].map((h, u) => `<i class="${h ? (recovered === ch ? 'rec' : 'ok') : 'miss'}" title="${c}${u + 1}"></i>`).join('')}</span></div>`).join('') + '</div>';
+      const nl = lost.size;
+      let msg;
+      if (mode === 'xor') {
+        if (!nl) msg = 'Sem perdas. Custo do FEC: 5 pacotes para 4 chunks, ou seja, <b>+1/n = +25% de largura de banda</b>.';
+        else if (recovered !== null) msg = `P${recovered + 1} perdeu-se, mas <b>foi reconstruído</b>: ${CH[recovered]} = P5 ⊕ os outros três. O preço é ter de esperar pelo grupo inteiro antes de reproduzir: mais atraso.`;
+        else if (nl === 1) msg = 'Perdeu-se só o pacote de redundância: o áudio está completo.';
+        else msg = '<b>Duas perdas no mesmo grupo</b>: o XOR só recupera uma. Os chunks em falta ficam com 20 ms de silêncio cada.';
+      } else {
+        msg = !nl ? 'Cada pacote leva uma unidade de 5 ms de <b>cada</b> chunk. Não há redundância: a largura de banda não aumenta.'
+          : `Perderam-se ${nl} pacote(s), mas cada chunk só perdeu ${nl} unidade(s) de 5 ms: pequenos buracos, fáceis de disfarçar, em vez de 20 ms seguidos de silêncio. O preço: só se pode reproduzir A depois de chegarem os quatro pacotes, o que dá mais atraso.`;
+      }
+      out.innerHTML = msg;
+    }
+    el.addEventListener('click', e => {
+      const m = e.target.closest('[data-m]'); if (m) { mode = m.dataset.m; draw(); return; }
+      const b = e.target.closest('[data-p]'); if (b) { const i = +b.dataset.p; lost.has(i) ? lost.delete(i) : lost.add(i); draw(); }
+    });
+    draw();
+  };
+
+  /* =====================================================================
+     rtcp — repartir a largura de banda de controlo (5% da sessão)
+     ===================================================================== */
+  W.rtcp = el => {
+    el.innerHTML = head(el, 'Largura de banda do RTCP', 'O RTCP limita-se a 5% da largura de banda da sessão: 25% disso para os emissores e 75% para os recetores, divididos igualmente.') + `
+      <div class="row">
+        <label class="f grow"><span>débito da sessão = <b data-bv></b> kbps</span><input type="range" min="50" max="8000" step="50" value="2000" data-i="b"></label>
+        <label class="f grow"><span>recetores R = <b data-rv></b></span><input type="range" min="1" max="200" step="1" value="10" data-i="r"></label>
+        <label class="f grow"><span>tamanho médio de um pacote RTCP = <b data-sv></b> bytes</span><input type="range" min="50" max="300" step="10" value="100" data-i="s"></label>
+      </div>
+      <dl class="kpis"></dl><p class="w-out"></p>`;
+    const kp = el.querySelector('.kpis'), out = el.querySelector('.w-out'), I = k => +el.querySelector(`[data-i="${k}"]`).value;
+    function draw() {
+      const B = I('b'), R = I('r'), S = I('s');
+      el.querySelector('[data-bv]').textContent = B; el.querySelector('[data-rv]').textContent = R; el.querySelector('[data-sv]').textContent = S;
+      const tot = 0.05 * B, snd = 0.25 * tot, per = 0.75 * tot / R, T = S * 8 / (per * 1000);
+      kp.innerHTML = kpi('RTCP total', fmt(tot, 1) + ' kbps') + kpi('emissor', fmt(snd, 1) + ' kbps') + kpi('cada recetor', fmt(per, 2) + ' kbps', true) + kpi('1 relatório a cada', T < 1 ? fmt(T * 1000, 0) + ' ms' : fmt(T, 1) + ' s');
+      out.innerHTML = `Cada recetor envia relatórios a ${fmt(per, 2)} kbps: com pacotes de ${S} bytes (${S * 8} bits), um relatório a cada ${S * 8} / ${fmt(per * 1000, 0)} bps ≈ <b>${T < 1 ? fmt(T * 1000, 0) + ' ms' : fmt(T, 1) + ' s'}</b>. ${R >= 50 ? 'Com muitos recetores, cada um reporta raramente: é assim que o controlo não cresce com o tamanho da conferência.' : 'Aumenta R e vê o intervalo entre relatórios crescer.'}`;
+    }
+    el.querySelectorAll('input').forEach(i => i.addEventListener('input', draw));
+    draw();
+  };
+
+  /* =====================================================================
      clustering — utilitários comuns aos widgets kmeans e dbscan
      ===================================================================== */
   const prng = seed => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };

@@ -24,5 +24,7 @@
   <url><loc>https://meium.space/esr/03-streaming-cdn.html</loc><lastmod>2026-10-28</lastmod></url>
   <url><loc>https://meium.space/esr/04-sockets.html</loc><lastmod>2026-10-28</lastmod></url>
   <url><loc>https://meium.space/esr/05-multicast.html</loc><lastmod>2026-10-28</lastmod></url>
+  <url><loc>https://meium.space/esr/06-streaming-voip.html</loc><lastmod>2026-11-19</lastmod></url>
+  <url><loc>https://meium.space/esr/07-rtp-sip.html</loc><lastmod>2026-11-19</lastmod></url>
   <url><loc>https://meium.space/esr/</loc><lastmod>2026-10-28</lastmod></url>
 </urlset>
