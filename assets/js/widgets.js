@@ -984,6 +984,233 @@
   };
 
   /* =====================================================================
+     clustering — utilitários comuns aos widgets kmeans e dbscan
+     ===================================================================== */
+  const prng = seed => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  const gaussGen = r => () => Math.sqrt(-2 * Math.log(r() + 1e-12)) * Math.cos(2 * Math.PI * r());
+  const CLU = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)', 'var(--s5)', 'var(--accent)'];
+  const d2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2;
+
+  /* =====================================================================
+     kmeans — K-means e K-medoids passo a passo, com outliers opcionais
+     ===================================================================== */
+  W.kmeans = el => {
+    const r = prng(7), g = gaussGen(r);
+    const BLOBS = [[-6, -5], [0, 1.5], [-4, 6], [4, 6]];
+    const base = BLOBS.flatMap(c => Array.from({ length: 30 }, () => [c[0] + 1.3 * g(), c[1] + 1.3 * g()]));
+    const OUT = [[13, -6], [13.5, -5], [12.5, -7], [14, -6.5], [13, -4.8]];
+    let k = 4, method = 'means', outliers = false, P = [], C = [], lab = [], it = 0, done = false, seed = 1;
+    el.innerHTML = head(el, 'K-means e K-medoids passo a passo', 'Cada passo faz duas coisas: atribui cada ponto ao centro mais próximo e recalcula os centros. Experimenta acrescentar outliers e trocar de método.') + `
+      <div class="row">
+        <span class="lang-seg" role="group" aria-label="Método"><button type="button" data-m="means">K-means</button><button type="button" data-m="medoids">K-medoids</button></span>
+        <label class="set-check"><input type="checkbox" data-out> 5 outliers</label>
+      </div>
+      <label class="f"><span>k = <b data-kv></b></span><input type="range" min="2" max="6" step="1" value="4"></label>
+      <div class="row"><button type="button" class="btn sm" data-a="step">Um passo</button><button type="button" class="btn sm" data-a="run">Até convergir</button><button type="button" class="btn sm" data-a="init">Recomeçar</button></div>
+      <svg class="w-svg" viewBox="0 0 640 300" role="img" aria-label="Pontos coloridos pelo cluster e centros dos clusters"></svg>
+      <dl class="kpis"></dl><p class="w-out"></p>`;
+    const svg = el.querySelector('svg'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out'), rg = el.querySelector('input[type=range]');
+    const X = scale(-11, 16, 20, 620), Y = scale(-10, 11, 286, 14);
+    const cost = () => P.reduce((s, q, i) => s + (method === 'means' ? d2(q, C[lab[i]]) : Math.sqrt(d2(q, C[lab[i]]))), 0);
+    /* como o n_init do scikit-learn: das 10 inicializações, fica a que converge para o menor custo */
+    function start(s) {
+      const rr = prng(s * 97 + k), idx = [];
+      while (idx.length < k) { const i = Math.floor(rr() * P.length); if (!idx.includes(i)) idx.push(i); }
+      C = idx.map(i => P[i].slice()); it = 0; done = false; assign();
+    }
+    function init() {
+      P = outliers ? base.concat(OUT) : base.slice();
+      let best = null;
+      for (let t = 0; t < 10; t++) {
+        const s = seed * 10 + t;
+        start(s); let n = 0; while (!done && n++ < 100) update();
+        const c = cost();
+        if (!best || c < best[1]) best = [s, c];
+      }
+      start(best[0]);
+    }
+    function assign() { lab = P.map(q => C.reduce((b, c, j) => (d2(q, c) < d2(q, C[b]) ? j : b), 0)); }
+    function update() {
+      const nc = C.map((c, j) => {
+        const m = P.filter((_, i) => lab[i] === j);
+        if (!m.length) return c;
+        if (method === 'means') return [m.reduce((s, q) => s + q[0], 0) / m.length, m.reduce((s, q) => s + q[1], 0) / m.length];
+        /* medoide: o ponto do cluster com menor soma de distâncias aos outros */
+        return m.reduce((b, q) => { const sq = m.reduce((s, o) => s + Math.sqrt(d2(q, o)), 0); return sq < b[1] ? [q, sq] : b; }, [m[0], Infinity])[0].slice();
+      });
+      const moved = nc.some((c, j) => d2(c, C[j]) > 1e-9);
+      C = nc; assign(); it++;
+      if (!moved) done = true;
+    }
+    function draw() {
+      el.querySelector('[data-kv]').textContent = k;
+      el.querySelectorAll('[data-m]').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === method));
+      const pts = P.map((q, i) => `<circle cx="${X(q[0]).toFixed(1)}" cy="${Y(q[1]).toFixed(1)}" r="${i >= base.length ? 4.5 : 3.2}" style="fill:${CLU[lab[i]]};opacity:.75${i >= base.length ? ';stroke:var(--ink);stroke-width:1' : ''}"/>`).join('');
+      const cen = C.map((c, j) => method === 'means'
+        ? `<g transform="translate(${X(c[0]).toFixed(1)},${Y(c[1]).toFixed(1)})"><path d="M-8 -8L8 8M-8 8L8 -8" style="stroke:var(--ink);stroke-width:4"/><path d="M-8 -8L8 8M-8 8L8 -8" style="stroke:${CLU[j]};stroke-width:2.2"/></g>`
+        : `<rect x="${(X(c[0]) - 7).toFixed(1)}" y="${(Y(c[1]) - 7).toFixed(1)}" width="14" height="14" style="fill:${CLU[j]};stroke:var(--ink);stroke-width:2"/>`).join('');
+      svg.innerHTML = pts + cen;
+      const sizes = C.map((_, j) => lab.filter(l => l === j).length);
+      kp.innerHTML = kpi('iterações', it) + kpi(method === 'means' ? 'inércia (Σ d²)' : 'Σ distâncias', fmt(cost(), 1), true) + kpi('tamanhos', sizes.join(' · '));
+      let msg = done ? '<b>Convergiu</b>: os centros já não mudam.' : 'Ainda não convergiu.';
+      msg += method === 'means' ? ' Os centros (✕) são <b>médias</b>: não têm de ser pontos dos dados.' : ' Os centros (■) são <b>medoides</b>: pontos reais dos dados.';
+      if (outliers && done) {
+        const oc = lab.slice(base.length), own = oc.every(l => lab.slice(0, base.length).every(m => m !== l));
+        msg += own ? ' Os outliers ficaram com <b>um cluster só para eles</b>, e dois grupos reais tiveram de partilhar um centro.' : ' Os outliers foram absorvidos pelo cluster mais próximo, sem deslocar muito o centro.';
+      }
+      if (done && k !== 4) msg += ` Os dados têm 4 grupos, mas o algoritmo cria sempre os ${k} que lhe pedires.`;
+      out.innerHTML = msg;
+    }
+    el.addEventListener('click', e => {
+      const m = e.target.closest('[data-m]'); if (m) { method = m.dataset.m; init(); draw(); return; }
+      const a = e.target.closest('[data-a]'); if (!a) return;
+      if (a.dataset.a === 'step' && !done) update();
+      if (a.dataset.a === 'run') { let n = 0; while (!done && n++ < 100) update(); }
+      if (a.dataset.a === 'init') { seed++; init(); }
+      draw();
+    });
+    el.querySelector('[data-out]').addEventListener('change', e => { outliers = e.target.checked; init(); let n = 0; while (!done && n++ < 100) update(); draw(); });
+    rg.addEventListener('input', () => { k = +rg.value; init(); draw(); });
+    init(); draw();
+  };
+
+  /* =====================================================================
+     dbscan — duas luas com ruído; ε e min_samples ajustáveis
+     ===================================================================== */
+  W.dbscan = el => {
+    const r = prng(42), g = gaussGen(r);
+    const P = [];
+    for (let i = 0; i < 150; i++) { const t = Math.PI * r(); P.push([Math.cos(t) + 0.07 * g(), Math.sin(t) + 0.07 * g()]); }
+    for (let i = 0; i < 150; i++) { const t = Math.PI * r(); P.push([1 - Math.cos(t) + 0.07 * g(), 0.5 - Math.sin(t) + 0.07 * g()]); }
+    for (let i = 0; i < 12; i++) P.push([-1.5 + 4 * r(), -1 + 2.5 * r()]);
+    let eps = 0.2, ms = 5, algo = 'db';
+    el.innerHTML = head(el, 'DBSCAN vs. K-means em formas não convexas', 'Duas luas encaixadas e 12 pontos de ruído. Um ponto é <b>core</b> se tiver pelo menos min_samples pontos (incluindo ele próprio) a uma distância ≤ ε.') + `
+      <div class="row"><span class="lang-seg" role="group" aria-label="Algoritmo"><button type="button" data-g="db">DBSCAN</button><button type="button" data-g="km">K-means (k = 2)</button></span></div>
+      <div class="row">
+        <label class="f grow"><span>ε = <b data-ev></b></span><input type="range" min="0.05" max="0.5" step="0.01" value="0.2" data-i="eps"></label>
+        <label class="f grow"><span>min_samples = <b data-mv></b></span><input type="range" min="2" max="15" step="1" value="5" data-i="ms"></label>
+      </div>
+      <svg class="w-svg" viewBox="0 0 640 300" role="img" aria-label="Pontos coloridos por cluster; ruído marcado com cruzes"></svg>
+      <dl class="kpis"></dl><p class="w-out"></p>`;
+    const svg = el.querySelector('svg'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out');
+    const X = scale(-1.6, 2.6, 20, 620), Y = scale(-1.1, 1.5, 286, 14);
+    function dbscan() {
+      const n = P.length, e2 = eps * eps;
+      const nb = P.map(p => P.reduce((a, q, j) => (d2(p, q) <= e2 ? (a.push(j), a) : a), []));
+      const core = nb.map(a => a.length >= ms), lab = Array(n).fill(-1);
+      let c = 0;
+      for (let i = 0; i < n; i++) {
+        if (!core[i] || lab[i] !== -1) continue;
+        const stack = [i]; lab[i] = c;
+        while (stack.length) {
+          const j = stack.pop();
+          if (!core[j]) continue;
+          nb[j].forEach(q => { if (lab[q] === -1) { lab[q] = c; stack.push(q); } });
+        }
+        c++;
+      }
+      return { lab, core, nc: c };
+    }
+    function kmeans2() {
+      let C = [P[0].slice(), P[200].slice()], lab = [];
+      for (let t = 0; t < 50; t++) {
+        lab = P.map(q => (d2(q, C[0]) <= d2(q, C[1]) ? 0 : 1));
+        C = [0, 1].map(j => { const m = P.filter((_, i) => lab[i] === j); return [m.reduce((s, q) => s + q[0], 0) / m.length, m.reduce((s, q) => s + q[1], 0) / m.length]; });
+      }
+      return { lab, core: P.map(() => false), nc: 2 };
+    }
+    function draw() {
+      el.querySelector('[data-ev]').textContent = fmt(eps, 2); el.querySelector('[data-mv]').textContent = ms;
+      el.querySelectorAll('[data-g]').forEach(b => b.setAttribute('aria-pressed', b.dataset.g === algo));
+      el.querySelectorAll('[data-i]').forEach(i => { i.disabled = algo !== 'db'; });
+      const R = algo === 'db' ? dbscan() : kmeans2();
+      const noise = R.lab.filter(l => l === -1).length;
+      svg.innerHTML = P.map((q, i) => {
+        const x = X(q[0]).toFixed(1), y = Y(q[1]).toFixed(1);
+        if (R.lab[i] === -1) return `<path d="M${x - 3.5} ${y - 3.5}l7 7m0 -7l-7 7" style="stroke:var(--ink-2);stroke-width:1.6"/>`;
+        return `<circle cx="${x}" cy="${y}" r="${R.core[i] || algo === 'km' ? 3.4 : 2.2}" style="fill:${CLU[R.lab[i] % CLU.length]};opacity:${R.core[i] || algo === 'km' ? .85 : .5}"/>`;
+      }).join('') + (algo === 'db' ? `<circle cx="${X(-1.2)}" cy="${Y(1.25)}" r="${(X(eps) - X(0)).toFixed(1)}" style="fill:none;stroke:var(--ink-2);stroke-dasharray:3 3"/><text x="${X(-1.2) + (X(eps) - X(0)) + 6}" y="${Y(1.25) + 4}">raio ε</text>` : '');
+      kp.innerHTML = kpi('clusters', R.nc, true) + kpi('ruído', algo === 'db' ? noise : '—') + kpi('pontos core', algo === 'db' ? R.core.filter(Boolean).length : '—');
+      let msg;
+      if (algo === 'km') msg = 'O K-means corta o plano ao meio com uma reta: cada lua fica <b>partida em duas</b>, e o ruído é sempre atribuído a algum cluster. Para ele, um cluster é uma "bola" à volta de uma média.';
+      else if (R.nc === 2 && noise <= 15) msg = '<b>As duas luas foram separadas</b> e os pontos isolados ficaram como ruído (✕). O DBSCAN descobriu o número de clusters sozinho.';
+      else if (R.nc > 2) msg = `ε pequeno demais para esta densidade: cada lua partiu-se em <b>${R.nc} clusters</b> e muitos pontos ficaram como ruído.`;
+      else if (R.nc === 1) msg = 'ε grande demais: as vizinhanças tocam-se e <b>as duas luas fundiram-se</b> num só cluster.';
+      else msg = 'Quase tudo é ruído: com este ε ninguém tem vizinhos suficientes para ser core.';
+      out.innerHTML = msg;
+    }
+    el.addEventListener('click', e => { const b = e.target.closest('[data-g]'); if (b) { algo = b.dataset.g; draw(); } });
+    el.querySelector('[data-i="eps"]').addEventListener('input', e => { eps = +e.target.value; draw(); });
+    el.querySelector('[data-i="ms"]').addEventListener('input', e => { ms = +e.target.value; draw(); });
+    draw();
+  };
+
+  /* =====================================================================
+     gd — descida do gradiente numa perda L(w) = ½(w1² + k·w2²)
+     k grande = features em escalas muito diferentes (vale estreito)
+     ===================================================================== */
+  W.gd = el => {
+    const LRS = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1];
+    const STEPS = 80;
+    let opt = 'sgd', norm = false;
+    el.innerHTML = head(el, 'Descida do gradiente: learning rate, otimizador e escala', 'Cada ponto é um passo do treino, a partir do mesmo início. Sem normalização, uma feature tem uma escala muito maior do que a outra e a perda fica um vale estreito e comprido.') + `
+      <div class="row">
+        <span class="lang-seg" role="group" aria-label="Otimizador"><button type="button" data-o="sgd">SGD</button><button type="button" data-o="mom">SGD + momentum</button><button type="button" data-o="adam">Adam</button></span>
+        <label class="set-check"><input type="checkbox" data-norm> features normalizadas</label>
+      </div>
+      <label class="f"><span>learning rate = <b data-lv></b></span><input type="range" min="0" max="6" step="1" value="4"></label>
+      <svg class="w-svg" viewBox="0 0 640 280" role="img" aria-label="Trajetória da descida do gradiente sobre as curvas de nível da perda"></svg>
+      <dl class="kpis"></dl><p class="w-out"></p>`;
+    const svg = el.querySelector('svg'), kp = el.querySelector('.kpis'), out = el.querySelector('.w-out'), rg = el.querySelector('input[type=range]');
+    const X = scale(-5, 5, 20, 620), Y = scale(-3, 3, 266, 14);
+    function path(k, lr) {
+      let w = [-4.5, 2.2], v = [0, 0], m = [0, 0], s2 = [0, 0];
+      const pts = [w.slice()], L = q => 0.5 * (q[0] * q[0] + k * q[1] * q[1]);
+      let reached = null, diverged = false;
+      for (let t = 1; t <= STEPS; t++) {
+        const g = [w[0], k * w[1]];
+        if (opt === 'sgd') w = [w[0] - lr * g[0], w[1] - lr * g[1]];
+        else if (opt === 'mom') { v = [0.9 * v[0] + g[0], 0.9 * v[1] + g[1]]; w = [w[0] - lr * v[0], w[1] - lr * v[1]]; }
+        else {
+          m = m.map((x, i) => 0.9 * x + 0.1 * g[i]); s2 = s2.map((x, i) => 0.999 * x + 0.001 * g[i] * g[i]);
+          w = w.map((x, i) => x - lr * (m[i] / (1 - 0.9 ** t)) / (Math.sqrt(s2[i] / (1 - 0.999 ** t)) + 1e-8));
+        }
+        pts.push(w.slice());
+        if (!isFinite(L(w)) || Math.abs(w[0]) > 1e3 || Math.abs(w[1]) > 1e3) { diverged = true; break; }
+        if (reached === null && L(w) < 0.01) reached = t;
+      }
+      return { pts, loss: L(w), reached, diverged };
+    }
+    function draw() {
+      const lr = LRS[+rg.value], k = norm ? 1.5 : 25;
+      el.querySelector('[data-lv]').textContent = lr;
+      el.querySelectorAll('[data-o]').forEach(b => b.setAttribute('aria-pressed', b.dataset.o === opt));
+      const r = path(k, lr);
+      const sx = (X(1) - X(0)), sy = (Y(0) - Y(1));
+      const rings = [0.05, 0.3, 1, 2.5, 5, 9, 14].map(c => `<ellipse cx="${X(0)}" cy="${Y(0)}" rx="${Math.sqrt(2 * c) * sx}" ry="${Math.sqrt(2 * c / k) * sy}" style="fill:none;stroke:var(--rule);stroke-width:1"/>`).join('');
+      const clip = q => [Math.max(-5.4, Math.min(5.4, q[0])), Math.max(-3.4, Math.min(3.4, q[1]))];
+      const line = r.pts.map(q => { const c = clip(q); return `${X(c[0]).toFixed(1)},${Y(c[1]).toFixed(1)}`; }).join(' ');
+      svg.innerHTML = `<defs><clipPath id="gdclip"><rect x="20" y="14" width="600" height="252"/></clipPath></defs><g clip-path="url(#gdclip)">${rings}
+        <polyline points="${line}" style="fill:none;stroke:var(--accent);stroke-width:1.6;opacity:.85"/>
+        ${r.pts.map(q => { const c = clip(q); return `<circle cx="${X(c[0]).toFixed(1)}" cy="${Y(c[1]).toFixed(1)}" r="2.4" style="fill:var(--accent)"/>`; }).join('')}</g>
+        <circle cx="${X(0)}" cy="${Y(0)}" r="5" style="fill:none;stroke:var(--good);stroke-width:2"/><text x="${X(0) + 9}" y="${Y(0) - 8}">mínimo</text>
+        <circle cx="${X(-4.5)}" cy="${Y(2.2)}" r="4" style="fill:var(--warn)"/><text x="${X(-4.5) + 8}" y="${Y(2.2) - 8}">início</text>`;
+      kp.innerHTML = kpi('perda final', r.diverged ? '∞' : fmt(r.loss, 4), true) + kpi('passos até perda < 0.01', r.reached ?? '—') + kpi('passos', r.pts.length - 1);
+      let msg;
+      if (r.diverged) msg = `<b>Divergiu.</b> O learning rate é demasiado alto para a direção mais inclinada: cada passo salta para o outro lado do vale e mais longe. ${norm ? '' : 'Normalizar as features permite usar um learning rate maior sem divergir.'}`;
+      else if (!r.reached) msg = `<b>Não chegou ao mínimo em ${STEPS} passos.</b> ${lr <= 0.01 ? 'O learning rate é tão pequeno que o treino quase não sai do sítio: seriam precisas muitas mais épocas.' : opt === 'adam' ? 'No Adam cada passo tem um tamanho próximo do learning rate: com um valor alto, oscila à volta do mínimo sem assentar.' : 'Avança depressa na direção inclinada mas arrasta-se ao longo do vale.'}`;
+      else msg = `Chegou perto do mínimo em <b>${r.reached} passos</b>.`;
+      if (!norm && opt === 'sgd' && !r.diverged) msg += ' Com features em escalas muito diferentes, o mesmo learning rate é grande demais numa direção e pequeno demais na outra.';
+      if (opt === 'adam') msg += ' O Adam adapta o passo a cada parâmetro (divide pela magnitude típica do gradiente), por isso é muito menos sensível à escala.';
+      out.innerHTML = msg;
+    }
+    el.addEventListener('click', e => { const b = e.target.closest('[data-o]'); if (b) { opt = b.dataset.o; draw(); } });
+    el.querySelector('[data-norm]').addEventListener('change', e => { norm = e.target.checked; draw(); });
+    rg.addEventListener('input', draw);
+    draw();
+  };
+
+  /* =====================================================================
      shapley — valores de Shapley exatos num modelo de 3 features binárias
      v(S) = previsão média quando só se conhecem as features de S
      (as outras valem 0 ou 1 com probabilidade 1/2, independentes)

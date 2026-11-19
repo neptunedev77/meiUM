@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aprendizagem Não Supervisionada: Clustering e Autoencoders · DAA · meiUM</title>
+<meta name="description" content="DAA · Tema 10: aprendizagem não supervisionada, K-means, K-medoids, DBSCAN, métricas de clustering e autoencoders (espaço latente e deteção de anomalias).">
+<!-- partilha: gerado por tools/seo.py -->
+<link rel="canonical" href="https://meium.space/daa/10-unsupervised.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="meiUM">
+<meta property="og:locale" content="pt_PT">
+<meta property="og:title" content="Aprendizagem Não Supervisionada: Clustering e Autoencoders · DAA">
+<meta property="og:description" content="DAA · Tema 10: aprendizagem não supervisionada, K-means, K-medoids, DBSCAN, métricas de clustering e autoencoders (espaço latente e deteção de anomalias).">
+<meta property="og:url" content="https://meium.space/daa/10-unsupervised.html">
+<meta property="og:image" content="https://meium.space/assets/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="meiUM: apontamentos do Mestrado em Engenharia Informática da Universidade do Minho">
+<meta name="twitter:card" content="summary_large_image">
+<!-- /partilha -->
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../assets/img/icon-192.png">
+<meta name="theme-color" content="#151d36">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var d=document.documentElement,g=function(k){return JSON.parse(localStorage.getItem('meium:'+k))},t=g('theme'),f=g('fontScale');if(t==='light'||t==='dark')d.dataset.theme=t;if(f)d.style.setProperty('--fs',f);if(g('showExtra')===false)d.classList.add('hide-extra')}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="daa" data-topic="10" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 10.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="10.0" data-title="Visão geral" data-desc="Aprender sem um target para prever.">
+  <header class="ph">
+    <h1>Aprendizagem Não Supervisionada<span class="en">Unsupervised Learning: Clustering and Autoencoders</span></h1>
+    <p class="lede">Na aprendizagem <strong>supervisionada</strong>, cada exemplo vem com a resposta certa. Na <strong>não supervisionada</strong>, não há nada a prever: o algoritmo procura sozinho <strong>padrões e estrutura</strong> nos dados.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">10.0.1</span>Duas famílias</h2>
+    <div class="two">
+      <div class="card"><span class="tag">Clustering</span><p>Agrupar os dados por <strong>semelhança</strong>: pontos parecidos no mesmo grupo, pontos diferentes em grupos diferentes. Neste tema: <strong>K-means</strong>, <strong>K-medoids</strong> e <strong>DBSCAN</strong>.</p></div>
+      <div class="card"><span class="tag">Autoencoders</span><p>Redes neuronais que aprendem a <strong>comprimir</strong> os dados numa representação pequena e a <strong>reconstruí-los</strong> a partir dela. Servem para reduzir a dimensionalidade e para detetar anomalias.</p></div>
+    </div>
+    <p>Exemplos de uso: segmentar clientes, agrupar documentos ou genes semelhantes, encontrar transações invulgares, ou comprimir dados com muitas features em poucas.</p>
+    <div class="note"><span class="lbl">Preparar os dados conta, e muito</span>
+      <p>Quase todos estes algoritmos assentam em <strong>distâncias</strong>, por isso as features devem estar normalizadas: sem isso, a que tiver a maior escala domina tudo (ver 10.5). Com muitas features, costuma também ajudar reduzir primeiro a dimensionalidade.</p></div>
+    <div class="note warn"><span class="lbl">Instalar o K-medoids</span>
+      <p>O <code>KMedoids</code> não está no scikit-learn, mas no pacote <code>scikit-learn-extra</code>. Esse pacote deixou de ser mantido e muitas vezes não instala em versões recentes do Python: falha a compilar, porque não há versões pré-compiladas. A alternativa é o pacote <code>kmedoids</code> (<code>pip install kmedoids</code>), com uma API parecida. É o usado nos exemplos deste tema (ver 10.3).</p></div>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <p class="src">Baseado nas aulas de DAA (Unsupervised Learning: Clustering and Autoencoders). Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 10.1 K-MEANS ============================ -->
+<article class="page" data-page="kmeans" data-num="10.1" data-title="K-means" data-desc="Partir os dados em k grupos à volta de médias.">
+  <header class="ph">
+    <h1>K-means</h1>
+    <p class="lede">Um método de <strong>partição</strong>: divide os dados em <strong>k grupos</strong>, cada um representado pelo seu <strong>centróide</strong> (a média dos pontos do grupo), de forma a que os pontos fiquem o mais perto possível do centro do seu grupo.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">10.1.1</span>O algoritmo</h2>
+    <ol class="steps-list">
+      <li><div>Escolhem-se k centros iniciais. O scikit-learn usa <code>k-means++</code>, que espalha os centros iniciais pelos dados.</div></li>
+      <li><div><strong>Atribuição</strong>: cada ponto vai para o centro mais próximo.</div></li>
+      <li><div><strong>Atualização</strong>: cada centro passa a ser a média dos pontos que lhe foram atribuídos.</div></li>
+      <li><div>Repete-se 2–3 até os centros deixarem de mudar.</div></li>
+    </ol>
+    <div class="formula"><div class="cap">O que o K-means minimiza: a inércia <span class="xtag">complemento</span></div>\[\sum_{i=1}^{n}\big\lVert x_i-\mu_{c(i)}\big\rVert^2\]</div>
+    <p>O resultado depende dos centros iniciais. Por isso, o <code>n_init</code> corre o algoritmo várias vezes e fica com a melhor solução.</p>
+    <div class="widget" data-widget="kmeans"></div>
+
+    <h2><span class="sn">10.1.2</span>No scikit-learn</h2>
+    <pre data-title="Assinatura"><code class="language-python">sklearn.cluster.KMeans(n_clusters=8, *, init='k-means++', n_init='auto', max_iter=300,
+                       tol=0.0001, random_state=None, algorithm='lloyd')</code></pre>
+    <p>Para ter dados com grupos conhecidos usa-se o <code>make_blobs</code>, que gera nuvens gaussianas isotrópicas e devolve também o grupo de cada ponto. Assim, o resultado pode ser comparado com a verdade.</p>
+    <pre><code class="language-python">from sklearn.datasets import make_blobs
+from sklearn.cluster import KMeans
+
+X, y = make_blobs(n_samples=200, n_features=2, centers=4, cluster_std=1.8, random_state=101)
+kmeans = KMeans(n_clusters=4, n_init=10, random_state=42).fit(X)
+kmeans.cluster_centers_     # [[-9.47 -6.56] [-0.01 2.13] [-4.14 7.95] [3.72 7.01]]
+kmeans.labels_[:10]         # [2 3 1 3 3 0 3 1 3 1]
+y[:10]                      # [3 2 0 2 2 1 2 0 2 0]   ← números diferentes, grupos iguais</code></pre>
+
+    <h2><span class="sn">10.1.3</span>Os números dos clusters não significam nada</h2>
+    <p>O "cluster 2" do K-means não tem nada a ver com o "grupo 2" verdadeiro: os números são arbitrários, e por isso as cores de dois gráficos não se comparam. Antes de construir uma matriz de confusão, é preciso <strong>alinhar</strong> os números, emparelhando cada cluster com o grupo com que mais se sobrepõe.</p>
+    <pre><code class="language-python">import numpy as np
+from scipy.optimize import linear_sum_assignment
+from sklearn.metrics import confusion_matrix, accuracy_score
+
+def align(y_true, y_pred):                      # emparelhamento ótimo (algoritmo húngaro)
+    cm = confusion_matrix(y_true, y_pred)
+    rows, cols = linear_sum_assignment(-cm)
+    mapping = dict(zip(cols, rows))
+    return np.array([mapping[c] for c in y_pred])
+
+y_pred = align(y, kmeans.labels_)
+confusion_matrix(y, y_pred)
+accuracy_score(y, y_pred)                       # 0.96</code></pre>
+    <pre data-title="Matriz de confusão"><code class="language-text">[[49  0  1  0]
+ [ 0 50  0  0]
+ [ 3  0 47  0]
+ [ 2  0  2 46]]</code></pre>
+    <div class="note extra"><span class="lbl">Alinhar à mão vs. automaticamente <span class="xtag">complemento</span></span>
+      <p>Também se podem trocar os números à mão, com <code>np.where</code>, depois de olhar para os gráficos. Mas isso muda a cada execução. O <code>linear_sum_assignment</code> faz o emparelhamento que maximiza a diagonal, sempre. E métricas como o ARI (10.2) nem precisam de alinhamento.</p></div>
+    <p>Para classificar <strong>pontos novos</strong>, o <code>kmeans.predict(x)</code> atribui-os ao centro mais próximo. Em alternativa, pode treinar-se um classificador sobre os rótulos que o clustering produziu.</p>
+  </section>
+</article>
+
+<!-- ============================ 10.2 AVALIAR ============================ -->
+<article class="page" data-page="avaliar" data-num="10.2" data-title="Avaliar clusters" data-desc="Métricas com e sem rótulos verdadeiros, e escolher k.">
+  <header class="ph">
+    <h1>Avaliar clusters</h1>
+    <p class="lede">Sem target não há accuracy. Há dois tipos de métricas: as que comparam com <strong>rótulos verdadeiros</strong> (quando os há, como no <code>make_blobs</code>) e as que só olham para a <strong>geometria</strong> dos clusters.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">10.2.1</span>As métricas</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Métrica</th><th>Precisa dos rótulos?</th><th>Mede</th><th>K-means nos blobs</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Homogeneidade</strong></td><td>sim</td><td>Cada cluster contém só pontos de um grupo verdadeiro (0 a 1)</td><td>0.880</td></tr>
+        <tr><td><strong>Completude</strong></td><td>sim</td><td>Todos os pontos de um grupo verdadeiro ficam no mesmo cluster (0 a 1)</td><td>0.881</td></tr>
+        <tr><td><strong>V-measure</strong></td><td>sim</td><td>Média harmónica das duas anteriores</td><td>0.880</td></tr>
+        <tr><td><strong>Adjusted Rand Index (ARI)</strong></td><td>sim</td><td>Concordância entre pares de pontos, corrigida para o acaso: 1 = perfeito, ≈ 0 = aleatório</td><td>0.896</td></tr>
+        <tr><td><strong>Adjusted Mutual Information (AMI)</strong></td><td>sim</td><td>Informação partilhada entre clusters e grupos, corrigida para o acaso</td><td>0.878</td></tr>
+        <tr><td><strong>Silhueta</strong></td><td><strong>não</strong></td><td>Quão perto cada ponto está do seu cluster face ao cluster vizinho (−1 a 1)</td><td>0.552</td></tr>
+      </tbody></table></div>
+    <pre><code class="language-python">from sklearn import metrics
+metrics.homogeneity_score(y, kmeans.labels_)        # 0.880
+metrics.adjusted_rand_score(y, kmeans.labels_)      # 0.896  ← igual com ou sem alinhar
+metrics.silhouette_score(X, kmeans.labels_)         # 0.552  ← não usa y</code></pre>
+    <p>Homogeneidade, completude, V-measure, ARI e AMI <strong>não dependem dos números</strong> dados aos clusters: dão o mesmo valor com ou sem alinhamento. A silhueta é a única que se pode usar num problema real, onde não há rótulos.</p>
+    <div class="formula"><div class="cap">Silhueta de um ponto <span class="xtag">complemento</span></div>\[s=\frac{b-a}{\max(a,b)}\]</div>
+    <p class="extra"><span class="xtag">complemento</span> \(a\) é a distância média aos pontos do próprio cluster e \(b\) a distância média aos pontos do cluster vizinho mais próximo. Perto de 1: ponto bem colocado; perto de 0: na fronteira; negativo: provavelmente no cluster errado.</p>
+
+    <h2><span class="sn">10.2.2</span>Escolher k <span class="xtag">complemento</span></h2>
+    <p>O K-means precisa de saber k de antemão. Sem rótulos, compara-se a solução para vários k:</p>
+    <pre data-title="K-means nos blobs para vários k"><code class="language-text">k      2       3       4       5       6       7       8
+inércia 3799.2  2288.1  1318.4  1133.2   990.4   883.3   770.0
+silhueta 0.649   0.504   0.552   0.479   0.390   0.359   0.356</code></pre>
+    <ul>
+      <li><strong>Método do cotovelo</strong>: a inércia desce sempre com k (com k = n chega a 0), por isso procura-se o ponto em que deixa de descer muito. Aqui é em <strong>k = 4</strong>: de 3 para 4 cai 970, de 4 para 5 só 185.</li>
+      <li><strong>Silhueta</strong>: escolhe-se o k com a silhueta mais alta. Aqui ganha k = 2 (0.649), porque dois dos quatro grupos estão próximos e "juntá-los" também faz sentido geometricamente. Entre k ≥ 3, ganha k = 4.</li>
+    </ul>
+    <p>Os critérios nem sempre concordam: escolher k é em parte uma decisão do problema (quantos segmentos de clientes fazem sentido?), e não só da matemática.</p>
+  </section>
+</article>
+
+<!-- ============================ 10.3 K-MEDOIDS ============================ -->
+<article class="page" data-page="kmedoids" data-num="10.3" data-title="K-medoids" data-desc="Centros que são pontos reais, e mais robustos a outliers.">
+  <header class="ph">
+    <h1>K-medoids</h1>
+    <p class="lede">Também divide os dados em k grupos, mas cada grupo é representado por um <strong>medoide</strong>: um <strong>ponto real dos dados</strong>, o que tem a menor soma de distâncias aos outros pontos do grupo.</p>
+  </header>
+
+  <section class="blk prose">
+    <p>A implementação mais comum é o <strong>PAM</strong> (<em>Partitioning Around Medoids</em>): começa com k medoides e vai trocando um medoide por um ponto que não o é, sempre que isso reduz a soma das distâncias. É uma pesquisa <strong>gulosa</strong>, por isso pode não encontrar o ótimo global.</p>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>K-means</th><th>K-medoids</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Representante</strong></td><td>Centróide: a média, que pode não ser um ponto dos dados</td><td>Medoide: um ponto real dos dados</td></tr>
+        <tr><td><strong>Distância</strong></td><td>Só otimiza a distância euclidiana ao quadrado</td><td>Qualquer métrica (Manhattan, cosseno, dissemelhanças de categorias…)</td></tr>
+        <tr><td><strong>Custo</strong></td><td>Linear no número de pontos, para um número fixo de iterações</td><td>A maioria dos algoritmos é quadrática no número de pontos</td></tr>
+        <tr><td><strong>Outliers</strong></td><td>Muito sensível a ruído e outliers</td><td>Menos sensível</td></tr>
+        <tr><td><strong>Forma dos clusters</strong></td><td colspan="2">Ambos funcionam melhor com grupos compactos e mais ou menos esféricos, e nenhum lida bem com formas arbitrárias (para isso, ver DBSCAN)</td></tr>
+      </tbody></table></div>
+
+    <h2><span class="sn">10.3.1</span>No Python</h2>
+    <pre data-title="Assinatura (scikit-learn-extra)"><code class="language-python">sklearn_extra.cluster.KMedoids(n_clusters=8, metric='euclidean', method='alternate',
+                               init='heuristic', max_iter=300, random_state=None)</code></pre>
+    <pre data-title="Com o pacote kmedoids (pip install kmedoids)"><code class="language-python">import kmedoids
+kmd = kmedoids.KMedoids(n_clusters=4, metric='euclidean', method='fasterpam', random_state=42).fit(X)
+kmd.cluster_centers_        # [[-9.15 -6.27] [0.09 2.12] [-4.11 8.03] [3.31 7.2]]  ← pontos de X
+kmd.medoid_indices_         # [ 69 152  46 158]
+metrics.adjusted_rand_score(y, kmd.labels_)     # 0.883   (K-means: 0.896)</code></pre>
+    <p>Nos blobs, os dois dão praticamente o mesmo resultado, e os medoides ficam muito perto dos centróides. São comparáveis porque os grupos são compactos e não têm outliers.</p>
+
+    <h2><span class="sn">10.3.2</span>Com outliers</h2>
+    <p>Juntam-se 5 pontos muito afastados, à volta de (25, 25), e corre-se tudo de novo com k = 4:</p>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>K-means</th><th>K-medoids</th></tr></thead>
+      <tbody>
+        <tr><td>Tamanho dos clusters</td><td>5 · 50 · 102 · 48</td><td>52 · 50 · 47 · 56</td></tr>
+        <tr><td>ARI nos 200 pontos originais</td><td>0.657</td><td><strong>0.884</strong></td></tr>
+      </tbody></table></div>
+    <p>O K-means gastou um dos quatro centros só com os 5 outliers, porque estão tão longe que reduzem muito a inércia ao ter um centro próprio. Por isso, dois grupos verdadeiros tiveram de partilhar um cluster (102 pontos). O K-medoids, que soma distâncias e não quadrados, quase não se mexeu: os outliers foram absorvidos pelo cluster mais próximo. Experimenta no widget de 10.1, com a opção "5 outliers".</p>
+  </section>
+</article>
+
+<!-- ============================ 10.4 DBSCAN ============================ -->
+<article class="page" data-page="dbscan" data-num="10.4" data-title="DBSCAN" data-desc="Clusters por densidade, de qualquer forma, e ruído.">
+  <header class="ph">
+    <h1>DBSCAN<span class="en">Density-Based Spatial Clustering of Applications with Noise</span></h1>
+    <p class="lede">Em vez de centros, o DBSCAN procura <strong>regiões densas</strong> (pontos próximos uns dos outros) separadas por regiões pouco densas. Encontra amostras <strong>core</strong> em zonas de alta densidade e expande os clusters a partir delas.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">10.4.1</span>Como funciona</h2>
+    <ul>
+      <li>Um ponto A é <strong>core</strong> se tiver, a uma distância ≤ <strong>ε</strong>, pelo menos <code>min_samples</code> pontos (normalmente contando com o próprio A).</li>
+      <li>Um cluster é formado por pontos core ligados entre si (cada um na vizinhança ε de outro) e pelos pontos que estão na vizinhança deles.</li>
+      <li>Os pontos que não estão perto de nenhum core ficam como <strong>ruído</strong> (rótulo <code>-1</code>).</li>
+    </ul>
+    <p class="extra"><span class="xtag">complemento</span> Os pontos de um cluster que não são core, mas estão na vizinhança de um, chamam-se pontos <strong>de fronteira</strong> (border).</p>
+    <div class="two">
+      <div class="card"><span class="tag">Pontos fortes</span><ul><li>Não é preciso saber o número de clusters</li><li>Deteta anomalias: o ruído são os outliers</li><li>Encontra clusters com qualquer forma</li></ul></div>
+      <div class="card"><span class="tag">Pontos fracos</span><ul><li>É preciso escolher e afinar ε (e <code>min_samples</code>)</li><li>Lida mal com dados esparsos e com clusters de densidades muito diferentes</li></ul></div>
+    </div>
+    <div class="widget" data-widget="dbscan"></div>
+
+    <h2><span class="sn">10.4.2</span>Escolher ε: o gráfico de k-distâncias</h2>
+    <ol class="steps-list">
+      <li><div>Para cada ponto, calcula-se a distância ao seu k-ésimo vizinho mais próximo, com k = <code>min_samples</code>.</div></li>
+      <li><div>Ordenam-se essas distâncias e desenham-se num gráfico.</div></li>
+      <li><div>Procura-se o <strong>cotovelo</strong>, onde a curva sobe de repente: abaixo dele estão os pontos de zonas densas, acima os isolados. Esse valor é um bom ε.</div></li>
+    </ol>
+    <pre><code class="language-python">from sklearn.datasets import make_moons
+from sklearn.neighbors import NearestNeighbors
+from sklearn.cluster import DBSCAN
+
+X, y = make_moons(n_samples=300, noise=0.07, random_state=42)
+X = np.vstack([X, np.random.RandomState(0).uniform([-1.5, -1], [2.5, 1.5], size=(12, 2))])  # + 12 pontos de ruído
+
+dist, _ = NearestNeighbors(n_neighbors=5).fit(X).kneighbors(X)
+k_dist = np.sort(dist[:, -1])           # percentis: 50% 0.089 · 90% 0.147 · 95% 0.171 · 99% 0.645
+# plt.plot(k_dist) → a curva dispara depois de ≈ 0.17–0.2
+
+db = DBSCAN(eps=0.2, min_samples=5).fit(X)
+labels = db.labels_                     # -1 = ruído
+len(set(labels)) - (1 if -1 in labels else 0)   # 2 clusters
+(labels == -1).sum()                    # 6 pontos de ruído
+len(db.core_sample_indices_)            # 303 pontos core</code></pre>
+    <pre data-title="O efeito de ε (min_samples = 5)"><code class="language-text">ε       clusters   ruído   ARI nas luas
+0.05        3        294      0.002     ← quase tudo é ruído
+0.10       11         55      0.209     ← as luas partem-se
+0.15        2          9      0.987
+0.20        2          6      1.000     ← perfeito
+0.30        1          6      0.000     ← as luas fundem-se</code></pre>
+
+    <h2><span class="sn">10.4.3</span>DBSCAN vs. K-means</h2>
+    <p>Nas mesmas luas, o K-means com k = 2 tem <strong>ARI 0.254</strong>: corta cada lua ao meio com uma reta, porque para ele um cluster é uma "bola" à volta de uma média. O DBSCAN tem ARI 1.000 e ainda marca o ruído. Por outro lado, em grupos esféricos de densidades diferentes, o K-means costuma ganhar. Mais uma vez, a escolha depende da forma dos dados.</p>
+  </section>
+</article>
+
+<!-- ============================ 10.5 ESCALA ============================ -->
+<article class="page" data-page="escala" data-num="10.5" data-title="Clustering como classificação" data-desc="Normalizar e avaliar com uma matriz de confusão.">
+  <header class="ph">
+    <h1>Clustering como classificação</h1>
+    <p class="lede">Uma forma de testar um algoritmo de clustering é usá-lo num problema em que se conhece a classe, sem lha mostrar, e ver se os clusters coincidem com as classes. Por exemplo, separar universidades públicas de privadas, ou tumores benignos de malignos.</p>
+  </header>
+
+  <section class="blk prose">
+    <p>Exemplo: K-means com k = 2 no <code>load_breast_cancer</code>. O diagnóstico é retirado antes de agrupar e usado só para avaliar.</p>
+    <pre><code class="language-python">from sklearn.datasets import load_breast_cancer
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import classification_report
+
+Xb, yb = load_breast_cancer(return_X_y=True); yb = 1 - yb        # 1 = maligno
+for name, Z in [('sem normalizar', Xb), ('StandardScaler', StandardScaler().fit_transform(Xb))]:
+    km = KMeans(n_clusters=2, n_init=10, random_state=42).fit(Z)
+    pred = align(yb, km.labels_)
+    print(name, accuracy_score(yb, pred), confusion_matrix(yb, pred))</code></pre>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Accuracy</th><th>ARI</th><th>Matriz de confusão [[TN FP] [FN TP]]</th></tr></thead>
+      <tbody>
+        <tr><td>Sem normalizar</td><td>0.854</td><td>0.491</td><td>[[356 1] [82 130]]</td></tr>
+        <tr><td>StandardScaler</td><td><strong>0.905</strong></td><td><strong>0.654</strong></td><td>[[339 18] [36 176]]</td></tr>
+      </tbody></table></div>
+    <p>Sem normalizar, o clustering é dominado pela <code>mean area</code> e pela <code>worst area</code> (valores na casa das centenas ou milhares): basicamente separa os tumores "grandes" dos "outros", e falha 82 malignos. Normalizado, todas as features contam.</p>
+    <div class="note"><span class="lbl">Quando corre bem, e quando corre mal</span>
+      <ul>
+        <li><strong>Bem</strong>: quando as classes formam grupos compactos e separados no espaço das features (normalizadas).</li>
+        <li><strong>Mal</strong>: quando as classes se sobrepõem, quando há features irrelevantes ou em escalas diferentes que dominam a distância, ou quando a estrutura "natural" dos dados não corresponde às classes. O clustering encontra grupos, não necessariamente <em>os</em> grupos que nos interessam.</li>
+        <li><strong>Como melhorar</strong>: normalizar, escolher ou reduzir features, testar outros algoritmos ou métricas de distância, e ajustar k ou ε.</li>
+      </ul></div>
+  </section>
+</article>
+
+<!-- ============================ 10.6 AUTOENCODERS ============================ -->
+<article class="page" data-page="autoencoders" data-num="10.6" data-title="Autoencoders" data-desc="Comprimir, reconstruir, explorar o espaço latente e detetar anomalias.">
+  <header class="ph">
+    <h1>Autoencoders</h1>
+    <p class="lede">Um <strong>autoencoder (AE)</strong> é uma rede neuronal que aprende a <strong>comprimir</strong> (codificar) os dados até às suas características essenciais e depois a <strong>reconstruí-los</strong> (descodificar) a partir dessa representação. A entrada é também o alvo: não precisa de rótulos.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">10.6.1</span>Arquitetura</h2>
+    <div class="card">
+      <svg class="w-svg" viewBox="0 0 640 170" role="img" aria-label="Autoencoder: o encoder estreita de 30 para 16, 8 e 2 dimensões; o decoder alarga de 2 para 8, 16 e 30">
+        <g style="font-family:var(--f-display);font-size:12px;font-weight:600">
+          <rect x="20" y="20" width="44" height="120" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="42" y="84" text-anchor="middle" style="fill:var(--ink)">30</text>
+          <rect x="100" y="40" width="40" height="80" rx="5" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="120" y="84" text-anchor="middle" style="fill:var(--ink)">16</text>
+          <rect x="176" y="58" width="36" height="44" rx="5" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="194" y="84" text-anchor="middle" style="fill:var(--ink)">8</text>
+          <rect x="300" y="68" width="40" height="24" rx="5" style="fill:var(--warn-bg);stroke:var(--warn)"/><text x="320" y="84" text-anchor="middle" style="fill:var(--ink)">2</text>
+          <rect x="428" y="58" width="36" height="44" rx="5" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="446" y="84" text-anchor="middle" style="fill:var(--ink)">8</text>
+          <rect x="500" y="40" width="40" height="80" rx="5" style="fill:var(--accent-soft);stroke:var(--accent)"/><text x="520" y="84" text-anchor="middle" style="fill:var(--ink)">16</text>
+          <rect x="576" y="20" width="44" height="120" rx="5" style="fill:var(--card-2);stroke:var(--rule)"/><text x="598" y="84" text-anchor="middle" style="fill:var(--ink)">30</text>
+          <path d="M64 80h36M140 80h36M212 80h88M340 80h88M464 80h36M540 80h36" style="stroke:var(--ink-2);stroke-width:1.4;fill:none"/>
+          <text x="120" y="160" text-anchor="middle" style="fill:var(--muted);font-family:var(--f-mono);font-size:11px;font-weight:500">encoder</text>
+          <text x="320" y="160" text-anchor="middle" style="fill:var(--muted);font-family:var(--f-mono);font-size:11px;font-weight:500">bottleneck</text>
+          <text x="520" y="160" text-anchor="middle" style="fill:var(--muted);font-family:var(--f-mono);font-size:11px;font-weight:500">decoder</text>
+          <text x="42" y="12" text-anchor="middle" style="fill:var(--muted);font-family:var(--f-mono);font-size:11px;font-weight:500">entrada</text>
+          <text x="598" y="12" text-anchor="middle" style="fill:var(--muted);font-family:var(--f-mono);font-size:11px;font-weight:500">reconstrução</text>
+        </g>
+      </svg>
+    </div>
+    <div class="three">
+      <div class="card"><span class="tag">Encoder</span><p>Camadas que comprimem a entrada numa representação de menor dimensão.</p></div>
+      <div class="card"><span class="tag">Bottleneck (código)</span><p>A representação mais comprimida, ou <strong>espaço latente</strong>: é a saída do encoder e a entrada do decoder. Como tudo tem de passar por ali, a rede é obrigada a guardar só o essencial para reconstruir.</p></div>
+      <div class="card"><span class="tag">Decoder</span><p>Camadas cada vez maiores que reconstroem os dados na forma original. A diferença para a entrada é o <strong>erro de reconstrução</strong>.</p></div>
+    </div>
+    <p><strong>Hiperparâmetros</strong>: o tamanho do código (quanto se comprime), o número de camadas, o número de nós por camada (diminui no encoder e aumenta no decoder) e a função de perda de reconstrução.</p>
+    <p>Há variantes para cada tipo de dados: <strong>denoising</strong> (limpar ruído de imagens ou som), <strong>variacionais</strong> (trabalham com distribuições em vez de valores fixos), <strong>convolucionais</strong> (imagens) e <strong>recorrentes</strong> (séries temporais e texto).</p>
+
+    <h2><span class="sn">10.6.2</span>Preparar os dados</h2>
+    <ul>
+      <li><strong>Identificadores ficam de fora</strong> (um <code>PassengerId</code>, um número de cliente): não têm significado e só acrescentam ruído.</li>
+      <li><strong>O target também fica de fora</strong>, mas guarda-se à parte para colorir o espaço latente depois.</li>
+      <li><strong>Features muito assimétricas</strong> (como um preço) passam por \(\log(1+x)\).</li>
+      <li><strong>Categorias nominais</strong> passam por one-hot, porque um código 0/1/2 inventaria uma ordem que não existe.</li>
+      <li><strong>Tudo em [0, 1]</strong> com um <code>MinMaxScaler</code> ajustado <strong>só no treino</strong>. A última camada do decoder é uma <strong>sigmoide</strong>, por isso os alvos têm de estar nesse intervalo.</li>
+    </ul>
+    <div class="note extra"><span class="lbl">E se o teste sair de [0, 1]? <span class="xtag">complemento</span></span>
+      <p>Um scaler ajustado no treino pode dar valores abaixo de 0 ou acima de 1 no teste: aqui, 5 tumores do teste tinham alguma medida fora do intervalo do treino. A sigmoide nunca os consegue reproduzir. Uma solução simples é cortá-los com <code>np.clip(..., 0, 1)</code>. E o próprio facto de saírem do intervalo já é um indício de que são invulgares.</p></div>
+
+    <h2><span class="sn">10.6.3</span>Treinar</h2>
+    <pre><code class="language-python">import torch
+from torch import nn
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
+
+Xtr, Xte, ytr, yte = train_test_split(Xb, yb, test_size=0.3, random_state=42, stratify=yb)
+mm = MinMaxScaler().fit(Xtr)
+Ttr = torch.tensor(mm.transform(Xtr), dtype=torch.float32)
+Tte = torch.tensor(np.clip(mm.transform(Xte), 0, 1), dtype=torch.float32)
+
+class AE(nn.Module):
+    def __init__(self, d, h1=16, h2=8, z=2):
+        super().__init__()
+        self.encoder = nn.Sequential(nn.Linear(d, h1), nn.ReLU(), nn.Linear(h1, h2), nn.ReLU(), nn.Linear(h2, z))
+        self.decoder = nn.Sequential(nn.Linear(z, h2), nn.ReLU(), nn.Linear(h2, h1), nn.ReLU(),
+                                     nn.Linear(h1, d), nn.Sigmoid())      # saída em [0, 1]
+    def forward(self, x):
+        return self.decoder(self.encoder(x))
+
+ae = AE(30)                                                  # 1328 parâmetros
+loss_fn = nn.MSELoss()
+opt = torch.optim.Adam(ae.parameters(), lr=1e-3, weight_decay=1e-5)
+sched = torch.optim.lr_scheduler.StepLR(opt, step_size=10, gamma=0.95)   # lr × 0.95 a cada 10 épocas
+loader = torch.utils.data.DataLoader(Ttr, batch_size=32, shuffle=True)
+
+for epoch in range(150):
+    for xb in loader:
+        loss = loss_fn(ae(xb), xb)       # o alvo é a própria entrada
+        opt.zero_grad(); loss.backward(); opt.step()
+    sched.step()</code></pre>
+    <pre data-title="Erro de reconstrução (MSE, escala [0, 1])"><code class="language-text">época      1       10      50      150
+treino  0.0965  0.0321  0.0098  0.0064
+teste   0.0937  0.0301  0.0088  0.0059</code></pre>
+    <p>Treino e teste andam juntos, por isso não há sinais de overfitting. O <code>StepLR</code> reduz o learning rate aos poucos, o que dá passos mais finos no fim do treino.</p>
+
+    <h2><span class="sn">10.6.4</span>A reconstrução</h2>
+    <p>Com só <strong>2 números</strong> por tumor, a rede reconstrói as 30 medidas com um erro pequeno, mas não igual para todas:</p>
+    <ul>
+      <li><strong>Mais fáceis</strong>: <code>worst perimeter</code>, <code>worst area</code>, <code>worst radius</code> (MSE ≈ 0.0008). Estão muito correlacionadas entre si, e um só número latente chega para as três.</li>
+      <li><strong>Mais difíceis</strong>: <code>worst texture</code>, <code>mean texture</code>, <code>texture error</code> (MSE até 0.022). A textura varia de forma quase independente do tamanho e "não cabe" nos 2 números.</li>
+    </ul>
+    <p>Nas unidades originais, para um tumor do teste: <code>mean radius</code> 14.53 → 14.75, <code>mean area</code> 659.7 → 680.3, <code>worst concave points</code> 0.096 → 0.103.</p>
+
+    <h2><span class="sn">10.6.5</span>O espaço latente</h2>
+    <p>Cada tumor passa a ser descrito por 2 números, que se podem desenhar diretamente. Se o AE aprendeu algo útil, tumores parecidos ficam perto uns dos outros. Para o confirmar, colorem-se os pontos com informação que o AE <strong>nunca viu</strong>: o diagnóstico.</p>
+    <div class="card">
+      <svg class="w-svg" viewBox="0 0 640 300" role="img" aria-label="Espaço latente de 2 dimensões: tumores benignos e malignos formam regiões distintas, embora o autoencoder nunca tenha visto o diagnóstico"><line class="ax" x1="40" x2="620" y1="270" y2="270"/><line class="ax" x1="40" x2="40" y1="14" y2="270"/><text x="330.0" y="292" text-anchor="middle">z₁</text><text x="28" y="142.0" text-anchor="middle">z₂</text><g style="fill:var(--s1);opacity:.6"><circle cx="444" cy="94" r="2.6"/><circle cx="426" cy="135" r="2.6"/><circle cx="430" cy="71" r="2.6"/><circle cx="468" cy="68" r="2.6"/><circle cx="393" cy="50" r="2.6"/><circle cx="453" cy="30" r="2.6"/><circle cx="472" cy="111" r="2.6"/><circle cx="470" cy="89" r="2.6"/><circle cx="485" cy="96" r="2.6"/><circle cx="519" cy="96" r="2.6"/><circle cx="517" cy="95" r="2.6"/><circle cx="388" cy="58" r="2.6"/><circle cx="404" cy="60" r="2.6"/><circle cx="427" cy="62" r="2.6"/><circle cx="462" cy="32" r="2.6"/><circle cx="485" cy="73" r="2.6"/><circle cx="502" cy="49" r="2.6"/><circle cx="483" cy="66" r="2.6"/><circle cx="434" cy="96" r="2.6"/><circle cx="459" cy="100" r="2.6"/><circle cx="541" cy="134" r="2.6"/><circle cx="465" cy="71" r="2.6"/><circle cx="495" cy="125" r="2.6"/><circle cx="457" cy="86" r="2.6"/><circle cx="417" cy="58" r="2.6"/><circle cx="424" cy="107" r="2.6"/><circle cx="518" cy="150" r="2.6"/><circle cx="553" cy="135" r="2.6"/><circle cx="471" cy="78" r="2.6"/><circle cx="488" cy="127" r="2.6"/><circle cx="449" cy="72" r="2.6"/><circle cx="466" cy="33" r="2.6"/><circle cx="466" cy="36" r="2.6"/><circle cx="469" cy="65" r="2.6"/><circle cx="532" cy="77" r="2.6"/><circle cx="485" cy="113" r="2.6"/><circle cx="529" cy="88" r="2.6"/><circle cx="461" cy="87" r="2.6"/><circle cx="450" cy="82" r="2.6"/><circle cx="535" cy="65" r="2.6"/><circle cx="433" cy="47" r="2.6"/><circle cx="436" cy="88" r="2.6"/><circle cx="452" cy="109" r="2.6"/><circle cx="496" cy="39" r="2.6"/><circle cx="464" cy="106" r="2.6"/><circle cx="427" cy="104" r="2.6"/><circle cx="474" cy="64" r="2.6"/><circle cx="433" cy="53" r="2.6"/><circle cx="395" cy="93" r="2.6"/><circle cx="457" cy="79" r="2.6"/><circle cx="464" cy="79" r="2.6"/><circle cx="512" cy="76" r="2.6"/><circle cx="513" cy="119" r="2.6"/><circle cx="492" cy="97" r="2.6"/><circle cx="542" cy="98" r="2.6"/><circle cx="536" cy="196" r="2.6"/><circle cx="421" cy="57" r="2.6"/><circle cx="461" cy="40" r="2.6"/><circle cx="458" cy="27" r="2.6"/><circle cx="511" cy="77" r="2.6"/><circle cx="479" cy="107" r="2.6"/><circle cx="509" cy="177" r="2.6"/><circle cx="441" cy="52" r="2.6"/><circle cx="414" cy="31" r="2.6"/><circle cx="447" cy="109" r="2.6"/><circle cx="540" cy="58" r="2.6"/><circle cx="458" cy="75" r="2.6"/><circle cx="484" cy="119" r="2.6"/><circle cx="488" cy="179" r="2.6"/><circle cx="513" cy="129" r="2.6"/><circle cx="542" cy="114" r="2.6"/><circle cx="448" cy="42" r="2.6"/><circle cx="429" cy="51" r="2.6"/><circle cx="513" cy="89" r="2.6"/><circle cx="494" cy="112" r="2.6"/><circle cx="508" cy="77" r="2.6"/><circle cx="481" cy="105" r="2.6"/><circle cx="443" cy="64" r="2.6"/><circle cx="479" cy="127" r="2.6"/><circle cx="397" cy="26" r="2.6"/><circle cx="465" cy="94" r="2.6"/><circle cx="411" cy="98" r="2.6"/><circle cx="404" cy="93" r="2.6"/><circle cx="501" cy="116" r="2.6"/><circle cx="455" cy="38" r="2.6"/><circle cx="528" cy="146" r="2.6"/><circle cx="449" cy="60" r="2.6"/><circle cx="469" cy="60" r="2.6"/><circle cx="469" cy="91" r="2.6"/><circle cx="515" cy="91" r="2.6"/><circle cx="573" cy="186" r="2.6"/><circle cx="424" cy="60" r="2.6"/><circle cx="431" cy="108" r="2.6"/><circle cx="571" cy="97" r="2.6"/><circle cx="462" cy="36" r="2.6"/><circle cx="419" cy="43" r="2.6"/><circle cx="529" cy="142" r="2.6"/><circle cx="427" cy="64" r="2.6"/><circle cx="448" cy="82" r="2.6"/><circle cx="460" cy="65" r="2.6"/><circle cx="511" cy="90" r="2.6"/><circle cx="426" cy="77" r="2.6"/><circle cx="446" cy="75" r="2.6"/><circle cx="539" cy="112" r="2.6"/><circle cx="488" cy="66" r="2.6"/><circle cx="508" cy="73" r="2.6"/><circle cx="457" cy="134" r="2.6"/><circle cx="458" cy="85" r="2.6"/><circle cx="409" cy="58" r="2.6"/><circle cx="399" cy="39" r="2.6"/><circle cx="405" cy="110" r="2.6"/><circle cx="515" cy="65" r="2.6"/><circle cx="508" cy="86" r="2.6"/><circle cx="470" cy="102" r="2.6"/><circle cx="491" cy="88" r="2.6"/><circle cx="427" cy="109" r="2.6"/><circle cx="510" cy="83" r="2.6"/><circle cx="450" cy="81" r="2.6"/><circle cx="460" cy="156" r="2.6"/><circle cx="533" cy="105" r="2.6"/><circle cx="351" cy="41" r="2.6"/><circle cx="464" cy="14" r="2.6"/><circle cx="442" cy="52" r="2.6"/><circle cx="386" cy="68" r="2.6"/><circle cx="426" cy="44" r="2.6"/><circle cx="418" cy="42" r="2.6"/><circle cx="556" cy="68" r="2.6"/><circle cx="456" cy="117" r="2.6"/><circle cx="503" cy="102" r="2.6"/><circle cx="509" cy="49" r="2.6"/><circle cx="417" cy="53" r="2.6"/><circle cx="476" cy="119" r="2.6"/><circle cx="446" cy="80" r="2.6"/><circle cx="444" cy="49" r="2.6"/><circle cx="494" cy="140" r="2.6"/><circle cx="480" cy="93" r="2.6"/><circle cx="593" cy="182" r="2.6"/><circle cx="464" cy="138" r="2.6"/><circle cx="395" cy="68" r="2.6"/><circle cx="530" cy="84" r="2.6"/><circle cx="463" cy="74" r="2.6"/><circle cx="471" cy="61" r="2.6"/><circle cx="438" cy="75" r="2.6"/><circle cx="457" cy="62" r="2.6"/><circle cx="445" cy="154" r="2.6"/><circle cx="483" cy="48" r="2.6"/><circle cx="492" cy="103" r="2.6"/><circle cx="444" cy="145" r="2.6"/><circle cx="589" cy="202" r="2.6"/><circle cx="517" cy="51" r="2.6"/><circle cx="454" cy="124" r="2.6"/><circle cx="444" cy="59" r="2.6"/><circle cx="553" cy="83" r="2.6"/><circle cx="541" cy="101" r="2.6"/><circle cx="403" cy="46" r="2.6"/><circle cx="415" cy="112" r="2.6"/><circle cx="417" cy="124" r="2.6"/><circle cx="493" cy="105" r="2.6"/><circle cx="511" cy="83" r="2.6"/><circle cx="480" cy="178" r="2.6"/><circle cx="413" cy="36" r="2.6"/><circle cx="449" cy="33" r="2.6"/><circle cx="461" cy="80" r="2.6"/><circle cx="440" cy="77" r="2.6"/><circle cx="487" cy="85" r="2.6"/><circle cx="543" cy="146" r="2.6"/><circle cx="462" cy="48" r="2.6"/><circle cx="456" cy="37" r="2.6"/><circle cx="449" cy="79" r="2.6"/><circle cx="523" cy="73" r="2.6"/><circle cx="535" cy="87" r="2.6"/><circle cx="447" cy="90" r="2.6"/><circle cx="466" cy="96" r="2.6"/><circle cx="439" cy="52" r="2.6"/><circle cx="500" cy="153" r="2.6"/><circle cx="555" cy="118" r="2.6"/><circle cx="489" cy="93" r="2.6"/><circle cx="426" cy="93" r="2.6"/><circle cx="472" cy="76" r="2.6"/><circle cx="512" cy="117" r="2.6"/><circle cx="603" cy="110" r="2.6"/><circle cx="440" cy="79" r="2.6"/><circle cx="395" cy="33" r="2.6"/><circle cx="482" cy="91" r="2.6"/><circle cx="398" cy="36" r="2.6"/><circle cx="440" cy="67" r="2.6"/><circle cx="386" cy="78" r="2.6"/><circle cx="473" cy="111" r="2.6"/><circle cx="572" cy="246" r="2.6"/><circle cx="448" cy="39" r="2.6"/><circle cx="444" cy="22" r="2.6"/><circle cx="469" cy="92" r="2.6"/><circle cx="502" cy="115" r="2.6"/><circle cx="525" cy="127" r="2.6"/><circle cx="417" cy="44" r="2.6"/><circle cx="452" cy="94" r="2.6"/><circle cx="506" cy="118" r="2.6"/><circle cx="408" cy="82" r="2.6"/><circle cx="334" cy="20" r="2.6"/><circle cx="553" cy="236" r="2.6"/><circle cx="484" cy="67" r="2.6"/><circle cx="424" cy="64" r="2.6"/><circle cx="421" cy="49" r="2.6"/><circle cx="524" cy="77" r="2.6"/><circle cx="400" cy="78" r="2.6"/><circle cx="489" cy="100" r="2.6"/><circle cx="431" cy="63" r="2.6"/><circle cx="463" cy="48" r="2.6"/><circle cx="468" cy="106" r="2.6"/><circle cx="448" cy="94" r="2.6"/><circle cx="510" cy="65" r="2.6"/><circle cx="489" cy="91" r="2.6"/><circle cx="571" cy="83" r="2.6"/><circle cx="380" cy="66" r="2.6"/><circle cx="456" cy="69" r="2.6"/><circle cx="528" cy="112" r="2.6"/><circle cx="412" cy="102" r="2.6"/><circle cx="495" cy="76" r="2.6"/><circle cx="480" cy="77" r="2.6"/><circle cx="430" cy="15" r="2.6"/><circle cx="454" cy="162" r="2.6"/><circle cx="467" cy="72" r="2.6"/><circle cx="539" cy="98" r="2.6"/><circle cx="425" cy="49" r="2.6"/><circle cx="398" cy="68" r="2.6"/><circle cx="372" cy="63" r="2.6"/><circle cx="477" cy="83" r="2.6"/><circle cx="557" cy="118" r="2.6"/><circle cx="418" cy="18" r="2.6"/><circle cx="591" cy="161" r="2.6"/><circle cx="477" cy="113" r="2.6"/><circle cx="485" cy="47" r="2.6"/><circle cx="477" cy="94" r="2.6"/><circle cx="458" cy="60" r="2.6"/><circle cx="407" cy="79" r="2.6"/><circle cx="499" cy="74" r="2.6"/><circle cx="450" cy="185" r="2.6"/><circle cx="398" cy="89" r="2.6"/><circle cx="411" cy="73" r="2.6"/><circle cx="429" cy="73" r="2.6"/><circle cx="564" cy="103" r="2.6"/><circle cx="484" cy="71" r="2.6"/><circle cx="404" cy="40" r="2.6"/><circle cx="484" cy="48" r="2.6"/><circle cx="460" cy="66" r="2.6"/><circle cx="523" cy="32" r="2.6"/><circle cx="451" cy="42" r="2.6"/><circle cx="477" cy="95" r="2.6"/><circle cx="426" cy="41" r="2.6"/><circle cx="401" cy="86" r="2.6"/></g><g style="fill:var(--s2);opacity:.7"><circle cx="305" cy="239" r="2.6"/><circle cx="373" cy="123" r="2.6"/><circle cx="413" cy="149" r="2.6"/><circle cx="343" cy="158" r="2.6"/><circle cx="378" cy="50" r="2.6"/><circle cx="406" cy="181" r="2.6"/><circle cx="351" cy="156" r="2.6"/><circle cx="350" cy="96" r="2.6"/><circle cx="332" cy="80" r="2.6"/><circle cx="326" cy="90" r="2.6"/><circle cx="338" cy="158" r="2.6"/><circle cx="294" cy="58" r="2.6"/><circle cx="417" cy="203" r="2.6"/><circle cx="319" cy="50" r="2.6"/><circle cx="290" cy="129" r="2.6"/><circle cx="309" cy="102" r="2.6"/><circle cx="325" cy="118" r="2.6"/><circle cx="256" cy="74" r="2.6"/><circle cx="360" cy="156" r="2.6"/><circle cx="300" cy="77" r="2.6"/><circle cx="406" cy="126" r="2.6"/><circle cx="263" cy="58" r="2.6"/><circle cx="458" cy="183" r="2.6"/><circle cx="384" cy="86" r="2.6"/><circle cx="313" cy="157" r="2.6"/><circle cx="387" cy="84" r="2.6"/><circle cx="249" cy="78" r="2.6"/><circle cx="465" cy="241" r="2.6"/><circle cx="365" cy="216" r="2.6"/><circle cx="320" cy="128" r="2.6"/><circle cx="438" cy="165" r="2.6"/><circle cx="299" cy="88" r="2.6"/><circle cx="392" cy="37" r="2.6"/><circle cx="302" cy="109" r="2.6"/><circle cx="125" cy="145" r="2.6"/><circle cx="285" cy="126" r="2.6"/><circle cx="331" cy="114" r="2.6"/><circle cx="161" cy="162" r="2.6"/><circle cx="308" cy="209" r="2.6"/><circle cx="319" cy="95" r="2.6"/><circle cx="337" cy="68" r="2.6"/><circle cx="193" cy="75" r="2.6"/><circle cx="389" cy="129" r="2.6"/><circle cx="355" cy="48" r="2.6"/><circle cx="316" cy="84" r="2.6"/><circle cx="363" cy="159" r="2.6"/><circle cx="342" cy="110" r="2.6"/><circle cx="397" cy="194" r="2.6"/><circle cx="363" cy="124" r="2.6"/><circle cx="294" cy="149" r="2.6"/><circle cx="367" cy="170" r="2.6"/><circle cx="294" cy="100" r="2.6"/><circle cx="368" cy="67" r="2.6"/><circle cx="400" cy="181" r="2.6"/><circle cx="315" cy="102" r="2.6"/><circle cx="318" cy="101" r="2.6"/><circle cx="305" cy="55" r="2.6"/><circle cx="268" cy="109" r="2.6"/><circle cx="297" cy="83" r="2.6"/><circle cx="264" cy="171" r="2.6"/><circle cx="412" cy="110" r="2.6"/><circle cx="229" cy="111" r="2.6"/><circle cx="447" cy="182" r="2.6"/><circle cx="453" cy="193" r="2.6"/><circle cx="421" cy="134" r="2.6"/><circle cx="392" cy="175" r="2.6"/><circle cx="285" cy="144" r="2.6"/><circle cx="300" cy="135" r="2.6"/><circle cx="445" cy="174" r="2.6"/><circle cx="347" cy="123" r="2.6"/><circle cx="352" cy="52" r="2.6"/><circle cx="259" cy="128" r="2.6"/><circle cx="329" cy="100" r="2.6"/><circle cx="337" cy="118" r="2.6"/><circle cx="365" cy="130" r="2.6"/><circle cx="359" cy="161" r="2.6"/><circle cx="321" cy="109" r="2.6"/><circle cx="330" cy="65" r="2.6"/><circle cx="478" cy="216" r="2.6"/><circle cx="403" cy="57" r="2.6"/><circle cx="213" cy="119" r="2.6"/><circle cx="368" cy="111" r="2.6"/><circle cx="265" cy="120" r="2.6"/><circle cx="272" cy="130" r="2.6"/><circle cx="398" cy="151" r="2.6"/><circle cx="395" cy="166" r="2.6"/><circle cx="282" cy="106" r="2.6"/><circle cx="345" cy="81" r="2.6"/><circle cx="335" cy="34" r="2.6"/><circle cx="325" cy="112" r="2.6"/><circle cx="345" cy="81" r="2.6"/><circle cx="366" cy="94" r="2.6"/><circle cx="371" cy="86" r="2.6"/><circle cx="480" cy="189" r="2.6"/><circle cx="435" cy="188" r="2.6"/><circle cx="353" cy="88" r="2.6"/><circle cx="345" cy="145" r="2.6"/><circle cx="364" cy="38" r="2.6"/><circle cx="169" cy="43" r="2.6"/><circle cx="410" cy="131" r="2.6"/><circle cx="303" cy="128" r="2.6"/><circle cx="275" cy="100" r="2.6"/><circle cx="294" cy="119" r="2.6"/><circle cx="301" cy="196" r="2.6"/><circle cx="338" cy="95" r="2.6"/><circle cx="408" cy="158" r="2.6"/><circle cx="91" cy="97" r="2.6"/><circle cx="260" cy="95" r="2.6"/><circle cx="211" cy="224" r="2.6"/><circle cx="506" cy="270" r="2.6"/><circle cx="399" cy="164" r="2.6"/><circle cx="230" cy="82" r="2.6"/><circle cx="197" cy="56" r="2.6"/><circle cx="417" cy="216" r="2.6"/><circle cx="250" cy="79" r="2.6"/><circle cx="296" cy="174" r="2.6"/><circle cx="296" cy="160" r="2.6"/><circle cx="396" cy="87" r="2.6"/><circle cx="423" cy="158" r="2.6"/><circle cx="388" cy="123" r="2.6"/><circle cx="421" cy="121" r="2.6"/><circle cx="343" cy="192" r="2.6"/><circle cx="347" cy="138" r="2.6"/><circle cx="270" cy="95" r="2.6"/><circle cx="313" cy="88" r="2.6"/><circle cx="250" cy="228" r="2.6"/><circle cx="423" cy="162" r="2.6"/><circle cx="151" cy="59" r="2.6"/><circle cx="261" cy="118" r="2.6"/><circle cx="439" cy="77" r="2.6"/><circle cx="259" cy="62" r="2.6"/><circle cx="168" cy="119" r="2.6"/><circle cx="206" cy="117" r="2.6"/><circle cx="357" cy="98" r="2.6"/><circle cx="265" cy="56" r="2.6"/><circle cx="382" cy="71" r="2.6"/><circle cx="478" cy="147" r="2.6"/><circle cx="256" cy="210" r="2.6"/><circle cx="462" cy="70" r="2.6"/><circle cx="285" cy="99" r="2.6"/><circle cx="411" cy="118" r="2.6"/><circle cx="158" cy="106" r="2.6"/><circle cx="102" cy="94" r="2.6"/><circle cx="415" cy="190" r="2.6"/><circle cx="401" cy="189" r="2.6"/><circle cx="156" cy="86" r="2.6"/><circle cx="397" cy="138" r="2.6"/><circle cx="285" cy="125" r="2.6"/></g><circle cx="347" cy="188" r="7" style="fill:none;stroke:var(--ink);stroke-width:1.6"/><circle cx="620" cy="179" r="7" style="fill:none;stroke:var(--ink);stroke-width:1.6"/><circle cx="40" cy="132" r="7" style="fill:none;stroke:var(--ink);stroke-width:1.6"/><circle cx="459" cy="231" r="7" style="fill:none;stroke:var(--ink);stroke-width:1.6"/><circle cx="378" cy="200" r="7" style="fill:none;stroke:var(--ink);stroke-width:1.6"/></svg>
+      <div class="legend"><span><i style="background:var(--s1)"></i>benigno</span><span><i style="background:var(--s2)"></i>maligno</span><span><i style="background:none;border:1.5px solid var(--ink);border-radius:50%"></i>5 tumores do teste com maior erro de reconstrução</span></div>
+    </div>
+    <p>Os malignos e os benignos ocupam regiões diferentes, apesar de o diagnóstico nunca ter entrado no treino. Uma regressão logística treinada <strong>só com os 2 números latentes</strong> acerta 95.9% no teste. E o K-means com k = 2, aplicado aos pontos latentes do treino, encontra os dois grupos com 88.2% de acerto (ARI 0.577).</p>
+    <div class="note"><span class="lbl">Gerar dados a partir do espaço latente</span>
+      <p>Pode alimentar-se o <strong>decoder</strong> com um ponto qualquer do espaço latente e ver que exemplo ele "imagina". Mas o espaço latente de um AE simples tem buracos entre grupos de pontos: a média de um grupo inteiro pode cair num desses buracos e dar um exemplo sem sentido. É melhor partir de um ponto real, como o exemplo mais próximo do centro do grupo. Andando aos poucos entre dois desses pontos, o exemplo gerado muda gradualmente de um para o outro.</p></div>
+
+    <h2><span class="sn">10.6.6</span>Detetar anomalias</h2>
+    <p>O AE aprende a reconstruir bem o que é <strong>típico</strong> no treino. Exemplos invulgares são mal reconstruídos, por isso o <strong>erro de reconstrução</strong> serve de pontuação de anomalia.</p>
+    <pre><code class="language-python">with torch.no_grad():
+    err = ((ae(Tte) - Tte) ** 2).mean(dim=1).numpy()     # erro por tumor
+np.median(err)                       # 0.0043
+np.argsort(err)[::-1][:5]            # os 5 piores: erro 0.040, 0.024, 0.022, 0.022, 0.021</code></pre>
+    <p>Dos 5 tumores com maior erro, <strong>4 são malignos</strong> (no teste, só 37% o são). Entre eles estão os extremos: um com área média de 2499 (a mediana é 551) e outro, o único benigno, com 244. O AE não sabe o que é "maligno", mas sabe o que é "normal" nos dados que viu.</p>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo, armadilhas e perguntas para testar.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Método</th><th>Ideia</th><th>Parâmetros</th><th>Bom para</th></tr></thead>
+      <tbody>
+        <tr><td><strong>K-means</strong></td><td>k centróides (médias); minimiza a inércia</td><td><code>n_clusters</code>, <code>n_init</code></td><td>Grupos compactos, muitos dados</td></tr>
+        <tr><td><strong>K-medoids</strong></td><td>k medoides (pontos reais); qualquer distância</td><td><code>n_clusters</code>, <code>metric</code></td><td>Outliers, distâncias não euclidianas</td></tr>
+        <tr><td><strong>DBSCAN</strong></td><td>Regiões densas ligadas; o resto é ruído</td><td><code>eps</code>, <code>min_samples</code></td><td>Formas arbitrárias, k desconhecido, anomalias</td></tr>
+        <tr><td><strong>Autoencoder</strong></td><td>Encoder → bottleneck → decoder; reconstruir a entrada</td><td>Tamanho do código, camadas, perda</td><td>Reduzir a dimensão, detetar anomalias</td></tr>
+      </tbody></table></div>
+    <div class="tw"><table>
+      <thead><tr><th>Métrica</th><th>Com rótulos?</th><th>Leitura</th></tr></thead>
+      <tbody>
+        <tr><td>Homogeneidade / completude / V-measure</td><td>sim</td><td>Clusters puros / grupos inteiros / as duas</td></tr>
+        <tr><td>ARI / AMI</td><td>sim</td><td>1 = perfeito, ≈ 0 = acaso</td></tr>
+        <tr><td>Silhueta</td><td>não</td><td>−1 a 1; maior = clusters mais compactos e separados</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">Σ.2</span>Armadilhas frequentes</h2>
+    <ul>
+      <li><strong>Esquecer de normalizar</strong>: a feature com maior escala domina a distância.</li>
+      <li><strong>Comparar números de clusters com classes</strong> sem alinhar: os números do clustering são arbitrários.</li>
+      <li>Escolher k só pela inércia: ela desce <strong>sempre</strong> quando k aumenta.</li>
+      <li>Usar o K-means em formas não convexas (luas, anéis): para isso existe o DBSCAN.</li>
+      <li>Um ε único para clusters de densidades muito diferentes: o DBSCAN parte uns e funde outros.</li>
+      <li>No autoencoder: ajustar o scaler aos dados todos, ou deixar o target ou identificadores na entrada.</li>
+    </ul>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.3</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">Qual é a diferença entre um centróide e um medoide?</p>
+        <div class="opts"><button>Nenhuma: são sinónimos</button><button data-ok>O centróide é a média do cluster, que pode não ser um ponto dos dados; o medoide é sempre um ponto real</button><button>O medoide é a mediana de cada feature</button></div>
+        <p class="why">O medoide é o ponto do cluster com menor soma de distâncias aos outros.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Juntaram-se alguns outliers muito afastados aos dados. Qual dos algoritmos é menos afetado?</p>
+        <div class="opts"><button>K-means</button><button data-ok>K-medoids</button><button>Os dois sofrem por igual</button></div>
+        <p class="why">O K-means usa médias e distâncias ao quadrado, por isso puxa um centro na direção dos outliers ou gasta um cluster com eles.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">O K-means devolveu os rótulos [2, 2, 0, 1] e a verdade é [0, 0, 1, 2]. Qual é o ARI?</p>
+        <div class="opts"><button>0, porque nenhum número coincide</button><button data-ok>1, porque os grupos são exatamente os mesmos, só com outros nomes</button><button>0.5</button></div>
+        <p class="why">O ARI compara pares de pontos (juntos ou separados), não os números dos clusters.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Que métrica de clustering se pode usar sem rótulos verdadeiros?</p>
+        <div class="opts"><button>Adjusted Rand Index</button><button>Homogeneidade</button><button data-ok>Silhueta</button></div>
+        <p class="why">A silhueta só usa as distâncias entre os pontos e os clusters a que foram atribuídos.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">No DBSCAN, o que significa o rótulo −1?</p>
+        <div class="opts"><button>O primeiro cluster</button><button data-ok>Ruído: o ponto não pertence a nenhum cluster</button><button>Um ponto core</button></div>
+        <p class="why">Pontos longe de qualquer ponto core ficam como ruído. É assim que o DBSCAN deteta anomalias.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">No DBSCAN, aumentar muito o ε faz com que…</p>
+        <div class="opts"><button>Haja mais ruído</button><button data-ok>Clusters diferentes se fundam num só</button><button>O número de clusters tenha de ser indicado</button></div>
+        <p class="why">Vizinhanças grandes ligam regiões que deviam estar separadas. Um ε pequeno demais faz o contrário: parte os clusters e cria muito ruído.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Os dados formam duas luas encaixadas. Que algoritmo as separa melhor?</p>
+        <div class="opts"><button>K-means com k = 2</button><button data-ok>DBSCAN</button><button>K-medoids com k = 2</button></div>
+        <p class="why">K-means e K-medoids procuram grupos compactos à volta de um centro e cortam as luas com uma fronteira reta.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Num autoencoder, o que é o bottleneck?</p>
+        <div class="opts"><button>A camada de entrada</button><button data-ok>A representação mais comprimida, entre o encoder e o decoder (o espaço latente)</button><button>A função de perda</button></div>
+        <p class="why">Por ser estreito, obriga a rede a guardar só a informação essencial para reconstruir a entrada.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Como se usa um autoencoder para detetar anomalias?</p>
+        <div class="opts"><button>Pelo valor do target previsto</button><button data-ok>Pelo erro de reconstrução: exemplos invulgares são mal reconstruídos</button><button>Pelo número de épocas de treino</button></div>
+        <p class="why">O AE aprende o que é típico no treino; o que foge ao padrão é reconstruído com erro maior.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">Σ.4</span>Exercício</h2>
+    <p>Com o <code>load_wine</code> (3 castas, 13 features), sem usar o rótulo para treinar:</p>
+    <ol>
+      <li>Aplica K-means, K-medoids e DBSCAN, com e sem normalização. Avalia cada um com o ARI, uma matriz de confusão (depois de alinhar) e um <code>classification_report</code>.</li>
+      <li>Escolhe k pelo cotovelo e pela silhueta, e ε pelo gráfico de k-distâncias. Os critérios concordam com as 3 castas?</li>
+      <li>Treina um autoencoder 13 → 8 → 2 → 8 → 13. As castas separam-se no espaço latente? Que vinhos têm o maior erro de reconstrução?</li>
+    </ol>
+    <details class="ans"><summary>Pistas</summary>
+      <div>
+        <ul>
+          <li>Sem normalização, a prolina (centenas a milhares) domina as distâncias, e o resultado fica muito pior.</li>
+          <li>Com 13 dimensões, o ε não se lê "a olho": usa o gráfico de k-distâncias. Experimenta também reduzir primeiro a dimensão.</li>
+          <li>No AE, usa o <code>MinMaxScaler</code> ajustado ao treino, e uma sigmoide no fim do decoder.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="../assets/vendor/katex/katex.min.js" defer></script>
+<script src="../assets/vendor/katex/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/i18n.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

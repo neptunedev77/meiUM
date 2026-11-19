@@ -142,7 +142,7 @@ section.blk>*,.prose>*,.widget>*,.card>*,.note>*{min-width:0}
 .katex{font-size:1.08em}
 
 /* tabelas */
-.tw{overflow-x:auto;border:1px solid var(--rule);border-radius:8px;background:var(--card)}
+.tw{position:relative;overflow-x:auto;border:1px solid var(--rule);border-radius:8px;background:var(--card)}
 table{border-collapse:collapse;width:100%;font-size:15px}
 th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--rule);vertical-align:top}
 th{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;background:var(--card-2)}

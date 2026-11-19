@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Redes Neuronais: Multilayer Perceptron · DAA · meiUM</title>
+<meta name="description" content="DAA · Tema 9: redes neuronais artificiais e Multilayer Perceptron em PyTorch: camadas, ativações, CrossEntropyLoss, SGD e Adam, inicialização, normalização e avaliação.">
+<!-- partilha: gerado por tools/seo.py -->
+<link rel="canonical" href="https://meium.space/daa/09-neural-networks.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="meiUM">
+<meta property="og:locale" content="pt_PT">
+<meta property="og:title" content="Redes Neuronais: Multilayer Perceptron · DAA">
+<meta property="og:description" content="DAA · Tema 9: redes neuronais artificiais e Multilayer Perceptron em PyTorch: camadas, ativações, CrossEntropyLoss, SGD e Adam, inicialização, normalização e avaliação.">
+<meta property="og:url" content="https://meium.space/daa/09-neural-networks.html">
+<meta property="og:image" content="https://meium.space/assets/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="meiUM: apontamentos do Mestrado em Engenharia Informática da Universidade do Minho">
+<meta name="twitter:card" content="summary_large_image">
+<!-- /partilha -->
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../assets/img/icon-192.png">
+<meta name="theme-color" content="#151d36">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var d=document.documentElement,g=function(k){return JSON.parse(localStorage.getItem('meium:'+k))},t=g('theme'),f=g('fontScale');if(t==='light'||t==='dark')d.dataset.theme=t;if(f)d.style.setProperty('--fs',f);if(g('showExtra')===false)d.classList.add('hide-extra')}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="daa" data-topic="09" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 9.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="9.0" data-title="Visão geral" data-desc="O que é uma rede neuronal e um MLP.">
+  <header class="ph">
+    <h1>Redes Neuronais: Multilayer Perceptron<span class="en">Artificial Neural Networks: Multilayer Perceptron</span></h1>
+    <p class="lede">As <strong>redes neuronais artificiais (ANN)</strong> são modelos computacionais inspirados no sistema nervoso central. Resolvem problemas de <strong>classificação</strong> e de <strong>regressão</strong>.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">9.0.1</span>O Multilayer Perceptron</h2>
+    <p>Um <strong>MLP</strong> é uma rede <strong>feedforward</strong> (a informação só segue para a frente) e <strong>totalmente ligada</strong>: cada neurónio de uma camada liga-se a todos os da camada seguinte. Tem pelo menos <strong>três camadas</strong> de nós: entrada, uma ou mais escondidas e saída. Tirando os nós de entrada, cada nó é um neurónio que costuma usar uma <strong>função de ativação não linear</strong>.</p>
+    <p>É a base das redes neuronais mais complexas e um modelo útil por si só, tanto em classificação como em regressão.</p>
+
+    <h2><span class="sn">9.0.2</span>Frameworks</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Framework</th><th>Origem</th><th>Nota</th></tr></thead>
+      <tbody>
+        <tr><td><strong>PyTorch</strong></td><td>Meta AI, agora na Linux Foundation</td><td>Tensores otimizados com suporte forte a GPU; grafos dinâmicos, estilo "pythónico". É o usado neste tema.</td></tr>
+        <tr><td><strong>TensorFlow</strong></td><td>Google Brain</td><td>Computação numérica com grafos</td></tr>
+        <tr><td><strong>Keras</strong></td><td>—</td><td>Biblioteca de alto nível, sobre TensorFlow (e antes Theano)</td></tr>
+        <tr><td><strong>Theano</strong>, Lasagne, Blocks</td><td>Univ. de Montreal</td><td>Pioneiros, hoje descontinuados</td></tr>
+        <tr><td><strong>MXNet</strong>, CNTK, Caffe, Deeplearning4j</td><td>Amazon, Microsoft, Berkeley, Skymind</td><td>Outras alternativas</td></tr>
+      </tbody></table></div>
+    <p>O PyTorch é muito usado em investigação e em empresas como a Amazon, a Tesla, a Meta e a OpenAI. Uma das razões é o <strong>grafo de computação dinâmico</strong>: a rede é código Python normal, que se pode alterar e depurar como qualquer outro.</p>
+    <div class="note extra"><span class="lbl">TensorFlow hoje <span class="xtag">complemento</span></span>
+      <p>A ideia de que o TensorFlow trata a rede como um objeto estático vem da versão 1. Desde o TensorFlow 2 (2019), a execução imediata (eager) é o modo por omissão, e a diferença para o PyTorch é hoje sobretudo de estilo e de ecossistema.</p></div>
+    <pre data-title="Instalar"><code class="language-bash">pip install torch            # a versão certa para o teu sistema está em pytorch.org/get-started
+pip install torchinfo livelossplot   # resumo da rede e gráficos de treino ao vivo</code></pre>
+
+    <h2><span class="sn">9.0.3</span>O exemplo deste tema</h2>
+    <p>Classificamos vinhos em <strong>3 classes</strong> com o <code>load_wine</code> do scikit-learn: 178 vinhos e 13 medidas químicas cada. É um problema do mesmo tipo de prever a classe (1.ª, 2.ª ou 3.ª) de um passageiro, e tem uma particularidade útil: as features estão em <strong>escalas muito diferentes</strong> (o magnésio vai de 70 a 162, a prolina de 278 a 1680).</p>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <p class="src">Baseado nas aulas de DAA (Artificial Neural Networks: Multilayer Perceptron). Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 9.1 NEURÓNIO E CAMADAS ============================ -->
+<article class="page" data-page="arquitetura" data-num="9.1" data-title="Neurónios, camadas e ativações" data-desc="O que cada neurónio calcula e como as camadas se ligam.">
+  <header class="ph">
+    <h1>Neurónios, camadas e ativações</h1>
+    <p class="lede">Cada neurónio faz uma soma pesada das entradas e aplica-lhe uma função. Uma rede é muitos destes neurónios, organizados em camadas.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">9.1.1</span>Um neurónio</h2>
+    <div class="formula"><div class="cap">Saída de um neurónio <span class="xtag">complemento</span></div>\[a=\varphi\Big(\underbrace{w_1x_1+w_2x_2+\dots+w_nx_n+b}_{z}\Big)\]</div>
+    <p>Os <strong>pesos</strong> \(w\) e o <strong>bias</strong> \(b\) são os parâmetros que o treino ajusta. \(\varphi\) é a <strong>função de ativação</strong>. Uma camada <code>Linear</code> faz o \(z\) de vários neurónios de uma vez; a ativação vem a seguir.</p>
+
+    <h2><span class="sn">9.1.2</span>Funções de ativação</h2>
+    <div class="two">
+      <div class="card"><span class="tag">ReLU · camadas escondidas</span><p>\(\mathrm{ReLU}(z)=\max(0,z)\). Deixa passar os valores positivos e anula os negativos. É simples, rápida e funciona bem nas camadas escondidas.</p></div>
+      <div class="card"><span class="tag">Softmax · saída de classificação</span><p>Transforma os \(C\) valores de saída em <strong>probabilidades</strong> que somam 1: \(\mathrm{softmax}(z)_c=\dfrac{e^{z_c}}{\sum_k e^{z_k}}\). A classe prevista é a de maior probabilidade.</p></div>
+    </div>
+    <p>Sem uma ativação no fim, a saída fica <strong>linear</strong>: os valores brutos, chamados <strong>logits</strong>, que é o que se usa em regressão. E sem ativações não lineares nas camadas escondidas, empilhar camadas não serve de nada: uma composição de funções lineares continua a ser linear.</p>
+    <div class="note extra"><span class="lbl">Outras ativações <span class="xtag">complemento</span></span>
+      <p><strong>Sigmoide</strong> \(1/(1+e^{-z})\), entre 0 e 1, para a saída de uma classificação binária. <strong>Tanh</strong>, entre −1 e 1. Ambas saturam para valores grandes de \(|z|\) (o gradiente fica quase 0), e é por isso que a ReLU as substituiu nas camadas escondidas.</p></div>
+
+    <h2><span class="sn">9.1.3</span>A arquitetura usada</h2>
+    <p>Três camadas lineares, totalmente ligadas: <strong>entrada → 24 → 12 → 3</strong>, com ReLU nas escondidas e uma saída por classe.</p>
+    <div class="card">
+      <svg class="w-svg" viewBox="0 0 640 250" role="img" aria-label="MLP com 13 entradas, camadas escondidas de 24 e 12 neurónios com ReLU e 3 saídas">
+        <g style="font-family:var(--f-display);font-size:12px;font-weight:600">
+          <g style="stroke:var(--rule);stroke-width:.6;opacity:.8">
+            <path d="M70 50L230 40M70 50L230 90M70 50L230 140M70 50L230 190M70 100L230 40M70 100L230 90M70 100L230 140M70 100L230 190M70 150L230 40M70 150L230 90M70 150L230 140M70 150L230 190M70 200L230 40M70 200L230 90M70 200L230 140M70 200L230 190"/>
+            <path d="M230 40L400 70M230 40L400 125M230 40L400 180M230 90L400 70M230 90L400 125M230 90L400 180M230 140L400 70M230 140L400 125M230 140L400 180M230 190L400 70M230 190L400 125M230 190L400 180"/>
+            <path d="M400 70L560 80M400 70L560 125M400 70L560 170M400 125L560 80M400 125L560 125M400 125L560 170M400 180L560 80M400 180L560 125M400 180L560 170"/>
+          </g>
+          <g style="fill:var(--card-2);stroke:var(--ink-2);stroke-width:1.2"><circle cx="70" cy="50" r="12"/><circle cx="70" cy="100" r="12"/><circle cx="70" cy="150" r="12"/><circle cx="70" cy="200" r="12"/></g>
+          <g style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.2"><circle cx="230" cy="40" r="12"/><circle cx="230" cy="90" r="12"/><circle cx="230" cy="140" r="12"/><circle cx="230" cy="190" r="12"/><circle cx="400" cy="70" r="12"/><circle cx="400" cy="125" r="12"/><circle cx="400" cy="180" r="12"/></g>
+          <g style="fill:var(--warn-bg);stroke:var(--warn);stroke-width:1.2"><circle cx="560" cy="80" r="12"/><circle cx="560" cy="125" r="12"/><circle cx="560" cy="170" r="12"/></g>
+          <g style="fill:var(--muted);font-family:var(--f-mono);font-size:14px"><text x="70" y="180" text-anchor="middle">⋮</text><text x="230" y="170" text-anchor="middle">⋮</text></g>
+          <text x="70" y="232" text-anchor="middle" style="fill:var(--ink)">13 entradas</text>
+          <text x="230" y="232" text-anchor="middle" style="fill:var(--ink)">24 · ReLU</text>
+          <text x="400" y="232" text-anchor="middle" style="fill:var(--ink)">12 · ReLU</text>
+          <text x="560" y="232" text-anchor="middle" style="fill:var(--ink)">3 saídas</text>
+          <text x="600" y="129" style="fill:var(--muted);font-family:var(--f-mono);font-size:11px;font-weight:500">logits</text>
+        </g>
+      </svg>
+    </div>
+    <div class="formula"><div class="cap">Número de parâmetros (pesos + bias)</div>\[\underbrace{13\cdot24+24}_{336}+\underbrace{24\cdot12+12}_{300}+\underbrace{12\cdot3+3}_{39}=675\]</div>
+    <p>O número de entradas tem de ser igual ao número de features, e o de saídas ao número de classes. O tamanho das camadas escondidas é um <strong>hiperparâmetro</strong>.</p>
+  </section>
+</article>
+
+<!-- ============================ 9.2 DADOS ============================ -->
+<article class="page" data-page="dados" data-num="9.2" data-title="Preparar os dados" data-desc="Tensores, Dataset, DataLoader e divisão treino/validação/teste.">
+  <header class="ph">
+    <h1>Preparar os dados</h1>
+    <p class="lede">O PyTorch trabalha com <strong>tensores</strong> (arrays multidimensionais, semelhantes aos do NumPy, que podem viver na GPU) e lê os dados em <strong>lotes</strong> através de um <code>DataLoader</code>.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">9.2.1</span>Três conjuntos</h2>
+    <div class="three">
+      <div class="card"><span class="tag">Treino</span><p>Onde a rede ajusta os pesos.</p></div>
+      <div class="card"><span class="tag">Validação</span><p>Avaliado no fim de cada época, sem treinar. Serve para acompanhar o treino e escolher hiperparâmetros.</p></div>
+      <div class="card"><span class="tag">Teste</span><p>Usado <strong>uma vez</strong>, no fim, para estimar o desempenho real.</p></div>
+    </div>
+    <pre><code class="language-python">import numpy as np, torch
+from torch import nn
+from torch.utils.data import TensorDataset, DataLoader
+from sklearn.datasets import load_wine
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+X, y = load_wine(return_X_y=True)                       # 178 × 13, classes 0, 1, 2
+X_tmp, X_test, y_tmp, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+X_train, X_val, y_train, y_val = train_test_split(X_tmp, y_tmp, test_size=0.25, random_state=42, stratify=y_tmp)
+# 106 treino, 36 validação, 36 teste
+
+sc = StandardScaler().fit(X_train)                      # ajustado só no treino
+T = lambda a: torch.tensor(sc.transform(a), dtype=torch.float32)
+
+train_dl = DataLoader(TensorDataset(T(X_train), torch.tensor(y_train)), batch_size=16, shuffle=True)
+xb, yb = next(iter(train_dl))
+xb.shape, yb.shape                                      # (torch.Size([16, 13]), torch.Size([16]))</code></pre>
+    <div class="note"><span class="lbl">Dataset próprio</span>
+      <p>Para ler de um CSV, escreve-se uma classe com <code>__len__</code> e <code>__getitem__</code> (que devolve um par <code>[X[i], y[i]]</code>). O <code>torch.utils.data.random_split</code> divide-a depois em treino, teste e validação pelas proporções pedidas, por exemplo 70/10/20.</p></div>
+    <div class="note warn"><span class="lbl">Divisão aleatória vs. estratificada</span>
+      <p>O <code>random_split</code> não estratifica: num conjunto pequeno, uma classe pode ficar sub-representada no teste. Por isso, convém sempre <strong>verificar o equilíbrio das classes</strong> em cada conjunto. Aqui usou-se o <code>train_test_split(..., stratify=y)</code>, que mantém as proporções (59/71/48 vinhos por classe).</p></div>
+
+    <h2><span class="sn">9.2.2</span>Normalizar</h2>
+    <p>A <strong>normalização</strong> põe as features numa escala comum, o que acelera o treino e melhora o resultado. Há duas formas habituais:</p>
+    <div class="two">
+      <div class="card"><span class="tag">Min-max</span><p>\(x'=\dfrac{x-\min}{\max-\min}\), para o intervalo [0, 1].</p></div>
+      <div class="card"><span class="tag">Standardização</span><p>\(x'=\dfrac{x-\mu}{\sigma}\), para média 0 e desvio padrão 1. É o que faz o <code>StandardScaler</code>.</p></div>
+    </div>
+    <p>Para uma rede neuronal, normalizam-se <strong>todas</strong> as features numéricas, e não só algumas. Basta uma feature ficar na escala original para dominar as somas pesadas e estragar o treino (ver a experiência em 9.5). Os mínimos, máximos, médias e desvios calculam-se <strong>só no treino</strong> e aplicam-se depois à validação e ao teste.</p>
+  </section>
+</article>
+
+<!-- ============================ 9.3 MODELO ============================ -->
+<article class="page" data-page="modelo" data-num="9.3" data-title="Construir o modelo" data-desc="nn.Module, Linear, ReLU e inicialização dos pesos.">
+  <header class="ph">
+    <h1>Construir o modelo</h1>
+    <p class="lede">Em PyTorch, uma rede é uma classe que herda de <code>nn.Module</code>: declaram-se as camadas no <code>__init__</code> e define-se o caminho dos dados no <code>forward</code>.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">9.3.1</span>As peças</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Classe</th><th>Função</th></tr></thead>
+      <tbody>
+        <tr><td><code>torch.nn.Module</code></td><td>Classe base de todas as redes</td></tr>
+        <tr><td><code>torch.nn.Linear(in_features, out_features, bias=True)</code></td><td>Camada totalmente ligada: \(z = xW^\top + b\)</td></tr>
+        <tr><td><code>torch.nn.ReLU()</code></td><td>Ativação ReLU, elemento a elemento</td></tr>
+        <tr><td><code>torch.nn.Softmax(dim=1)</code></td><td>Converte as saídas em probabilidades por classe; <code>dim=1</code> é a dimensão das classes num lote</td></tr>
+      </tbody></table></div>
+    <pre><code class="language-python">class MLP(nn.Module):
+    def __init__(self, n_inputs):
+        super().__init__()
+        self.hidden1 = nn.Linear(n_inputs, 24)
+        self.hidden2 = nn.Linear(24, 12)
+        self.hidden3 = nn.Linear(12, 3)        # uma saída por classe
+        self.act = nn.ReLU()
+
+    def forward(self, X):
+        X = self.act(self.hidden1(X))
+        X = self.act(self.hidden2(X))
+        return self.hidden3(X)                 # logits: sem softmax (ver o aviso abaixo)
+
+model = MLP(13)
+sum(p.numel() for p in model.parameters())     # 675</code></pre>
+    <div class="note warn"><span class="lbl">Softmax + <code>CrossEntropyLoss</code>: um erro comum</span>
+      <p>A <code>nn.CrossEntropyLoss</code> do PyTorch <strong>já aplica o softmax internamente</strong> e espera receber os <strong>logits</strong>. Se a rede acabar num <code>Softmax</code>, ele é aplicado duas vezes. A rede continua a treinar, mas muito pior: os gradientes ficam pequenos e a perda nem chega a zero. Nas experiências deste tema, ao fim de 200 épocas a perda de treino era 0.613 com softmax duplo e 0.027 sem ele. Mesmo uma previsão perfeita nunca dá perda abaixo de ≈ 0.55.</p>
+      <p>A regra: treina-se com logits e aplica-se o softmax só quando se querem ver as probabilidades: <code>torch.softmax(model(x), dim=1)</code>.</p></div>
+
+    <h2><span class="sn">9.3.2</span>Inicialização dos pesos</h2>
+    <p>Os pesos começam com valores aleatórios. A forma de os sortear influencia a rapidez e a estabilidade do treino.</p>
+    <div class="two">
+      <div class="card"><span class="tag">Xavier (Glorot)</span><p><code>nn.init.xavier_uniform_(tensor)</code>. Mantém a variância dos sinais entre camadas; pensada para ativações simétricas (tanh, sigmoide, saída linear).</p></div>
+      <div class="card"><span class="tag">Kaiming (He)</span><p><code>nn.init.kaiming_uniform_(tensor, nonlinearity='relu')</code>. Pensada para camadas seguidas de ReLU, que anula metade dos valores.</p></div>
+    </div>
+    <pre><code class="language-python">nn.init.kaiming_uniform_(model.hidden1.weight, nonlinearity='relu')
+nn.init.kaiming_uniform_(model.hidden2.weight, nonlinearity='relu')
+nn.init.xavier_uniform_(model.hidden3.weight)</code></pre>
+    <p>O <code>nn.Linear</code> já tem uma inicialização por omissão razoável (uma variante de Kaiming uniforme). Numa rede pequena como esta, mudar a inicialização quase não altera o resultado (ver 9.5). A diferença nota-se em redes <strong>profundas</strong>, onde uma má escala inicial faz os sinais explodir ou desaparecer camada após camada.</p>
+  </section>
+</article>
+
+<!-- ============================ 9.4 TREINO ============================ -->
+<article class="page" data-page="treino" data-num="9.4" data-title="Treinar" data-desc="Função de perda, otimizadores e o ciclo de treino.">
+  <header class="ph">
+    <h1>Treinar a rede</h1>
+    <p class="lede">Treinar é repetir quatro passos: prever, medir o erro com a <strong>função de perda</strong>, calcular os gradientes (<strong>backpropagation</strong>) e ajustar os pesos com o <strong>otimizador</strong>.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">9.4.1</span>Função de perda</h2>
+    <p>A <code>nn.CrossEntropyLoss(weight=None, ..., label_smoothing=0.0)</code> é a perda para classificação com \(C\) classes:</p>
+    <ul>
+      <li>Recebe os rótulos como <strong>inteiros</strong> de 0 a \(C-1\): não é preciso fazer one-hot encoding.</li>
+      <li>O argumento <code>weight</code> dá um peso a cada classe. Pesos maiores nas classes raras fazem a rede prestar-lhes mais atenção, o que é útil com <strong>dados desequilibrados</strong>. A isto chama-se uma perda <strong>assimétrica</strong> ou pesada.</li>
+    </ul>
+    <div class="formula"><div class="cap">Entropia cruzada de um exemplo da classe c <span class="xtag">complemento</span></div>\[\mathcal{L}=-\log\big(\mathrm{softmax}(z)_c\big)\]</div>
+    <p class="extra"><span class="xtag">complemento</span> Se a rede dá probabilidade 1 à classe certa, a perda é 0. Se dá 1/3 a cada uma das 3 classes (não sabe nada), a perda é \(\log 3\approx1.099\). Este valor é uma boa referência para ler as curvas de treino.</p>
+
+    <h2><span class="sn">9.4.2</span>Otimizadores</h2>
+    <div class="two">
+      <div class="card"><span class="tag">SGD</span><p><code>torch.optim.SGD(params, lr=0.001, momentum=0)</code>. Dá um passo contra o gradiente, de tamanho <code>lr</code>. Com <code>momentum=0.9</code>, acumula uma "velocidade" que amortece as oscilações e acelera nas direções consistentes.</p></div>
+      <div class="card"><span class="tag">Adam</span><p><code>torch.optim.Adam(params, lr=0.001, betas=(0.9, 0.999))</code>. Momentum e, além disso, um <strong>passo adaptativo por parâmetro</strong>, dividido pela magnitude típica do gradiente desse parâmetro. É menos sensível à escala e ao learning rate.</p></div>
+    </div>
+    <div class="widget" data-widget="gd"></div>
+
+    <h2><span class="sn">9.4.3</span>O ciclo de treino</h2>
+    <pre><code class="language-python">EPOCHS, LEARNING_RATE = 200, 0.001
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, momentum=0.9)
+
+for epoch in range(EPOCHS):                    # 1 época = passar por todo o treino uma vez
+    model.train()
+    for inputs, labels in train_dl:            # um lote de cada vez
+        outputs = model(inputs)                # 1. prever
+        loss = criterion(outputs, labels)      # 2. medir o erro
+        optimizer.zero_grad()                  #    limpar os gradientes do lote anterior
+        loss.backward()                        # 3. backpropagation
+        optimizer.step()                       # 4. ajustar os pesos
+
+    model.eval()                               # validação no fim de cada época, sem treinar
+    with torch.no_grad():
+        val_loss = criterion(model(T(X_val)), torch.tensor(y_val)).item()</code></pre>
+    <div class="tw"><table>
+      <thead><tr><th>Hiperparâmetro</th><th>O que é</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Épocas</strong></td><td>Quantas vezes cada exemplo passa pela rede durante o treino</td></tr>
+        <tr><td><strong>Batch size</strong></td><td>Quantos exemplos por atualização dos pesos</td></tr>
+        <tr><td><strong>Learning rate</strong></td><td>O tamanho de cada passo do otimizador</td></tr>
+      </tbody></table></div>
+    <div class="note"><span class="lbl"><code>zero_grad</code>, <code>train</code> e <code>eval</code></span>
+      <ul>
+        <li>O PyTorch <strong>acumula</strong> os gradientes: sem <code>optimizer.zero_grad()</code>, cada lote somava os gradientes dos anteriores.</li>
+        <li><code>model.train()</code> e <code>model.eval()</code> mudam o comportamento de camadas como Dropout e BatchNorm. O <code>torch.no_grad()</code> desliga o cálculo de gradientes na avaliação, o que poupa memória e tempo.</li>
+      </ul></div>
+
+    <h2><span class="sn">9.4.4</span>Ler as curvas de treino</h2>
+    <p>A biblioteca <code>livelossplot</code> desenha, ao vivo, a perda de treino e de validação em cada época. A leitura é a mesma em qualquer framework:</p>
+    <div class="tw"><table>
+      <thead><tr><th>O que se vê</th><th>Diagnóstico</th><th>O que fazer</th></tr></thead>
+      <tbody>
+        <tr><td>As duas curvas descem e ficam próximas</td><td>Bom treino</td><td>—</td></tr>
+        <tr><td>A perda fica parada perto de \(\log C\)</td><td>A rede não aprende (prevê ao calhas ou a classe maioritária)</td><td>Normalizar, subir o learning rate, rever a arquitetura</td></tr>
+        <tr><td>O treino desce mas a validação sobe</td><td><strong>Overfitting</strong></td><td>Menos épocas (early stopping), rede mais pequena, regularização</td></tr>
+        <tr><td>A perda oscila muito ou dá <code>nan</code></td><td>Learning rate demasiado alto</td><td>Baixar o learning rate</td></tr>
+      </tbody></table></div>
+  </section>
+</article>
+
+<!-- ============================ 9.5 EXPERIÊNCIAS ============================ -->
+<article class="page" data-page="experiencias" data-num="9.5" data-title="Comparar configurações" data-desc="Normalização, inicialização, otimizador e pesos: o que muda mesmo.">
+  <header class="ph">
+    <h1>Comparar configurações</h1>
+    <p class="lede">A mesma rede (13 → 24 → 12 → 3, 200 épocas, lr = 0.001, lotes de 16) treinada com variações, uma de cada vez. Cada configuração foi treinada com <strong>5 sementes</strong> diferentes, para separar o efeito real da sorte.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">9.5.1</span>Resultados</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Modelo</th><th>Inicialização</th><th>Normalização</th><th>Otimizador</th><th>Accuracy no teste (5 sementes)</th></tr></thead>
+      <tbody>
+        <tr><td><strong>M1</strong></td><td>por omissão</td><td>—</td><td>SGD</td><td>0.389 ± 0.000</td></tr>
+        <tr><td><strong>M2</strong></td><td>Kaiming + Xavier</td><td>—</td><td>SGD</td><td>0.389 ± 0.000</td></tr>
+        <tr><td><strong>M3</strong></td><td>por omissão</td><td>StandardScaler</td><td>SGD</td><td>0.967 ± 0.011</td></tr>
+        <tr><td><strong>M4</strong></td><td>por omissão</td><td>StandardScaler</td><td>Adam</td><td><strong>0.972 ± 0.000</strong></td></tr>
+        <tr><td>M4 + init</td><td>Kaiming + Xavier</td><td>StandardScaler</td><td>Adam</td><td>0.967 ± 0.011</td></tr>
+        <tr><td><strong>M5</strong></td><td>por omissão</td><td>StandardScaler</td><td>Adam, perda pesada (1.01, 0.82, 1.26)</td><td>0.972 ± 0.000</td></tr>
+        <tr><td>M3 com softmax + CE</td><td>por omissão</td><td>StandardScaler</td><td>SGD</td><td>0.956 ± 0.052</td></tr>
+      </tbody></table></div>
+    <pre data-title="Perda de treino ao longo das épocas (semente 0)"><code class="language-text">época          1       10       50      100      200
+brutos, SGD  15.933    1.099    1.086    1.084    1.084   ← parada em log 3 ≈ 1.099
+norm., SGD    1.096    1.029    0.493    0.098    0.027
+norm., Adam   1.084    0.732    0.017    0.003    0.001</code></pre>
+
+    <h2><span class="sn">9.5.2</span>O que se conclui</h2>
+    <details class="ans"><summary>Porque é que M1 e M2 ficam nos 0.389? Pensa primeiro, depois abre</summary>
+      <div>
+        <p>0.389 é a proporção da classe mais frequente no teste (14 em 36): a rede prevê <strong>sempre a mesma classe</strong>. Com a prolina a valer centenas ou milhares, as somas pesadas são enormes logo à partida (perda inicial de 15.9), os ReLU saturam ou morrem, e a perda fica parada em log 3. Mudar a inicialização não resolve, porque o problema está nos dados, não nos pesos.</p>
+      </div>
+    </details>
+    <details class="ans"><summary>O que fez a maior diferença?</summary>
+      <div>
+        <ul>
+          <li><strong>A normalização</strong>, de longe: de 0.39 para 0.97. Numa rede neuronal, escalar <strong>todas</strong> as features não é um pormenor.</li>
+          <li><strong>O Adam</strong> chegou ao mesmo nível muito mais depressa (perda 0.017 à época 50, contra 0.493 com SGD) e foi mais estável entre sementes.</li>
+          <li><strong>A inicialização e os pesos da perda</strong> quase não mudaram nada: a rede é pequena e as classes estão pouco desequilibradas.</li>
+          <li><strong>O softmax duplo</strong> piorou a média e aumentou muito a variância (uma das sementes caiu para 0.861).</li>
+        </ul>
+      </div>
+    </details>
+    <div class="note warn"><span class="lbl">Cuidado com conclusões de uma só corrida</span>
+      <p>Com 36 vinhos no teste, cada erro vale 2.8 pontos percentuais. Com um teste ainda mais pequeno, ou avaliado só no primeiro lote (um <code>break</code> no ciclo de avaliação), a accuracy de uma única corrida pode variar dezenas de pontos só por causa da semente. Antes de dizer "o Adam piorou" ou "a inicialização estragou", repete-se com várias sementes, ou usa-se validação cruzada, e olha-se para as curvas de perda.</p></div>
+
+    <h2><span class="sn">9.5.3</span>Prever um caso</h2>
+    <pre><code class="language-python">model.eval()
+with torch.no_grad():
+    z = model(T(X_test[:1]))          # logits: [[10.16, -5.03, -6.74]]
+    torch.softmax(z, dim=1)           # probabilidades: [[1.000, 0.000, 0.000]]
+    z.argmax(1).item()                # 0  ← classe prevista (e a verdadeira também é 0)</code></pre>
+
+    <h2><span class="sn">9.5.4</span>E os modelos clássicos?</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Modelo</th><th>Accuracy no teste</th></tr></thead>
+      <tbody>
+        <tr><td>Árvore de decisão</td><td>0.889</td></tr>
+        <tr><td>MLP (M4)</td><td>0.972</td></tr>
+        <tr><td>Random Forest</td><td>1.000</td></tr>
+      </tbody></table></div>
+    <p>Em dados <strong>tabulares e pequenos</strong>, uma Random Forest iguala ou bate um MLP, sem normalização nem escolha de learning rate. As redes neuronais ganham vantagem com muitos dados e dados não estruturados (imagem, som, texto). É sempre boa prática comparar com um modelo clássico antes de concluir que uma rede é a melhor opção.</p>
+    <div class="note extra"><span class="lbl">MLP sem PyTorch <span class="xtag">complemento</span></span>
+      <p>Para experiências rápidas em dados tabulares, o scikit-learn tem o <code>MLPClassifier(hidden_layer_sizes=(24, 12), solver='adam')</code>, com a mesma interface de <code>fit</code> e <code>predict</code> dos outros modelos, e que pode entrar num <code>Pipeline</code> com o <code>StandardScaler</code> e num <code>GridSearchCV</code>.</p></div>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo, armadilhas e perguntas para testar.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Peça</th><th>Ideia-chave</th></tr></thead>
+      <tbody>
+        <tr><td><strong>MLP</strong></td><td>Feedforward, totalmente ligado, ≥ 3 camadas, ativações não lineares</td></tr>
+        <tr><td><strong>Neurónio</strong></td><td>\(a=\varphi(w\cdot x+b)\)</td></tr>
+        <tr><td><strong>ReLU / Softmax</strong></td><td>Camadas escondidas / probabilidades na saída de classificação</td></tr>
+        <tr><td><strong><code>nn.Linear(in, out)</code></strong></td><td>in·out pesos + out bias</td></tr>
+        <tr><td><strong><code>CrossEntropyLoss</code></strong></td><td>Recebe logits e rótulos inteiros; <code>weight</code> para classes desequilibradas</td></tr>
+        <tr><td><strong>SGD / Adam</strong></td><td>Passo fixo (com momentum) / passo adaptativo por parâmetro</td></tr>
+        <tr><td><strong>Xavier / Kaiming</strong></td><td>Inicialização para ativações simétricas / para ReLU</td></tr>
+        <tr><td><strong>Ciclo</strong></td><td><code>model(x)</code> → <code>loss</code> → <code>zero_grad</code> → <code>backward</code> → <code>step</code></td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">Σ.2</span>Armadilhas frequentes</h2>
+    <ul>
+      <li><strong>Não normalizar todas as features</strong>: uma só feature numa escala grande pode impedir a rede de aprender.</li>
+      <li><strong>Softmax antes da <code>CrossEntropyLoss</code></strong>: o softmax fica aplicado duas vezes.</li>
+      <li>Esquecer o <code>optimizer.zero_grad()</code>: os gradientes acumulam-se entre lotes.</li>
+      <li>Avaliar sem <code>model.eval()</code> e <code>torch.no_grad()</code>, ou só sobre <strong>um lote</strong> do teste.</li>
+      <li>Ajustar o scaler ao conjunto inteiro, em vez de só ao treino (fuga de informação).</li>
+      <li>Tirar conclusões de <strong>uma só corrida</strong> num teste pequeno.</li>
+    </ul>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.3</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">Quantos parâmetros tem uma camada <code>nn.Linear(10, 4)</code>?</p>
+        <div class="opts"><button>40</button><button data-ok>44</button><button>14</button></div>
+        <p class="why">10 × 4 = 40 pesos, mais 4 bias (um por neurónio de saída).</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Porque é que um MLP precisa de ativações não lineares nas camadas escondidas?</p>
+        <div class="opts"><button>Para treinar mais depressa</button><button data-ok>Sem elas, várias camadas lineares equivalem a uma só, e a rede só aprende fronteiras lineares</button><button>Para as saídas somarem 1</button></div>
+        <p class="why">Uma composição de funções lineares é linear. Somar as probabilidades a 1 é o papel do softmax, na saída.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Em PyTorch, a rede acaba numa camada <code>Softmax</code> e treina com <code>CrossEntropyLoss</code>. O que acontece?</p>
+        <div class="opts"><button>Nada: é a configuração recomendada</button><button data-ok>O softmax fica aplicado duas vezes, porque a perda já o inclui, e o treino fica mais lento e pior</button><button>Dá erro ao executar</button></div>
+        <p class="why">A <code>CrossEntropyLoss</code> espera logits. Com o softmax duplo, a perda deixa de poder chegar a zero e os gradientes ficam pequenos.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Uma rede de classificação com 3 classes tem a perda parada em ≈ 1.10 desde as primeiras épocas. O que indica?</p>
+        <div class="opts"><button>Overfitting</button><button data-ok>A rede não está a aprender: 1.10 ≈ log 3 é a perda de quem não sabe distinguir as classes</button><button>O learning rate é ideal</button></div>
+        <p class="why">Causas típicas: features por normalizar, learning rate inadequado, softmax duplo.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual é a principal diferença entre o Adam e o SGD?</p>
+        <div class="opts"><button>O Adam não usa gradientes</button><button data-ok>O Adam adapta o tamanho do passo a cada parâmetro, com base na magnitude dos seus gradientes</button><button>O Adam só funciona com regressão</button></div>
+        <p class="why">O Adam junta momentum com um passo adaptativo, o que o torna menos sensível à escala das features e ao learning rate.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Para que serve o argumento <code>weight</code> da <code>CrossEntropyLoss</code>?</p>
+        <div class="opts"><button>Para inicializar os pesos da rede</button><button data-ok>Para dar mais peso aos erros em certas classes, por exemplo nas raras, em dados desequilibrados</button><button>Para definir o learning rate</button></div>
+        <p class="why">É uma perda pesada (assimétrica): errar uma classe com peso maior custa mais.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">A perda de treino continua a descer, mas a de validação começou a subir. O que fazer?</p>
+        <div class="opts"><button>Treinar mais épocas</button><button data-ok>Parar mais cedo (early stopping) ou regularizar: a rede está a fazer overfitting</button><button>Aumentar o learning rate</button></div>
+        <p class="why">A rede começa a decorar o treino; o modelo a guardar é o da época com menor perda de validação.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Para que serve chamar <code>optimizer.zero_grad()</code> em cada lote?</p>
+        <div class="opts"><button data-ok>Para limpar os gradientes do lote anterior, porque o PyTorch os acumula</button><button>Para pôr os pesos a zero</button><button>Para desligar o cálculo de gradientes na avaliação</button></div>
+        <p class="why">Desligar os gradientes na avaliação é o papel do <code>torch.no_grad()</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">Σ.4</span>Exercício</h2>
+    <p>Partindo do modelo M4:</p>
+    <ol>
+      <li>Varia a arquitetura: (8), (24, 12), (64, 32) e (24, 12, 6) neurónios nas camadas escondidas. O que acontece à accuracy de validação e ao tempo de treino?</li>
+      <li>Varia o treino: learning rate 0.0001, 0.001 e 0.01; 50, 200 e 500 épocas. Qual é a melhor combinação? Há sinais de overfitting nas curvas?</li>
+      <li>Compara o melhor MLP com uma árvore de decisão e uma Random Forest, usando várias sementes. Qual escolherias, e porquê?</li>
+    </ol>
+    <details class="ans"><summary>Pistas</summary>
+      <div>
+        <ul>
+          <li>Escolhe a configuração pela <strong>validação</strong>, e só no fim avalia a escolhida no teste.</li>
+          <li>Com lr = 0.01 e 500 épocas, procura a época em que a perda de validação é mínima: é aí que deverias parar.</li>
+          <li>Neste dataset há pouca margem para melhorar (já está perto de 97%). Pensa também em simplicidade e em interpretabilidade, e não só na accuracy.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="../assets/vendor/katex/katex.min.js" defer></script>
+<script src="../assets/vendor/katex/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/i18n.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>
