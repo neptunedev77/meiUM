@@ -984,6 +984,62 @@
   };
 
   /* =====================================================================
+     shapley — valores de Shapley exatos num modelo de 3 features binárias
+     v(S) = previsão média quando só se conhecem as features de S
+     (as outras valem 0 ou 1 com probabilidade 1/2, independentes)
+     ===================================================================== */
+  W.shapley = el => {
+    const F = [
+      { k: 'A', name: 'tumor grande' },
+      { k: 'B', name: 'contorno irregular' },
+      { k: 'C', name: 'textura alta' }
+    ];
+    const f = (a, b, c) => 0.05 + 0.30 * a + 0.20 * b + 0.05 * c + 0.30 * a * b;
+    const x = [1, 1, 0];
+    el.innerHTML = head(el, 'Calcular valores de Shapley à mão', 'Modelo de risco: P(maligno) = 0.05 + 0.30·A + 0.20·B + 0.05·C + 0.30·A·B. O último termo é uma interação: tumor grande <i>e</i> contorno irregular juntos pesam mais. Escolhe o doente.') + `
+      <div class="row">${F.map((d, i) => `<span class="sh-pick"><span>${d.k}: ${d.name}</span><span class="lang-seg" role="group" aria-label="${d.name}"><button type="button" data-f="${i}" data-v="0">não</button><button type="button" data-f="${i}" data-v="1">sim</button></span></span>`).join('')}</div>
+      <div class="tw"><table class="sh-tab"></table></div>
+      <div class="sh-wf"></div><p class="w-out"></p>`;
+    const tab = el.querySelector('.sh-tab'), wf = el.querySelector('.sh-wf'), out = el.querySelector('.w-out');
+    /* média de f quando as features fora de S são desconhecidas (0 ou 1, prob. 1/2) */
+    const v = S => {
+      let sum = 0;
+      for (let m = 0; m < 8; m++) sum += f(...[0, 1, 2].map(i => (S.includes(i) ? x[i] : (m >> i) & 1)));
+      return sum / 8;
+    };
+    const perms = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+    const p3 = n => fmt(n, 3), sg = n => (n >= 0 ? '+' : '−') + fmt(Math.abs(n), 3);
+    function draw() {
+      el.querySelectorAll('[data-f]').forEach(b => b.setAttribute('aria-pressed', x[+b.dataset.f] === +b.dataset.v));
+      const phi = [0, 0, 0];
+      const rows = perms.map(o => {
+        const S = [], m = [0, 0, 0];
+        o.forEach(i => { const before = v(S); S.push(i); m[i] = v(S) - before; phi[i] += m[i] / 6; });
+        return `<tr><td class="mono">${o.map(i => F[i].k).join(' → ')}</td>${m.map(c => `<td class="num">${sg(c)}</td>`).join('')}</tr>`;
+      }).join('');
+      const base = v([]), fx = f(...x);
+      tab.innerHTML = `<thead><tr><th>Ordem de chegada</th>${F.map(d => `<th class="num">${d.k}</th>`).join('')}</tr></thead><tbody>${rows}
+        <tr class="sh-tot"><td><b>Média = φ</b></td>${phi.map(c => `<td class="num"><b>${sg(c)}</b></td>`).join('')}</tr></tbody>`;
+      /* waterfall: da previsão média até à previsão deste doente */
+      const MAX = 0.9;
+      let acc = base;
+      const bar = (lbl, from, to, cls) => {
+        const l = Math.min(from, to) / MAX * 100, w = Math.max(Math.abs(to - from) / MAX * 100, 0.4);
+        return `<div class="sh-row"><span>${lbl}</span><div class="sh-track"><i class="${cls}" style="left:${l}%;width:${w}%"></i></div><b>${cls === 'base' || cls === 'fx' ? p3(to) : sg(to - from)}</b></div>`;
+      };
+      wf.innerHTML = bar('E[f(X)], a média', 0, base, 'base') +
+        F.map((d, i) => { const from = acc; acc += phi[i]; return bar(`${d.k} = ${x[i] ? 'sim' : 'não'}`, from, acc, phi[i] >= 0 ? 'up' : 'down'); }).join('') +
+        bar('f(x), este doente', 0, fx, 'fx');
+      const total = base + phi.reduce((a, b) => a + b, 0);
+      out.innerHTML = `Soma: ${p3(base)} ${phi.map(sg).join(' ')} = <b>${p3(total)}</b>, exatamente a previsão f(x) = ${p3(fx)}. ` +
+        (x[0] && x[1] ? 'A interação A·B foi <b>repartida entre A e B</b>: o contributo de cada uma depende de a outra já ser conhecida, e o Shapley faz a média das ordens.'
+          : 'Repara que o contributo marginal de uma feature muda com a ordem quando há interação: o Shapley resolve isso fazendo a média de todas as ordens.');
+    }
+    el.addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) { x[+b.dataset.f] = +b.dataset.v; draw(); } });
+    draw();
+  };
+
+  /* =====================================================================
      k8s — um Deployment a manter o estado desejado (self-healing e scheduling)
      cada nó aguenta 3 Pods; o controlador faz uma correção de cada vez
      ===================================================================== */

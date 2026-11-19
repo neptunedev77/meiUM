@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Interpretabilidade e Explicabilidade · DAA · meiUM</title>
+<meta name="description" content="DAA · Tema 8: interpretabilidade e explicabilidade de modelos, importância das features global e local, MDI (Gini), importância por permutação e valores SHAP.">
+<!-- partilha: gerado por tools/seo.py -->
+<link rel="canonical" href="https://meium.space/daa/08-interpretability.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="meiUM">
+<meta property="og:locale" content="pt_PT">
+<meta property="og:title" content="Interpretabilidade e Explicabilidade · DAA">
+<meta property="og:description" content="DAA · Tema 8: interpretabilidade e explicabilidade de modelos, importância das features global e local, MDI (Gini), importância por permutação e valores SHAP.">
+<meta property="og:url" content="https://meium.space/daa/08-interpretability.html">
+<meta property="og:image" content="https://meium.space/assets/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="meiUM: apontamentos do Mestrado em Engenharia Informática da Universidade do Minho">
+<meta name="twitter:card" content="summary_large_image">
+<!-- /partilha -->
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../assets/img/icon-192.png">
+<meta name="theme-color" content="#151d36">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<script>try{var d=document.documentElement,g=function(k){return JSON.parse(localStorage.getItem('meium:'+k))},t=g('theme'),f=g('fontScale');if(t==='light'||t==='dark')d.dataset.theme=t;if(f)d.style.setProperty('--fs',f);if(g('showExtra')===false)d.classList.add('hide-extra')}catch(e){}</script>
+</head>
+<body data-view="topic" data-uc="daa" data-topic="08" data-root="..">
+<div class="app">
+<nav class="nav" id="nav" aria-label="Índice"></nav>
+<main id="main">
+
+<!-- ============================ 8.0 VISÃO GERAL ============================ -->
+<article class="page" data-page="inicio" data-num="8.0" data-title="Visão geral" data-desc="Porque é que não basta um modelo acertar.">
+  <header class="ph">
+    <h1>Interpretabilidade e Explicabilidade<span class="en">Interpretability and Explainability</span></h1>
+    <p class="lede">Um modelo com 97% de accuracy ainda deixa uma pergunta em aberto: <strong>porque é que decidiu assim?</strong> Este tema trata das técnicas para responder a essa pergunta, para o modelo inteiro e para cada previsão.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">8.0.1</span>Dois conceitos próximos</h2>
+    <div class="two">
+      <div class="card"><span class="tag">Interpretabilidade · porquê</span><p>Perceber <strong>a causa da decisão</strong> do modelo: compreender o seu comportamento e o processo pelo qual chega a uma previsão.</p></div>
+      <div class="card"><span class="tag">Explicabilidade · como</span><p>Explicar o comportamento do modelo <strong>depois de treinado</strong> (post hoc), e <strong>comunicar</strong> essa explicação a quem usa o modelo: que features pesaram e como.</p></div>
+    </div>
+    <p>As duas dão <strong>transparência</strong> a decisões automáticas, o que permite <strong>confiança</strong>, <strong>responsabilização</strong> e a possibilidade de <strong>depurar</strong> o modelo quando algo corre mal. Isto conta sobretudo quando a decisão afeta pessoas: um crédito recusado, um diagnóstico, uma seleção para entrevista.</p>
+    <div class="note"><span class="lbl">Onde entra no ciclo de vida</span>
+      <p>Depois de treinar os modelos candidatos e ao avaliá-los: além de "qual acerta mais?", pergunta-se "acerta pelas razões certas?". Um modelo que acerta por usar uma feature que não devia (um identificador, uma fuga de informação do target) só se apanha olhando para as explicações.</p></div>
+
+    <h2><span class="sn">8.0.2</span>O exemplo deste tema</h2>
+    <p>Usamos o <code>load_breast_cancer</code> (569 tumores, 30 features numéricas, 1 = maligno), dividido 70/30 de forma estratificada. O modelo principal é uma Random Forest, e a pergunta é a mesma de qualquer problema de classificação: porque é que este tumor foi classificado como benigno, e que medidas pesam mais no modelo em geral?</p>
+    <pre><code class="language-python">import numpy as np, pandas as pd
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+
+data = load_breast_cancer(as_frame=True)
+X, y = data.data, 1 - data.target            # 1 = maligno
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, stratify=y)
+
+rf = RandomForestClassifier(n_estimators=100, random_state=42).fit(X_train, y_train)
+rf.score(X_test, y_test)                     # 0.965</code></pre>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">⌁</span>Mapa do tema</h2>
+    <div data-map></div>
+    <p class="src">Baseado nas aulas de DAA (Interpretability and Explainability). Caixas e etiquetas <span class="xtag">complemento</span> vão além da matéria dada na aula.</p>
+  </section>
+</article>
+
+<!-- ============================ 8.1 FEATURE IMPORTANCE ============================ -->
+<article class="page" data-page="importancia" data-num="8.1" data-title="Importância das features" data-desc="Global vs. local, agnóstica vs. específica do modelo.">
+  <header class="ph">
+    <h1>Importância das features<span class="en">Feature Importance</span></h1>
+    <p class="lede">A <strong>importância de uma feature</strong> mede o seu contributo para o desempenho preditivo do modelo, revelando que atributos têm mais impacto nos resultados.</p>
+  </header>
+
+  <section class="blk prose">
+    <p>Serve para perceber o modelo, mas também para o <strong>melhorar</strong>: orienta a seleção de features (manter as relevantes, retirar as inúteis), o que pode aumentar a accuracy e tornar o modelo mais eficiente.</p>
+
+    <h2><span class="sn">8.1.1</span>Global vs. local</h2>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Importância global</th><th>Importância local</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Âmbito</strong></td><td>O comportamento do <strong>modelo inteiro</strong>, em todas as previsões</td><td>Porque é que foi feita <strong>uma previsão concreta</strong>, para um exemplo</td></tr>
+        <tr><td><strong>Para quê</strong></td><td>Identificar as features mais influentes no modelo</td><td>Depurar uma previsão ou justificar uma decisão a uma pessoa</td></tr>
+        <tr><td><strong>Exemplo</strong></td><td>Um partial dependence plot mostra que o preço médio de um carro desce à medida que o número de reparações aumenta</td><td>Com LIME ou valores de Shapley, mostrar que um pedido de crédito foi recusado por dívida alta e baixa pontuação de crédito</td></tr>
+      </tbody></table></div>
+
+    <h2><span class="sn">8.1.2</span>Agnóstica vs. específica do modelo</h2>
+    <div class="tw"><table>
+      <thead><tr><th></th><th>Agnóstica do modelo</th><th>Específica do modelo</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Método</strong></td><td>Trata o modelo como uma <strong>caixa negra</strong>: altera as entradas e vê como a saída muda</td><td>Usa a <strong>estrutura interna</strong> do modelo</td></tr>
+        <tr><td><strong>Flexibilidade</strong></td><td>Aplica-se a <strong>qualquer</strong> modelo, seja qual for a arquitetura</td><td>Costuma ser <strong>mais eficiente</strong> no modelo para que foi feita</td></tr>
+        <tr><td><strong>Exemplos globais</strong></td><td>Importância por permutação (FPI)</td><td>Importância de Gini numa Random Forest</td></tr>
+        <tr><td><strong>Exemplos locais</strong></td><td>LIME, valores de Shapley</td><td>Analisar as ativações de um neurónio numa rede neuronal</td></tr>
+      </tbody></table></div>
+    <p>As três técnicas deste tema cobrem os quatro cantos com que mais se trabalha:</p>
+    <div class="three">
+      <div class="card"><span class="tag">MDI / Gini</span><p>Global · específica de árvores</p></div>
+      <div class="card"><span class="tag">Permutação</span><p>Global · agnóstica</p></div>
+      <div class="card"><span class="tag">SHAP</span><p>Local <em>e</em> global · agnóstica, com versões rápidas para árvores e modelos lineares</p></div>
+    </div>
+
+    <h3>Classifica a técnica</h3>
+    <div class="classify" data-options="Global,Local">
+      <div class="ci" data-answer="Local" data-why="Explica uma previsão de um só doente.">"Este tumor foi classificado como maligno sobretudo por causa da área e da concavidade."</div>
+      <div class="ci" data-answer="Global" data-why="Resume o modelo em todas as previsões.">"No modelo, as três features mais importantes são a área, o perímetro e a concavidade."</div>
+      <div class="ci" data-answer="Global" data-why="Um PDP mostra o efeito médio de uma feature em todo o conjunto.">Um partial dependence plot da idade</div>
+      <div class="ci" data-answer="Local" data-why="O waterfall de SHAP decompõe uma única previsão.">Um gráfico waterfall de SHAP para o cliente n.º 42</div>
+    </div>
+  </section>
+</article>
+
+<!-- ============================ 8.2 MDI ============================ -->
+<article class="page" data-page="mdi" data-num="8.2" data-title="Importância nas árvores (MDI)" data-desc="Mean Decrease in Impurity: o feature_importances_ das árvores.">
+  <header class="ph">
+    <h1>Importância nas árvores: MDI<span class="en">Mean Decrease in Impurity (Gini importance)</span></h1>
+    <p class="lede">Cada divisão de uma árvore reduz a impureza (Gini ou entropia). A <strong>importância MDI</strong> de uma feature é quanto essa feature reduziu a impureza, somado por todas as divisões em que foi usada e calculado em média sobre as árvores da floresta.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">8.2.1</span>No scikit-learn</h2>
+    <p>É o atributo <code>feature_importances_</code> do modelo treinado: fica disponível de graça, sem cálculos extra. Os valores estão normalizados e <strong>somam 1</strong>. O desvio padrão entre as árvores dá uma ideia de quanto varia.</p>
+    <pre><code class="language-python">mdi = pd.Series(rf.feature_importances_, index=X.columns).sort_values(ascending=False)
+std = pd.Series(np.std([t.feature_importances_ for t in rf.estimators_], axis=0), index=X.columns)
+pd.DataFrame({'mdi': mdi, 'std': std[mdi.index]}).head(5)</code></pre>
+    <pre data-title="Saída"><code class="language-text">                        mdi    std
+worst area            0.168  0.278
+mean concave points   0.111  0.226
+worst concave points  0.102  0.198
+worst radius          0.081  0.202
+worst perimeter       0.079  0.182</code></pre>
+    <div class="note"><span class="lbl">"Random Forest importance" e "MDI" são o mesmo número</span>
+      <p>Por vezes aparecem como se fossem dois métodos, mas no scikit-learn ambos são o <code>feature_importances_</code>: a importância de Gini <em>é</em> a redução média da impureza. O que muda é só a apresentação (com ou sem as barras de desvio padrão).</p></div>
+    <p>O desvio padrão é maior do que a própria média. Isso é normal numa Random Forest: cada árvore vê só uma parte das features em cada divisão, por isso uma árvore pode depender muito da área e outra quase nada.</p>
+
+    <h2><span class="sn">8.2.2</span>Limitações</h2>
+    <ul>
+      <li>É calculada sobre os <strong>dados de treino</strong>: mede o que a árvore usou para se ajustar, não o que ajuda a <strong>generalizar</strong>.</li>
+      <li>Tem um <strong>enviesamento a favor de features com muitos valores distintos</strong> (contínuas, ou categóricas com muitas categorias): têm mais pontos de corte possíveis, por isso entram em mais divisões, mesmo que por acaso.</li>
+    </ul>
+    <div class="note extra"><span class="lbl">Experiência: uma feature de puro ruído <span class="xtag">complemento</span></span>
+      <p>Acrescenta-se uma coluna de números aleatórios, sem qualquer relação com o target, e treina-se de novo:</p>
+      <pre><code class="language-python">rng = np.random.RandomState(0)
+X_tr2 = X_train.assign(ruido=rng.randn(len(X_train)))
+X_te2 = X_test.assign(ruido=rng.randn(len(X_test)))
+rf2 = RandomForestClassifier(n_estimators=100, random_state=42).fit(X_tr2, y_train)
+# MDI do ruído: 0.0055, 24.º lugar em 31: à frente de 7 features reais
+# importância por permutação do ruído: 0.0000</code></pre>
+      <p>A MDI dá ao ruído mais importância do que a 7 medidas reais do tumor. A importância por permutação, calculada no teste, dá-lhe exatamente zero.</p></div>
+  </section>
+</article>
+
+<!-- ============================ 8.3 PERMUTAÇÃO ============================ -->
+<article class="page" data-page="permutacao" data-num="8.3" data-title="Importância por permutação" data-desc="Baralhar uma feature e ver quanto o modelo piora.">
+  <header class="ph">
+    <h1>Importância por permutação<span class="en">Permutation Feature Importance</span></h1>
+    <p class="lede">Uma ideia simples e agnóstica: se uma feature é importante, <strong>baralhar os seus valores</strong> deve estragar as previsões. Quanto mais o desempenho cai, mais importante ela é.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">8.3.1</span>O algoritmo</h2>
+    <ol class="steps-list">
+      <li><div>Mede-se o desempenho do modelo já treinado num conjunto de avaliação (de preferência o de <strong>teste</strong>).</div></li>
+      <li><div>Baralham-se ao acaso os valores de <strong>uma</strong> coluna. Isto quebra a sua relação com o target e mantém a distribuição da coluna.</div></li>
+      <li><div>Mede-se de novo o desempenho. A <strong>queda</strong> é a importância dessa feature.</div></li>
+      <li><div>Repete-se várias vezes (<code>n_repeats</code>) e faz-se a média, porque cada baralhamento é aleatório. Depois passa-se à feature seguinte.</div></li>
+    </ol>
+    <div class="formula"><div class="cap">Importância da feature j <span class="xtag">complemento</span></div>\[I_j = s - \frac{1}{K}\sum_{k=1}^{K} s_{k,j}\]</div>
+    <p>Aqui \(s\) é o score original e \(s_{k,j}\) o score depois da k-ésima permutação da coluna \(j\). <strong>Não é preciso treinar de novo</strong>: o modelo fica igual, só mudam os dados de entrada.</p>
+    <p>Em relação à MDI, tem duas vantagens: <strong>não favorece features com muitos valores distintos</strong> e pode ser calculada num <strong>conjunto que o modelo não viu</strong>.</p>
+
+    <h2><span class="sn">8.3.2</span>No scikit-learn</h2>
+    <pre><code class="language-python">from sklearn.inspection import permutation_importance
+
+result = permutation_importance(rf, X_test, y_test, n_repeats=10, random_state=42)
+pi = pd.DataFrame({'mean': result.importances_mean, 'std': result.importances_std},
+                  index=X.columns).sort_values('mean', ascending=False)
+pi.head(5)</code></pre>
+    <pre data-title="Saída"><code class="language-text">                        mean     std
+worst area            0.0158  0.0064
+worst concave points  0.0117  0.0078
+worst perimeter       0.0053  0.0085
+worst concavity       0.0041  0.0027
+mean concavity        0.0041  0.0053</code></pre>
+    <p>Lê-se assim: baralhar a <code>worst area</code> faz a accuracy descer, em média, 1.6 pontos percentuais. O topo coincide em parte com a MDI (área e pontos côncavos), mas a ordem e os valores mudam.</p>
+    <div class="note warn"><span class="lbl">Metade das features com importância zero?</span>
+      <p>Aqui, 15 das 30 features têm importância ≤ 0. Não quer dizer que sejam inúteis. Este dataset tem grupos de features <strong>muito correlacionadas</strong> (raio, perímetro e área medem quase o mesmo). Quando se baralha uma delas, o modelo continua a ter as outras e quase não perde nada. A importância por permutação mede o que se perde ao tirar uma feature <em>mantendo as restantes</em>, por isso divide (ou anula) a importância entre features redundantes.</p></div>
+    <div class="note extra"><span class="lbl">Custo <span class="xtag">complemento</span></span>
+      <p>São necessárias \(n_\text{features}\times n_\text{repeats}\) passagens de previsão: aqui, 30 × 10 = 300. A MDI é instantânea. Com modelos lentos ou muitas features, a permutação pode demorar.</p></div>
+  </section>
+</article>
+
+<!-- ============================ 8.4 SHAP ============================ -->
+<article class="page" data-page="shap" data-num="8.4" data-title="SHAP" data-desc="Valores de Shapley: explicar cada previsão como uma soma.">
+  <header class="ph">
+    <h1>SHAP<span class="en">SHapley Additive exPlanations</span></h1>
+    <p class="lede">O SHAP vem da <strong>teoria dos jogos</strong>. As features são "jogadores" que cooperam para produzir a previsão, e o valor de Shapley reparte essa previsão <strong>de forma justa</strong> entre eles.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">8.4.1</span>A ideia</h2>
+    <p>Cada previsão é decomposta numa <strong>soma</strong>: parte-se da previsão média do modelo e cada feature empurra para cima ou para baixo. Daí o "additive" no nome.</p>
+    <div class="formula"><div class="cap">Propriedade aditiva</div>\[f(x) \;=\; \underbrace{\mathbb{E}[f(X)]}_{\text{valor base}} \;+\; \sum_{j=1}^{p} \phi_j(x)\]</div>
+    <ul>
+      <li>\(\phi_j(x) &gt; 0\): a feature \(j\) <strong>aumenta</strong> a previsão para este exemplo; \(\phi_j(x) &lt; 0\): <strong>diminui</strong>.</li>
+      <li>O mesmo cálculo dá uma explicação <strong>local</strong> (os \(\phi_j\) de um exemplo) e, fazendo a média de \(|\phi_j|\) sobre muitos exemplos, uma explicação <strong>global</strong>.</li>
+      <li>Como reparte o efeito pela distribuição dos valores das features, e não por médias ou contagens simples, capta melhor as <strong>interações</strong>. Isso ajuda também a detetar e mitigar <strong>enviesamentos</strong> do modelo.</li>
+    </ul>
+    <div class="formula"><div class="cap">Valor de Shapley <span class="xtag">complemento</span></div>\[\phi_j=\sum_{S\subseteq F\setminus\{j\}}\frac{|S|!\,(p-|S|-1)!}{p!}\Big[v(S\cup\{j\})-v(S)\Big]\]</div>
+    <p class="extra"><span class="xtag">complemento</span> Em palavras: imagina as features a "chegar" uma a uma, por todas as ordens possíveis. Em cada ordem, a feature \(j\) recebe o que acrescentou à previsão quando chegou (\(v(S\cup\{j\})-v(S)\), em que \(v(S)\) é a previsão esperada conhecendo só as features de \(S\)). O valor de Shapley é a média desse contributo sobre todas as ordens.</p>
+    <div class="widget" data-widget="shapley"></div>
+    <div class="note extra"><span class="lbl">Porque é que o SHAP precisa de "explainers" <span class="xtag">complemento</span></span>
+      <p>Com \(p\) features há \(2^p\) subconjuntos: com 30 features, mais de mil milhões. Por isso o SHAP tem algoritmos próprios para cada família de modelos:</p>
+      <ul>
+        <li><code>TreeExplainer</code>: exato e rápido para árvores, Random Forest e XGBoost.</li>
+        <li><code>LinearExplainer</code>: exato para modelos lineares.</li>
+        <li><code>KernelExplainer</code>: qualquer modelo (agnóstico), por amostragem e lento.</li>
+      </ul></div>
+
+    <h2><span class="sn">8.4.2</span>Explicação local: um tumor</h2>
+    <pre><code class="language-python">import shap
+
+explainer = shap.TreeExplainer(rf)
+sv = explainer(X_test)               # forma (171, 30, 2): exemplos × features × classes
+sv.base_values[0, 1]                 # 0.374  ← valor base para a classe 1 (maligno)
+
+i = 0
+rf.predict_proba(X_test.iloc[[i]])[0, 1]   # 0.05  ← P(maligno) prevista
+shap.plots.waterfall(sv[i, :, 1])          # gráfico da decomposição</code></pre>
+    <pre data-title="Os maiores contributos para o tumor 0 (benigno na realidade)"><code class="language-text">feature                 valor     φ (SHAP)
+mean concave points     0.029    -0.0673
+worst concave points    0.096    -0.0477
+worst perimeter       108.100    -0.0470
+worst area            830.500    -0.0345
+worst concavity         0.378    +0.0303
+worst radius           16.300    -0.0252
+restantes 24 features            -0.1328</code></pre>
+    <p>Somando: 0.374 − 0.067 − 0.048 − 0.047 − 0.035 + 0.030 − 0.025 − 0.133 = <strong>0.050</strong>, exatamente a probabilidade prevista. Em palavras: "o modelo partiu de 37% (a proporção típica de malignos) e desceu para 5% sobretudo porque o tumor tem poucos pontos côncavos e um perímetro e uma área moderados. A concavidade é a única medida que puxou um pouco para cima."</p>
+    <div class="note"><span class="lbl">Classificadores: escolher a classe</span>
+      <p>No <code>RandomForestClassifier</code>, os valores SHAP têm uma dimensão a mais, uma por classe. <code>sv[i, :, 1]</code> explica a probabilidade da classe 1. Na classe 0, os valores são simétricos.</p></div>
+
+    <h2><span class="sn">8.4.3</span>Explicação global</h2>
+    <pre><code class="language-python">shap.plots.bar(sv[:, :, 1])        # média de |φ| por feature
+shap.plots.beeswarm(sv[:, :, 1])   # um ponto por exemplo: posição = φ, cor = valor da feature</code></pre>
+    <pre data-title="Média de |φ| (Random Forest)"><code class="language-text">worst area              0.0774
+mean concave points     0.0548
+worst concave points    0.0545
+worst perimeter         0.0460
+worst radius            0.0391</code></pre>
+    <p>O topo bate certo com a MDI. A diferença é que cada barra resulta de explicações individuais, que se podem abrir uma a uma.</p>
+
+    <h2><span class="sn">8.4.4</span>Feature a feature: dependência e PDP</h2>
+    <p>Um <strong>gráfico de dispersão</strong> (<code>shap.plots.scatter</code>) põe, para uma feature, o seu valor no eixo x e o seu \(\phi\) no eixo y, com um ponto por exemplo. Mostra <strong>em que sentido</strong> e <strong>a partir de que valores</strong> a feature empurra a previsão.</p>
+    <pre><code class="language-python">shap.plots.scatter(sv[:, 'worst concave points', 1])</code></pre>
+    <p>Aqui, a correlação entre o valor e o \(\phi\) de <code>worst concave points</code> é <strong>0.86</strong>: valores baixos puxam para benigno e valores altos (acima de ≈ 0.10, a mediana) puxam para maligno. É o tipo de leitura que se faz em problemas de tabela, como "ter menos de 10 anos aumentava a probabilidade de sobreviver".</p>
+    <p>Um <strong>partial dependence plot (PDP)</strong> é uma ferramenta global: mostra como a previsão <strong>média</strong> do modelo muda quando se varia uma feature, mantendo as outras como estão nos dados.</p>
+    <pre><code class="language-python">shap.partial_dependence_plot('worst concave points', lambda d: rf.predict_proba(d)[:, 1], X_train,
+                             ice=False, model_expected_value=True, feature_expected_value=True)</code></pre>
+
+    <h2><span class="sn">8.4.5</span>Num modelo linear</h2>
+    <p>Para um modelo linear com features independentes, o valor de Shapley tem uma forma fechada:</p>
+    <div class="formula"><div class="cap">SHAP de um modelo linear <span class="xtag">complemento</span></div>\[\phi_j(x)=\beta_j\,\big(x_j-\mathbb{E}[x_j]\big)\]</div>
+    <p>O coeficiente diz quanto vale cada unidade; o desvio face à média diz quantas unidades este exemplo tem a mais ou a menos.</p>
+    <pre><code class="language-python">from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+
+sc = StandardScaler().fit(X_train)
+Xs_train = pd.DataFrame(sc.transform(X_train), columns=X.columns)
+Xs_test  = pd.DataFrame(sc.transform(X_test),  columns=X.columns)
+lr = LogisticRegression(max_iter=1000, random_state=42).fit(Xs_train, y_train)   # accuracy 0.971
+
+lexp = shap.LinearExplainer(lr, shap.maskers.Independent(Xs_train, max_samples=len(Xs_train)))
+lsv = lexp(Xs_test)
+j = X.columns.get_loc('worst texture')
+lsv.values[0, j]                                              # 0.5597
+lr.coef_[0, j] * (Xs_test.iloc[0, j] - Xs_train.iloc[:, j].mean())   # 0.5597  ← igual</code></pre>
+    <div class="note warn"><span class="lbl">Unidades diferentes</span>
+      <p>Na regressão logística, o SHAP explica o <strong>log-odds</strong> (a saída antes da sigmoide), e não a probabilidade: o valor base é −0.348 e a soma para o tumor 0 dá −2.057, que é o <code>decision_function</code>. Por isso, os \(\phi\) de modelos diferentes <strong>não se comparam pelo tamanho</strong>, só pela ordem.</p></div>
+    <div class="note extra"><span class="lbl">Regressão linear num target 0/1 <span class="xtag">complemento</span></span>
+      <p>Também se pode explicar uma <code>LinearRegression</code> treinada num target binário (sobreviveu sim/não, por exemplo), e o SHAP funciona da mesma forma. Mas, para classificar, a regressão logística é o modelo mais adequado: as previsões ficam entre 0 e 1 e os coeficientes têm uma leitura em odds.</p></div>
+  </section>
+</article>
+
+<!-- ============================ 8.5 COMPARAR ============================ -->
+<article class="page" data-page="comparar" data-num="8.5" data-title="Comparar modelos e métodos" data-desc="Random Forest, regressão logística e XGBoost lado a lado.">
+  <header class="ph">
+    <h1>Comparar modelos e métodos</h1>
+    <p class="lede">Três modelos com accuracy quase igual podem justificar as decisões com features diferentes. Comparar as explicações é tão útil como comparar as métricas.</p>
+  </header>
+
+  <section class="blk prose">
+    <h2><span class="sn">8.5.1</span>O mesmo problema, cinco rankings</h2>
+    <pre><code class="language-python">from xgboost import XGBClassifier
+
+xgb = XGBClassifier(n_estimators=200, max_depth=3, learning_rate=0.1, random_state=42,
+                    eval_metric='logloss').fit(X_train, y_train)     # accuracy 0.977
+xsv = shap.TreeExplainer(xgb)(X_test)
+pd.Series(np.abs(xsv.values).mean(0), index=X.columns).nlargest(3)</code></pre>
+    <div class="tw"><table>
+      <thead><tr><th>Modelo · método</th><th>Accuracy</th><th>Top 3</th></tr></thead>
+      <tbody>
+        <tr><td>Random Forest · MDI</td><td rowspan="3">0.965</td><td>worst area, mean concave points, worst concave points</td></tr>
+        <tr><td>Random Forest · permutação</td><td>worst area, worst concave points, worst perimeter</td></tr>
+        <tr><td>Random Forest · SHAP</td><td>worst area, mean concave points, worst concave points</td></tr>
+        <tr><td>Regressão logística · SHAP</td><td>0.971</td><td>worst texture, radius error, worst symmetry</td></tr>
+        <tr><td>XGBoost · SHAP</td><td>0.977</td><td>mean concave points, area error, worst concavity</td></tr>
+      </tbody></table></div>
+
+    <h2><span class="sn">8.5.2</span>Como ler isto</h2>
+    <details class="ans"><summary>Porque é que os rankings diferem? Pensa primeiro, depois abre</summary>
+      <div>
+        <ul>
+          <li><strong>Na mesma Random Forest</strong>, os três métodos concordam no essencial (área e pontos côncavos). As diferenças vêm do que cada um mede: o uso no treino (MDI), a perda no teste (permutação) e a contribuição por previsão (SHAP).</li>
+          <li><strong>Entre modelos</strong>, o topo muda porque há <strong>features redundantes</strong>. Área, raio e perímetro trazem quase a mesma informação, e cada modelo "escolhe" uma delas: o modelo pode trocar uma pela outra sem perder desempenho.</li>
+          <li>A importância é <strong>do modelo, não do fenómeno</strong>: diz em que é que o modelo se apoia, não o que causa a malignidade.</li>
+        </ul>
+      </div>
+    </details>
+    <details class="ans"><summary>Qual é o modelo mais interpretável?</summary>
+      <div>
+        <ul>
+          <li>A <strong>regressão logística</strong> é interpretável por natureza: cada coeficiente é o efeito de uma feature, igual para todos os exemplos, e o SHAP é só \(\beta_j(x_j-\bar x_j)\).</li>
+          <li>A <strong>Random Forest</strong> e o <strong>XGBoost</strong> captam interações e não-linearidades, mas são caixas negras: precisam de MDI, permutação ou SHAP para se explicarem.</li>
+          <li>Neste dataset, a logística tem praticamente a mesma accuracy (0.971 contra 0.965 e 0.977). Quando a diferença de desempenho é pequena, o modelo mais simples de explicar é muitas vezes a melhor escolha.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+</article>
+
+<!-- ============================ Σ REVISÃO ============================ -->
+<article class="page" data-page="revisao" data-num="Σ" data-title="Revisão rápida" data-desc="Resumo, armadilhas e perguntas para testar.">
+  <header class="ph">
+    <h1>Revisão rápida</h1>
+    <p class="lede">O essencial do tema numa página, seguido de perguntas para confirmar que ficou.</p>
+  </header>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.1</span>Folha de resumo</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Técnica</th><th>Tipo</th><th>Mede</th><th>Código</th></tr></thead>
+      <tbody>
+        <tr><td><strong>MDI / Gini</strong></td><td>Global · específica (árvores)</td><td>Redução de impureza no treino, soma 1</td><td><code>rf.feature_importances_</code></td></tr>
+        <tr><td><strong>Permutação</strong></td><td>Global · agnóstica</td><td>Queda do score ao baralhar a feature</td><td><code>permutation_importance(m, X_test, y_test)</code></td></tr>
+        <tr><td><strong>SHAP local</strong></td><td>Local · agnóstica</td><td>\(f(x)=\text{base}+\sum\phi_j\)</td><td><code>shap.plots.waterfall(sv[i])</code></td></tr>
+        <tr><td><strong>SHAP global</strong></td><td>Global</td><td>Média de \(|\phi_j|\)</td><td><code>shap.plots.bar</code>, <code>beeswarm</code></td></tr>
+        <tr><td><strong>Dependência / PDP</strong></td><td>Global, por feature</td><td>Efeito do valor de uma feature</td><td><code>shap.plots.scatter</code>, <code>partial_dependence_plot</code></td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">Σ.2</span>Armadilhas frequentes</h2>
+    <ul>
+      <li><strong>Importância não é causalidade.</strong> Diz em que é que o modelo se apoia, não o que causa o resultado.</li>
+      <li><strong>Identificadores como features.</strong> Um <code>PassengerId</code> ou um número de cliente não tem significado. Se aparecer como importante numa explicação, é sinal de um problema nos dados (ordem, fuga de informação), não de um padrão real. Remove-se antes de treinar.</li>
+      <li><strong>Features correlacionadas</strong> dividem a importância entre si. Na permutação, cada uma pode até parecer inútil.</li>
+      <li><strong>A MDI é calculada no treino</strong> e favorece features com muitos valores distintos.</li>
+      <li><strong>Escalas de SHAP diferentes</strong> (probabilidade vs. log-odds) não se comparam pelo tamanho entre modelos.</li>
+      <li>Num classificador, escolher a <strong>classe</strong> certa nos valores SHAP (<code>sv[:, :, 1]</code>).</li>
+    </ul>
+  </section>
+
+  <section class="blk">
+    <h2><span class="sn">Σ.3</span>Perguntas de escolha múltipla</h2>
+    <div data-quizset style="display:flex;flex-direction:column;gap:12px">
+      <div class="quiz">
+        <p class="qq">Um banco tem de explicar a um cliente porque é que o seu crédito foi recusado. Que tipo de explicação precisa?</p>
+        <div class="opts"><button>Global, com a importância MDI</button><button data-ok>Local, por exemplo com valores SHAP desse cliente</button><button>O valor da accuracy do modelo</button></div>
+        <p class="why">Uma explicação local justifica uma decisão concreta; a global descreve o modelo em geral.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">O que é a importância por permutação de uma feature?</p>
+        <div class="opts"><button>A redução média da impureza nas divisões que a usam</button><button data-ok>A queda do desempenho quando os valores dessa feature são baralhados</button><button>O coeficiente da feature num modelo linear</button></div>
+        <p class="why">Baralhar quebra a relação com o target; a queda do score mede quanto o modelo dependia dela. O modelo não é treinado de novo.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual é uma vantagem da importância por permutação sobre a MDI?</p>
+        <div class="opts"><button>É instantânea, sem qualquer cálculo extra</button><button data-ok>Pode ser calculada no conjunto de teste e não favorece features com muitos valores distintos</button><button>Só funciona em árvores, por isso é mais precisa</button></div>
+        <p class="why">A MDI é calculada no treino e é enviesada para features com muitos pontos de corte. A permutação é agnóstica e mede a generalização.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Num tumor, o valor base do SHAP é 0.37 e a soma dos \(\phi\) é −0.32. Qual é a previsão do modelo?</p>
+        <div class="opts"><button>0.37</button><button data-ok>0.05</button><button>−0.32</button></div>
+        <p class="why">Pela propriedade aditiva, f(x) = valor base + Σφ = 0.37 − 0.32 = 0.05.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">O que significa um valor SHAP negativo para uma feature num exemplo?</p>
+        <div class="opts"><button>A feature tem um valor negativo</button><button data-ok>Neste exemplo, a feature puxou a previsão para baixo face à média</button><button>A feature é inútil para o modelo</button></div>
+        <p class="why">O sinal do φ é o sentido do contributo face ao valor base, não o sinal do valor da feature.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Raio, perímetro e área de um tumor estão muito correlacionados. O que se espera na importância por permutação de cada um?</p>
+        <div class="opts"><button>Que seja muito alta para os três</button><button data-ok>Que seja baixa, porque o modelo compensa com as outras quando se baralha uma</button><button>Que seja sempre negativa</button></div>
+        <p class="why">Ao baralhar uma feature redundante, a informação continua disponível nas outras, por isso o score quase não cai.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Numa Random Forest, a MDI dá a uma coluna de números aleatórios uma importância maior do que a algumas features reais. Porquê?</p>
+        <div class="opts"><button data-ok>A MDI é calculada no treino e favorece features contínuas, que oferecem muitos pontos de corte</button><button>A coluna aleatória tem realmente informação sobre o target</button><button>A Random Forest ignora as features reais</button></div>
+        <p class="why">Com muitos valores distintos, há sempre algum corte que reduz a impureza por acaso no treino. No teste, essa "importância" não se mantém.</p>
+      </div>
+      <div class="quiz">
+        <p class="qq">Qual destas técnicas é agnóstica do modelo?</p>
+        <div class="opts"><button>A importância de Gini</button><button data-ok>A importância por permutação</button><button>As ativações de um neurónio</button></div>
+        <p class="why">A permutação só precisa de fazer previsões; a importância de Gini usa a estrutura interna das árvores.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="blk prose">
+    <h2><span class="sn">Σ.4</span>Exercício</h2>
+    <p>Com o dataset <code>load_wine</code> (3 classes de vinho, 13 features): treina uma Random Forest e uma regressão logística e responde:</p>
+    <ol>
+      <li>Quais são as três features mais importantes segundo a MDI e segundo a permutação no teste? Coincidem?</li>
+      <li>Para um vinho do teste, que features mais contribuíram para a classe prevista, segundo o SHAP?</li>
+      <li>Os dois modelos apoiam-se nas mesmas features? Qual achas mais fácil de explicar a um enólogo?</li>
+    </ol>
+    <details class="ans"><summary>Pistas</summary>
+      <div>
+        <ul>
+          <li>Com 3 classes, os valores SHAP da Random Forest têm forma <code>(n, 13, 3)</code>: escolhe a coluna da classe prevista, <code>sv[i, :, classe]</code>.</li>
+          <li>Na regressão logística multiclasse há um conjunto de coeficientes por classe. Normaliza as features antes de comparar coeficientes.</li>
+          <li>Se o topo mudar entre métodos, procura features correlacionadas com <code>X.corr()</code>.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+</article>
+
+</main>
+</div>
+<script src="../assets/vendor/katex/katex.min.js" defer></script>
+<script src="../assets/vendor/katex/contrib/auto-render.min.js" defer></script>
+<script src="../assets/js/catalog.js" defer></script>
+<script src="../assets/js/widgets.js" defer></script>
+<script src="../assets/js/i18n.js" defer></script>
+<script src="../assets/js/app.js" defer></script>
+</body>
+</html>

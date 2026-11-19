@@ -20,8 +20,8 @@ window.CATALOG = {
       en: 'Data and Machine Learning',
       year: '2026/2027',
       hue: 172,
-      desc: 'Fundamentos de ciência de dados e Machine Learning: estatística descritiva, validação de modelos, preparação de dados, regressão, feature engineering, árvores de decisão e ensembles.',
-      desc_en: 'Foundations of data science and Machine Learning: descriptive statistics, model validation, data preparation, regression, feature engineering, decision trees and ensembles.',
+      desc: 'Fundamentos de ciência de dados e Machine Learning: estatística descritiva, validação de modelos, preparação de dados, regressão, feature engineering, árvores de decisão, ensembles e interpretabilidade de modelos.',
+      desc_en: 'Foundations of data science and Machine Learning: descriptive statistics, model validation, data preparation, regression, feature engineering, decision trees, ensembles and model interpretability.',
       staff: 'Filipa Ferraz, Victor Alves, Dalila Durães, Francisco Marcondes, Guilherme Barbosa',
       topics: [
         { id: '01', file: '01-data-science-concepts.html', title: 'Conceitos de Ciência de Dados', en: 'Introduction to Data Science Concepts', status: 'ready', source: 'DAA_PL_1' },
@@ -30,7 +30,11 @@ window.CATALOG = {
         { id: '04', file: '04-regression.html', title: 'Regressão Linear e Logística', en: 'Linear and Logistic Regression', status: 'ready', source: 'DAA_PL_4' },
         { id: '05', file: '05-feature-engineering.html', title: 'Feature Engineering', en: 'Feature Engineering', status: 'ready', source: 'DAA_PL_5' },
         { id: '06', file: '06-decision-trees.html', title: 'Poda de Árvores e Afinação de Hiperparâmetros', en: 'Decision Tree Pruning and Hyperparameter Tuning', status: 'ready', source: 'DAA_PL_5' },
-        { id: '07', file: '07-ensemble-learning.html', title: 'Ensemble Learning', en: 'Ensemble Learning', status: 'ready', source: 'DAA_PL_6' }
+        { id: '07', file: '07-ensemble-learning.html', title: 'Ensemble Learning', en: 'Ensemble Learning', status: 'ready', source: 'DAA_PL_6' },
+        { id: '08', file: '08-interpretability.html', title: 'Interpretabilidade e Explicabilidade', en: 'Interpretability and Explainability', status: 'ready', source: 'DAA_PL_7' },
+        { id: '09', file: '09-neural-networks.html', title: 'Redes Neuronais: Multilayer Perceptron', en: 'Artificial Neural Networks: Multilayer Perceptron', status: 'soon', source: 'DAA_PL_8' },
+        { id: '10', file: '10-unsupervised.html', title: 'Aprendizagem Não Supervisionada: Clustering e Autoencoders', en: 'Unsupervised Learning: Clustering and Autoencoders', status: 'soon', source: 'DAA_PL_9' },
+        { id: '11', file: '11-svm.html', title: 'Support Vector Machines', en: 'Support Vector Machines', status: 'soon', source: 'DAA_PL_10' }
       ]
     },
     {
